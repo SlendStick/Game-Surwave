@@ -189,11 +189,14 @@ static func button(parent: Node, text: String, size: int = 10, min_size: Vector2
 	b.add_theme_constant_override("shadow_offset_y", 1)
 	b.add_theme_constant_override("outline_size", 2)
 	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	var normal := stone_box(Color(0.10, 0.082, 0.062, 0.45), Color(0.32, 0.25, 0.14, 0.55))
-	var hover := stone_box(Color(0.20, 0.16, 0.10, 0.95), GOLD_DEEP)
-	hover.shadow_color = Color(0.78, 0.60, 0.20, 0.20)
-	hover.shadow_size = 4
-	var pressed := stone_box(Color(0.06, 0.05, 0.04, 1.0), GOLD)
+	var normal := stone_box(Color(0.11, 0.095, 0.075, 0.78), Color(0.38, 0.31, 0.20, 0.72))
+	normal.shadow_color = Color(0, 0, 0, 0.45)
+	normal.shadow_size = 3
+	normal.shadow_offset = Vector2(0, 1)
+	var hover := stone_box(Color(0.22, 0.17, 0.11, 0.96), GOLD)
+	hover.shadow_color = Color(0.78, 0.60, 0.20, 0.26)
+	hover.shadow_size = 5
+	var pressed := stone_box(Color(0.07, 0.055, 0.045, 1.0), GOLD_BRIGHT)
 	b.add_theme_stylebox_override("normal", normal)
 	b.add_theme_stylebox_override("hover", hover)
 	b.add_theme_stylebox_override("pressed", pressed)

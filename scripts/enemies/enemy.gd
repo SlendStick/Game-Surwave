@@ -151,6 +151,11 @@ func visual_class() -> String:
 		if Assets.has_real_sprite(id):
 			return id
 		return "mb"
+	var mid := String(game.map_data.get("id", "")) if (game != null and game.map_data is Dictionary) else ""
+	if mid != "":
+		var themed := "%s__%s" % [id, mid]
+		if Assets.has_real_sprite(themed):
+			return themed
 	return id
 
 func _base_modulate() -> Color:

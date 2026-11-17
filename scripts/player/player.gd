@@ -776,13 +776,16 @@ func _finish_reload() -> void:
 	if upg.flag_num("reload_pillar") > 0.0:
 		game.aoe_damage(global_position, 96.0, upg.flag_num("reload_pillar"), {"holy": true, "source": "dawn"})
 		game.spawn_fx(global_position, Color(1, 0.95, 0.6), 96.0, 0.5)
+		game.spawn_perk_fx("holy", global_position, 82.0, 0.36)
 	if upg.flag_num("arrow_rain_reload") > 0.0:
 		game.aoe_damage(global_position, upg.flag_num("arrow_rain_reload"), current_damage() * 0.6, {"source": "arrow_rain"})
+		game.spawn_perk_fx("wind", global_position, 64.0, 0.32)
 	var behavior := String(weapon.get("behavior", "straight"))
 	if behavior == "blade":
 		var radius := 48.0 * (1.0 + upg.flag_num("circle_radius"))
 		var hit: int = game.aoe_damage(global_position, radius, 24.0 * dmg_multiplier(), {"source": "circle"})
 		game.spawn_fx(global_position, Color(0.9, 0.95, 1.0), radius, 0.25)
+		game.spawn_perk_fx("blood", global_position, radius * 1.15, 0.28)
 		if upg.flag_on("circle_heal") and hit > 0:
 			heal(1)
 		for i in int(upg.flag_num("orbit_blades")):
@@ -790,9 +793,11 @@ func _finish_reload() -> void:
 	if behavior == "arrow":
 		for pos in stuck_arrows:
 			game.aoe_damage(pos, 26.0, current_damage() * 0.8, {"source": "arrow_return"})
+			game.spawn_perk_fx("wind", pos, 34.0, 0.24)
 		stuck_arrows.clear()
 	if behavior == "orb":
 		game.explode_orbs(current_damage() * 2.0)
+		game.spawn_perk_fx("curse", global_position, 56.0, 0.30)
 	if upg.flag_num("resonance") > 0.0:
 		set_timer("buff_fire_rate", 2.0)
 		stacks["buff_fire_rate"] = float(stacks.get("buff_fire_rate", 0.0)) + upg.flag_num("resonance")
@@ -928,8 +933,16 @@ func _shoot() -> void:
 		var angle := 0.0
 		if pellets > 1 and spread > 0.0:
 			angle = deg_to_rad(spread) * (float(i) / float(pellets - 1) - 0.5)
+		if behavior == "orb":
+			angle += deg_to_rad(10.0 if (shots_fired % 2 == 0) else -10.0)
 		var dir := aim_dir.rotated(angle + deg_to_rad(randf_range(-1.5, 1.5)))
-		game.spawn_bullet(global_position + dir * 10.0, dir, dmg, opts)
+		var p_opts := opts
+		if behavior == "shotgun":
+			p_opts = opts.duplicate()
+			p_opts["speed"] = float(opts.get("speed", 400.0)) * randf_range(0.88, 1.14)
+		game.spawn_bullet(global_position + dir * 10.0, dir, dmg, p_opts)
+	if is_crit:
+		AudioManager.play_sfx("crit", randf_range(0.96, 1.06))
 	# «Перегрузка» (Вольтра): лазер бьёт несколько раз за один выстрел
 	if upg.flag_num("triple_shot") > 0.0:
 		var extra_beams := maxi(0, int(upg.flag_num("triple_shot")) - 1)
@@ -960,9 +973,13 @@ func _shoot() -> void:
 
 func _shot_sfx() -> String:
 	match String(weapon.get("behavior", "straight")):
-		"fireball", "orb", "curse":
+		"fireball", "orb", "curse", "homing", "gas":
 			return "shot_magic"
-		"grenade", "hammer":
+		"lightning":
+			return "shot_lightning"
+		"arrow":
+			return "shot_bow"
+		"grenade", "hammer", "shotgun":
 			return "shot_heavy"
 		_:
 			return "shot"
@@ -1079,9 +1096,11 @@ func _use_skill() -> void:
 			var target := global_position + (aim_pos - global_position).normalized() * float(p.get("distance", 128.0))
 			target = game.clamp_to_map(target)
 			var from := global_position
-			game.spawn_hazard_zone(from.lerp(target, 0.5), float(p.get("trail_dps", 4.0)) * dmg_multiplier(), float(p.get("trail_dur", 2.0)), 26.0, Color(1, 0.5, 0.2))
+			game.spawn_hazard_zone(from.lerp(target, 0.5), float(p.get("trail_dps", 4.0)) * dmg_multiplier(), float(p.get("trail_dur", 2.0)), 26.0, Color(1, 0.5, 0.2), {"pattern": "fire"})
 			global_position = target
 			game.spawn_fx(target, Color(1.0, 0.7, 0.3), 30.0, 0.25)
+			game.spawn_perk_fx("fireball", from, 36.0, 0.25)
+			game.spawn_perk_fx("fireball", target, 46.0, 0.30)
 		"divine_shield":
 			if upg.flag_on("skill_spear"):
 				# «Святое Копьё»: вместо щита — мощный пронзающий снаряд
@@ -1090,19 +1109,23 @@ func _use_skill() -> void:
 					{"speed": 420.0, "pierce": int(p.get("spear_pierce", 5)), "radius": 6.0, "life": 2.0,
 					 "color": Color(1, 0.95, 0.5), "source": "smite", "holy": true})
 				game.spawn_fx(global_position, Color(1, 0.95, 0.5), 30.0, 0.25)
+				game.spawn_perk_fx("holy", global_position, 44.0, 0.28)
 			else:
 				shield_charges = int(p.get("absorb", 2))
 				shield_recharge_left = float(p.get("duration", 5.0))
 				game.spawn_fx(global_position, Color(1, 0.85, 0.3), 48.0, 0.4)
+				game.spawn_perk_fx("holy", global_position, 56.0, 0.36)
 		"dark_harvest":
 			harvest_left = float(p.get("duration", 5.0))
 			harvest_zones = 0
 			game.spawn_hazard_zone(aim_pos, float(p.get("dps", 3.0)) * dmg_multiplier(),
 				float(p.get("duration", 5.0)), float(p.get("radius", 32.0)), Color(0.4, 0.1, 0.6),
-				{"slow": float(p.get("slow", 0.3))})
+				{"slow": float(p.get("slow", 0.3)), "pattern": "void"})
+			game.spawn_perk_fx("curse", aim_pos, 56.0, 0.35)
 		"berserk":
 			berserk_left = float(p.get("duration", 8.0))
 			game.spawn_fx(global_position, Color(1, 0.35, 0.1), 48.0, 0.35)
+			game.spawn_perk_fx("blood", global_position, 56.0, 0.35)
 		"arrow_rain":
 			# «Град Стрел» (Лиэль): веер стрел по кругу; поддерживаем и count, и arrows
 			var ar: Dictionary = p
@@ -1113,6 +1136,7 @@ func _use_skill() -> void:
 					{"speed": float(ar.get("speed", 240.0)), "radius": 3.0, "life": float(ar.get("life", 2.5)),
 					 "color": Color(0.45, 1.0, 0.35), "source": "arrow_rain"})
 			game.spawn_fx(global_position, Color(0.45, 1.0, 0.35), 40.0, 0.25)
+			game.spawn_perk_fx("wind", global_position, 54.0, 0.32)
 		"shadow_dash":
 			var from_pos := global_position
 			var to_pos: Vector2 = game.clamp_to_map(global_position + (aim_pos - global_position).normalized() * float(p.get("distance", 192.0)))
@@ -1120,18 +1144,21 @@ func _use_skill() -> void:
 				game.damage_enemy(enemy, float(p.get("damage", 6.0)) * dmg_multiplier(), {"source": "shadow_dash"})
 			global_position = to_pos
 			dash_buff_double = true
+			AudioManager.play_sfx("dash", 1.0)
 			game.spawn_fx(from_pos, Color(0.05, 0.05, 0.05), 30.0, 0.2)
 			game.spawn_fx(to_pos, Color(0.05, 0.05, 0.05), 30.0, 0.2)
+			game.spawn_perk_fx("curse", to_pos, 48.0, 0.28)
 			if upg.flag_num("shadow_clones") > 0.0:
 				for i in int(upg.flag_num("shadow_clones")):
 					game.spawn_ally("shadow_clone", {"damage": 3.0 * float(S.summon_dmg), "duration": 5.0})
 		"gravity_gun":
 			game.pull_enemies(aim_pos, float(p.get("radius", 192.0)), float(p.get("force", 100.0)), float(p.get("duration", 3.0)))
 			game.spawn_fx(aim_pos, Color(0.58, 0.0, 0.83), float(p.get("radius", 192.0)), 0.4)
+			game.spawn_perk_fx("curse", aim_pos, 72.0, 0.40)
 			if upg.flag_on("skill_blackhole"):
 				# «Чёрная Дыра»: зона урона вместо пушки
 				game.spawn_hazard_zone(aim_pos, 10.0 * dmg_multiplier(), 5.0, float(p.get("radius", 192.0)) * 0.5,
-					Color(0.15, 0.0, 0.25), {})
+					Color(0.15, 0.0, 0.25), {"pattern": "void"})
 		"aimed_shot":
 			var adir := aim_dir
 			var count_aimed := int(upg.flag_num("aimed_triple", 1))
@@ -1141,18 +1168,22 @@ func _use_skill() -> void:
 					{"speed": float(p.get("speed", 640.0)), "pierce": int(p.get("pierce", 10)), "radius": 8.0,
 					 "life": float(p.get("life", 3.0)), "color": Color(1, 0.85, 0.2), "source": "aimed", "crit": true})
 			game.spawn_fx(global_position, Color(1, 0.85, 0.2), 30.0, 0.25)
+			game.spawn_perk_fx("holy", global_position, 44.0, 0.26)
 		"firestorm":
 			game.spawn_hazard_zone(aim_pos, float(p.get("dps", 8.0)) * dmg_multiplier(), float(p.get("duration", 4.0)),
-				float(p.get("radius", 96.0)), Color(1, 0.35, 0.1), {"burn": float(p.get("dps", 8.0)) if upg.flag_on("napalm") else 0.0})
+				float(p.get("radius", 96.0)), Color(1, 0.35, 0.1), {"burn": float(p.get("dps", 8.0)) if upg.flag_on("napalm") else 0.0, "pattern": "fire"})
 			game.spawn_fx(aim_pos, Color(1, 0.35, 0.1), float(p.get("radius", 96.0)), 0.4)
+			game.spawn_perk_fx("fireball", aim_pos, float(p.get("radius", 96.0)) * 0.85, 0.40)
 		"divine_wave":
 			game.aoe_damage(global_position, float(p.get("radius", 96.0)), float(p.get("damage", 20.0)) * dmg_multiplier(), {"holy": true, "source": "divine"})
 			kills_retribution += 0
 			game.spawn_fx(global_position, Color(1, 1, 0.8), float(p.get("radius", 96.0)), 0.35)
+			game.spawn_perk_fx("holy", global_position, float(p.get("radius", 96.0)) * 0.9, 0.38)
 		"raise_skeleton":
 			var corpse: Vector2 = game.pop_corpse()
 			var pos := corpse if corpse != Vector2.INF else global_position + Vector2.RIGHT * 20.0
 			game.spawn_ally("skeleton", {"damage": float(p.get("damage", 6.0)) * float(S.summon_dmg), "duration": float(p.get("duration", 15.0)), "pos": pos})
+			game.spawn_perk_fx("curse", pos, 36.0, 0.30)
 		"blood_storm":
 			var count := mag
 			mag = 0
@@ -1160,29 +1191,39 @@ func _use_skill() -> void:
 			for i in count:
 				var dir := Vector2.RIGHT.rotated(randf() * TAU)
 				game.spawn_bullet(global_position, dir, current_damage(), {"speed": float(S.proj_speed), "pierce": int(S.pierce), "bounce": int(S.bounce), "radius": 3.0 * float(S.size), "color": Color(0.9, 0.3, 0.2), "source": "blood_storm"})
+			game.spawn_perk_fx("blood", global_position, 54.0, 0.30)
 			start_reload()
 		"turret":
 			var mult := 1.5 if upg.flag_num("turret_master") > 0.0 else 1.0
 			game.spawn_ally("turret", {"damage": float(p.get("damage", 10.0)) * float(S.summon_dmg), "duration": float(p.get("duration", 8.0)) * mult, "interval": float(p.get("interval", 0.35)) / (1.3 if upg.flag_num("turret_master") > 0.0 else 1.0), "pos": global_position})
+			game.spawn_perk_fx("wind", global_position, 40.0, 0.26)
 		"shadow_step":
 			var t2 := global_position + move_input.normalized() * float(p.get("distance", 120.0)) if move_input.length() > 0.1 else global_position + aim_dir * float(p.get("distance", 120.0))
 			var prev := global_position
 			global_position = game.clamp_to_map(t2)
+			if upg.flag_on("dash_double"):
+				dash_buff_double = true
+			AudioManager.play_sfx("dash", 1.05)
 			game.spawn_ally("shadow_clone", {"damage": current_damage(), "duration": float(p.get("clone_dur", 2.0)), "pos": prev, "radius": float(p.get("radius", 44.0))})
+			game.spawn_perk_fx("curse", prev, 42.0, 0.26)
+			game.spawn_perk_fx("curse", global_position, 42.0, 0.26)
 		"tornado":
 			for i in int(p.get("count", 3)):
 				var off := Vector2.RIGHT.rotated(TAU * float(i) / maxf(1.0, float(p.get("count", 3)))) * 40.0
 				game.spawn_ally("tornado", {"damage": float(p.get("damage", 15.0)) * float(S.summon_dmg), "duration": float(p.get("duration", 3.0)), "radius": float(p.get("radius", 44.0)), "pos": global_position + off})
+			game.spawn_perk_fx("wind", global_position, 64.0, 0.34)
 		"heal_wave":
 			heal(int(p.get("heal", 2)))
 			upg.apply_flags({"aura_fire_rate": float(p.get("aura_fire_rate", 0.15))})
 			set_timer("aura", float(p.get("duration", 5.0)))
 			game.spawn_fx(global_position, Color(1, 0.9, 0.5), float(p.get("radius", 120.0)), 0.5)
+			game.spawn_perk_fx("holy", global_position, 72.0, 0.40)
 			game.spawn_ally("aura", {"damage": 0.0, "duration": float(p.get("duration", 5.0)), "radius": float(p.get("radius", 120.0))})
 		"blood_cleave":
 			game.aoe_damage(global_position, float(p.get("radius", 72.0)), float(p.get("damage", 30.0)) * dmg_multiplier(), {"source": "cleave"})
 			heal(int(p.get("heal", 1)))
 			game.spawn_fx(global_position, Color(0.8, 0.2, 0.2), float(p.get("radius", 72.0)), 0.3)
+			game.spawn_perk_fx("blood", global_position, float(p.get("radius", 72.0)) * 0.95, 0.32)
 
 func _meteor_rain(center: Vector2, count: int, dmg: float) -> void:
 	for i in count:

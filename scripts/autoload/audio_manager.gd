@@ -1,25 +1,41 @@
 extends Node
-## AudioManager — шины, SFX и адаптивная музыка.
-## ВАЖНО: аудио-ассетов в проекте нет, поэтому все звуки синтезируются в рантайме
-## (процедурный placeholder-синтез). Позже их можно заменить файлами .ogg,
-## не меняя интерфейс вызовов play_sfx()/play_music().
+## AudioManager — шины, качественный многослойный SFX-синтез,
+## тематический эмбиент для каждой карты и адаптивная боевая/босс-музыка.
 
 const RATE := 22050
-const MUSIC_LEN := 4.0        # длина лупа одного слоя, сек
+const MUSIC_LEN := 4.0        # длина лупа музыкальных слоёв, сек
+const AMB_LEN := 5.0          # длина лупа эмбиента карты, сек
+const MAX_SFX_VOICES := 16
 
 var music_volume := 0.8
 var sfx_volume := 0.8
 var _sfx_cache: Dictionary = {}
+var _amb_cache: Dictionary = {}
 var _layers: Array[AudioStreamPlayer] = []
+var _amb_player: AudioStreamPlayer = null
 var _mood_key: String = ""
+var _amb_key: String = ""
 var _intensity: float = 0.0
+var _cur_intensity: float = 0.0
 var _boss_active := false
+var _cur_boss: float = 0.0
 var _music_players_ready := false
+var _active_sfx: int = 0
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_buses()
 	_build_sfx()
 	_ensure_players()
+
+func _process(delta: float) -> void:
+	if not _music_players_ready:
+		return
+	var target_boss := 1.0 if _boss_active else 0.0
+	if absf(_cur_intensity - _intensity) > 0.002 or absf(_cur_boss - target_boss) > 0.002 or _layers[0].playing:
+		_cur_intensity = move_toward(_cur_intensity, _intensity, delta * 1.4)
+		_cur_boss = move_toward(_cur_boss, target_boss, delta * 1.8)
+		_apply_layer_volumes()
 
 func _setup_buses() -> void:
 	for bus_name in ["Music", "SFX", "UI", "Ambience"]:
@@ -32,7 +48,9 @@ func _setup_buses() -> void:
 
 func apply_volumes() -> void:
 	_set_bus_db("Music", music_volume)
+	_set_bus_db("Ambience", music_volume * 0.72)
 	_set_bus_db("SFX", sfx_volume)
+	_set_bus_db("UI", sfx_volume)
 
 func _set_bus_db(bus_name: String, linear: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
@@ -46,7 +64,7 @@ func _wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
 	var bytes := PackedByteArray()
 	bytes.resize(samples.size() * 2)
 	for i in samples.size():
-		var v := int(clampf(samples[i], -1.0, 1.0) * 32000.0)
+		var v := int(clampf(tanh(samples[i] * 1.15), -1.0, 1.0) * 32000.0)
 		bytes.encode_s16(i * 2, v)
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
@@ -66,62 +84,102 @@ func _osc(phase: float, shape: String) -> float:
 		"square": return 1.0 if phase < 0.5 else -1.0
 		"saw": return phase * 2.0 - 1.0
 		"tri": return 4.0 * absf(phase - 0.5) - 1.0
+		"organ": return 0.65 * sin(phase * TAU) + 0.25 * sin(phase * TAU * 2.0) + 0.12 * sin(phase * TAU * 3.0)
 		_: return sin(phase * TAU)
 
-## Простой тон с огибающей.
-func _tone(dur: float, f0: float, f1: float, shape: String, decay: float, noise: float = 0.0, vol: float = 0.5) -> AudioStreamWAV:
-	var n := int(dur * RATE)
+## Слоистый синтез SFX: тон + гармоника + фильтрованный шум + щелчок атаки.
+func _sfx_layered(dur: float, f0: float, f1: float, shape: String, decay: float, noise: float = 0.0, vol: float = 0.4, sub_mix: float = 0.0, click: float = 0.0) -> AudioStreamWAV:
+	var n := maxi(64, int(dur * RATE))
 	var samples := PackedFloat32Array()
 	samples.resize(n)
 	var phase := 0.0
+	var sub_phase := 0.0
+	var lp_noise := 0.0
 	var rng := RandomNumberGenerator.new()
-	rng.seed = int(f0 * 1000.0 + dur * 100.0)
+	rng.seed = int(f0 * 1000.0 + dur * 170.0 + noise * 91.0)
 	for i in n:
 		var t := float(i) / RATE
 		var k := t / maxf(dur, 0.001)
-		var freq: float = lerpf(f0, f1, k)
+		var atk := minf(1.0, t / 0.004)
+		var freq: float = lerpf(f0, f1, pow(k, 0.72))
 		phase += freq / RATE
-		var env: float = exp(-decay * k) * (1.0 - k * 0.15)
-		var s := _osc(phase, shape) * env
+		sub_phase += (freq * 0.5) / RATE
+		var env: float = atk * exp(-decay * k) * (1.0 - k * 0.12)
+		var s := _osc(phase, shape) * (1.0 - sub_mix) + _osc(sub_phase, "sine") * sub_mix
 		if noise > 0.0:
-			s = lerpf(s, rng.randf_range(-1.0, 1.0) * env, noise)
-		samples[i] = s * vol
+			var raw_n := rng.randf_range(-1.0, 1.0)
+			lp_noise = lerpf(lp_noise, raw_n, 0.35)
+			s = lerpf(s, lp_noise, noise)
+		var out := s * env
+		if click > 0.0 and t < 0.014:
+			out += rng.randf_range(-1.0, 1.0) * click * (1.0 - t / 0.014)
+		samples[i] = out * vol
+	return _wav(samples)
+
+## Аккорд / арпеджио для наград, побед и прокачки.
+func _chord_sfx(freqs: Array, dur: float, shape: String = "tri", stagger: float = 0.05, vol: float = 0.28) -> AudioStreamWAV:
+	var n := maxi(128, int(dur * RATE))
+	var samples := PackedFloat32Array()
+	samples.resize(n)
+	for idx in freqs.size():
+		var f := float(freqs[idx])
+		var start := int(float(idx) * stagger * RATE)
+		var ph := 0.0
+		var ph2 := 0.0
+		for i in range(start, n):
+			var k := float(i - start) / maxf(1.0, float(n - start))
+			var atk := minf(1.0, float(i - start) / (0.008 * RATE))
+			var env := atk * exp(-3.2 * k)
+			ph += f / RATE
+			ph2 += (f * 1.003) / RATE
+			samples[i] += (_osc(ph, shape) * 0.65 + _osc(ph2, "sine") * 0.35) * env * vol / maxf(1.0, sqrt(float(freqs.size())))
 	return _wav(samples)
 
 func _build_sfx() -> void:
-	_sfx_cache["shot"] = _tone(0.09, 900.0, 220.0, "square", 6.0, 0.25, 0.35)
-	_sfx_cache["shot_heavy"] = _tone(0.16, 400.0, 90.0, "saw", 4.5, 0.35, 0.45)
-	_sfx_cache["shot_magic"] = _tone(0.14, 1400.0, 500.0, "sine", 5.0, 0.0, 0.30)
-	_sfx_cache["reload"] = _tone(0.10, 220.0, 160.0, "square", 8.0, 0.4, 0.25)
-	_sfx_cache["hit"] = _tone(0.06, 700.0, 300.0, "square", 10.0, 0.5, 0.22)
-	_sfx_cache["kill"] = _tone(0.12, 320.0, 80.0, "saw", 7.0, 0.45, 0.28)
-	_sfx_cache["hurt"] = _tone(0.22, 260.0, 70.0, "square", 3.5, 0.3, 0.45)
-	_sfx_cache["xp"] = _tone(0.07, 1600.0, 2100.0, "sine", 8.0, 0.0, 0.20)
-	_sfx_cache["gold"] = _tone(0.12, 1200.0, 1800.0, "tri", 6.0, 0.0, 0.22)
-	_sfx_cache["levelup"] = _tone(0.45, 600.0, 1200.0, "tri", 2.5, 0.0, 0.32)
-	_sfx_cache["chest"] = _tone(0.35, 400.0, 900.0, "square", 3.0, 0.15, 0.28)
-	_sfx_cache["boss"] = _tone(0.9, 90.0, 45.0, "saw", 1.2, 0.25, 0.5)
-	_sfx_cache["ui"] = _tone(0.05, 900.0, 900.0, "square", 10.0, 0.0, 0.20)
-	_sfx_cache["error"] = _tone(0.18, 240.0, 180.0, "square", 4.0, 0.0, 0.28)
-	_sfx_cache["skill"] = _tone(0.30, 700.0, 300.0, "saw", 3.0, 0.15, 0.30)
-	_sfx_cache["freeze"] = _tone(0.20, 1800.0, 2400.0, "sine", 5.0, 0.1, 0.22)
-	_sfx_cache["fire"] = _tone(0.25, 300.0, 500.0, "saw", 4.0, 0.55, 0.25)
-	_sfx_cache["lightning"] = _tone(0.25, 2000.0, 300.0, "square", 3.0, 0.6, 0.28)
-	_sfx_cache["secret"] = _tone(0.7, 300.0, 900.0, "sine", 1.6, 0.1, 0.35)
-	_sfx_cache["sathan"] = _tone(1.4, 70.0, 33.0, "saw", 0.8, 0.35, 0.55)
+	_sfx_cache["shot"] = _sfx_layered(0.11, 780.0, 145.0, "saw", 7.2, 0.32, 0.36, 0.25, 0.45)
+	_sfx_cache["shot_heavy"] = _sfx_layered(0.22, 260.0, 52.0, "saw", 4.6, 0.42, 0.48, 0.45, 0.55)
+	_sfx_cache["shot_magic"] = _sfx_layered(0.16, 1180.0, 440.0, "organ", 4.8, 0.08, 0.30, 0.20, 0.0)
+	_sfx_cache["shot_bow"] = _sfx_layered(0.11, 520.0, 210.0, "tri", 6.5, 0.18, 0.32, 0.15, 0.35)
+	_sfx_cache["shot_lightning"] = _sfx_layered(0.16, 1750.0, 320.0, "square", 5.2, 0.52, 0.30, 0.10, 0.40)
+	_sfx_cache["reload"] = _sfx_layered(0.12, 340.0, 580.0, "square", 8.5, 0.35, 0.25, 0.0, 0.50)
+	_sfx_cache["hit"] = _sfx_layered(0.07, 460.0, 140.0, "tri", 10.5, 0.45, 0.24, 0.30, 0.30)
+	_sfx_cache["crit"] = _sfx_layered(0.15, 1320.0, 880.0, "saw", 5.8, 0.20, 0.34, 0.15, 0.45)
+	_sfx_cache["kill"] = _sfx_layered(0.14, 280.0, 68.0, "saw", 6.5, 0.40, 0.30, 0.40, 0.25)
+	_sfx_cache["hurt"] = _sfx_layered(0.24, 220.0, 58.0, "saw", 3.6, 0.35, 0.46, 0.45, 0.35)
+	_sfx_cache["xp"] = _sfx_layered(0.08, 1320.0, 1980.0, "sine", 7.8, 0.0, 0.19, 0.15, 0.0)
+	_sfx_cache["gold"] = _chord_sfx([1318.5, 1760.0, 2093.0], 0.20, "tri", 0.04, 0.28)
+	_sfx_cache["levelup"] = _chord_sfx([440.0, 554.37, 659.25, 880.0], 0.65, "organ", 0.07, 0.36)
+	_sfx_cache["chest"] = _chord_sfx([392.0, 493.88, 587.33, 783.99], 0.55, "tri", 0.06, 0.34)
+	_sfx_cache["boss"] = _sfx_layered(1.10, 98.0, 41.0, "saw", 1.3, 0.28, 0.52, 0.55, 0.25)
+	_sfx_cache["phase"] = _chord_sfx([146.83, 220.0, 293.66, 349.23], 0.85, "saw", 0.04, 0.42)
+	_sfx_cache["ui"] = _sfx_layered(0.045, 840.0, 620.0, "tri", 11.0, 0.05, 0.20, 0.1, 0.18)
+	_sfx_cache["error"] = _sfx_layered(0.20, 210.0, 145.0, "saw", 4.2, 0.10, 0.28, 0.3, 0.0)
+	_sfx_cache["skill"] = _sfx_layered(0.32, 620.0, 280.0, "organ", 3.2, 0.22, 0.32, 0.25, 0.20)
+	_sfx_cache["dash"] = _sfx_layered(0.18, 420.0, 160.0, "sine", 5.5, 0.65, 0.26, 0.0, 0.15)
+	_sfx_cache["freeze"] = _sfx_layered(0.24, 1760.0, 2640.0, "sine", 4.8, 0.15, 0.25, 0.0, 0.1)
+	_sfx_cache["fire"] = _sfx_layered(0.28, 260.0, 460.0, "saw", 3.8, 0.58, 0.28, 0.25, 0.12)
+	_sfx_cache["lightning"] = _sfx_layered(0.28, 2100.0, 260.0, "square", 3.2, 0.62, 0.30, 0.15, 0.45)
+	_sfx_cache["smite"] = _chord_sfx([523.25, 783.99, 1046.5], 0.40, "organ", 0.02, 0.34)
+	_sfx_cache["secret"] = _chord_sfx([293.66, 440.0, 587.33, 880.0, 1174.6], 0.95, "organ", 0.09, 0.36)
+	_sfx_cache["sathan"] = _sfx_layered(1.50, 74.0, 32.0, "saw", 0.85, 0.38, 0.56, 0.60, 0.2)
+	_sfx_cache["victory"] = _chord_sfx([392.0, 493.88, 587.33, 783.99, 987.77], 1.05, "organ", 0.08, 0.40)
+	_sfx_cache["defeat"] = _chord_sfx([293.66, 261.63, 220.0, 174.61], 1.00, "saw", 0.14, 0.34)
 
 func _ensure_players() -> void:
-	if _music_players_ready:
-		return
-	for i in 4:
-		var p := AudioStreamPlayer.new()
-		p.bus = "Music"
-		p.volume_db = -60.0
-		add_child(p)
-		_layers.append(p)
-	_music_players_ready = true
+	if not _music_players_ready:
+		for i in 4:
+			var p := AudioStreamPlayer.new()
+			p.bus = "Music"
+			p.volume_db = -60.0
+			add_child(p)
+			_layers.append(p)
+		_music_players_ready = true
+	if _amb_player == null:
+		_amb_player = AudioStreamPlayer.new()
+		_amb_player.bus = "Ambience"
+		_amb_player.volume_db = -20.0
+		add_child(_amb_player)
 
-## Останавливаем проигрывание при выходе, чтобы буферы не «висели» до конца процесса.
 func _exit_tree() -> void:
 	_release_audio()
 
@@ -132,22 +190,136 @@ func _release_audio() -> void:
 			child.stream = null
 			child.queue_free()
 	_layers.clear()
+	_amb_player = null
 	_sfx_cache.clear()
+	_amb_cache.clear()
 
 func play_sfx(sfx_name: String, pitch: float = 1.0, bus: String = "SFX") -> void:
 	if not _sfx_cache.has(sfx_name):
 		return
 	if sfx_volume <= 0.001:
 		return
+	if _active_sfx >= MAX_SFX_VOICES and not (sfx_name in ["levelup", "boss", "phase", "victory", "defeat", "hurt"]):
+		return
+	_active_sfx += 1
 	var p := AudioStreamPlayer.new()
 	p.stream = _sfx_cache[sfx_name]
 	p.bus = bus
 	p.pitch_scale = clampf(pitch, 0.4, 2.5)
-	p.volume_db = -6.0
+	p.volume_db = -5.5
 	add_child(p)
 	p.play()
-	# привязка к самому плееру: связь умирает вместе с ним, лямбда не нужна
-	p.finished.connect(p.queue_free)
+	p.finished.connect(func() -> void:
+		_active_sfx = maxi(0, _active_sfx - 1)
+		if is_instance_valid(p):
+			p.queue_free())
+
+# ------------------------------------------------------------------ ЭМБИЕНТ КАРТ
+## Проработанный процедурный эмбиент по характеру каждой из 13 карт.
+func play_ambience(map_id: String) -> void:
+	_ensure_players()
+	if map_id == "":
+		stop_ambience()
+		return
+	if map_id == _amb_key and _amb_player.playing:
+		return
+	_amb_key = map_id
+	if not _amb_cache.has(map_id):
+		_amb_cache[map_id] = _make_ambience(map_id)
+	_amb_player.stream = _amb_cache[map_id]
+	_amb_player.volume_db = -17.0
+	_amb_player.play()
+
+func stop_ambience() -> void:
+	if _amb_player != null:
+		_amb_player.stop()
+	_amb_key = ""
+
+func _make_ambience(map_id: String) -> AudioStreamWAV:
+	var n := int(AMB_LEN * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(n)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9001 + map_id.hash()
+	# Параметры характера карты: ветер, гул, переливы/капли/треск
+	var cfg := {
+		"sands":     {"wind": 0.24, "whistle": 540.0, "rumble": 58.0, "rumble_amt": 0.08, "chime": 0.0, "drip": 0.0, "hum": 0.0},
+		"tundra":    {"wind": 0.28, "whistle": 760.0, "rumble": 64.0, "rumble_amt": 0.07, "chime": 1320.0, "drip": 0.0, "hum": 0.0},
+		"peak":      {"wind": 0.16, "whistle": 420.0, "rumble": 44.0, "rumble_amt": 0.22, "chime": 0.0, "drip": 0.0, "hum": 0.0},
+		"abyss":     {"wind": 0.10, "whistle": 290.0, "rumble": 50.0, "rumble_amt": 0.14, "chime": 880.0, "drip": 0.25, "hum": 0.0},
+		"forest":    {"wind": 0.15, "whistle": 360.0, "rumble": 72.0, "rumble_amt": 0.05, "chime": 1046.0, "drip": 0.12, "hum": 0.0},
+		"rift":      {"wind": 0.14, "whistle": 620.0, "rumble": 48.0, "rumble_amt": 0.15, "chime": 988.0, "drip": 0.0, "hum": 135.0},
+		"graveyard": {"wind": 0.20, "whistle": 310.0, "rumble": 55.0, "rumble_amt": 0.10, "chime": 440.0, "drip": 0.10, "hum": 0.0},
+		"hive":      {"wind": 0.10, "whistle": 240.0, "rumble": 62.0, "rumble_amt": 0.12, "chime": 0.0, "drip": 0.15, "hum": 168.0},
+		"bloodmoon": {"wind": 0.18, "whistle": 390.0, "rumble": 46.0, "rumble_amt": 0.18, "chime": 587.0, "drip": 0.0, "hum": 92.0},
+		"chaos":     {"wind": 0.18, "whistle": 680.0, "rumble": 52.0, "rumble_amt": 0.16, "chime": 1175.0, "drip": 0.0, "hum": 195.0},
+		"temple":    {"wind": 0.11, "whistle": 340.0, "rumble": 58.0, "rumble_amt": 0.13, "chime": 659.0, "drip": 0.18, "hum": 110.0},
+		"throne":    {"wind": 0.20, "whistle": 460.0, "rumble": 42.0, "rumble_amt": 0.24, "chime": 0.0, "drip": 0.0, "hum": 82.0},
+		"void":      {"wind": 0.12, "whistle": 260.0, "rumble": 38.0, "rumble_amt": 0.22, "chime": 740.0, "drip": 0.0, "hum": 74.0},
+	}
+	var c: Dictionary = cfg.get(map_id, cfg["sands"])
+	var wind_amt := float(c["wind"])
+	var whistle_f := float(c["whistle"])
+	var rumble_f := float(c["rumble"])
+	var rumble_amt := float(c["rumble_amt"])
+	var chime_f := float(c["chime"])
+	var hum_f := float(c["hum"])
+	var drip_amt := float(c["drip"])
+
+	var lp := 0.0
+	var bp_prev := 0.0
+	var ph_wh := 0.0
+	var ph_rm := 0.0
+	var ph_hm := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var w := rng.randf_range(-1.0, 1.0)
+		lp = lerpf(lp, w, 0.045)
+		var gust := 0.55 + 0.45 * sin(TAU * t / AMB_LEN * 2.0 + 0.4)
+		var air := (lp * 0.7 + (lp - bp_prev) * 1.4) * wind_amt * gust
+		bp_prev = lp
+
+		ph_wh += (whistle_f * (1.0 + 0.06 * sin(TAU * t / AMB_LEN))) / RATE
+		var wh := sin(ph_wh * TAU) * 0.035 * wind_amt * gust
+
+		ph_rm += rumble_f / RATE
+		var rm := (sin(ph_rm * TAU) * 0.7 + sin(ph_rm * TAU * 1.5) * 0.3) * rumble_amt
+
+		var hm := 0.0
+		if hum_f > 0.0:
+			ph_hm += (hum_f * (1.0 + 0.03 * sin(TAU * t * 3.0))) / RATE
+			hm = (_osc(ph_hm, "saw") * 0.4 + _osc(ph_hm * 1.01, "sine") * 0.6) * 0.08
+		samples[i] = air + wh + rm + hm
+
+	# Редкие кристальные переливы / капли / далёкий колокол
+	if chime_f > 0.0:
+		for k in 3:
+			var start := int((0.6 + float(k) * 1.55) * AMB_LEN / 5.0 * RATE)
+			var f := chime_f * (1.0 if k % 2 == 0 else 1.25)
+			var ph := 0.0
+			for i in int(0.8 * RATE):
+				if start + i >= n:
+					break
+				var kk := float(i) / (0.8 * RATE)
+				ph += f / RATE
+				samples[start + i] += sin(ph * TAU) * exp(-4.0 * kk) * 0.06
+	if drip_amt > 0.0:
+		for k in 4:
+			var start2 := int((0.4 + float(k) * 1.15) * RATE)
+			var ph2 := 0.0
+			for i in int(0.14 * RATE):
+				if start2 + i >= n:
+					break
+				var kk2 := float(i) / (0.14 * RATE)
+				ph2 += lerpf(650.0, 1250.0, kk2) / RATE
+				samples[start2 + i] += sin(ph2 * TAU) * exp(-6.0 * kk2) * drip_amt * 0.14
+
+	var fade := int(0.08 * RATE)
+	for i in fade:
+		var a := float(i) / float(fade)
+		samples[i] *= a
+		samples[n - 1 - i] *= a
+	return _wav(samples, true)
 
 # ------------------------------------------------------------------ МУЗЫКА
 var _scales := {
@@ -162,7 +334,7 @@ var _scales := {
 func _midi_freq(note: int) -> float:
 	return 440.0 * pow(2.0, (note - 69) / 12.0)
 
-## Генерирует 4 слоя для настроения карты: ambient / tension / combat / boss.
+## Генерирует 4 адаптивных музыкальных слоя для настроения карты: ambient / tension / combat / boss.
 func play_music(mood: Dictionary, boss_layer_only: bool = false) -> void:
 	_ensure_players()
 	var key := JSON.stringify(mood)
@@ -184,32 +356,55 @@ func _make_layer(layer: int, root: int, scale: Array, tempo: float) -> AudioStre
 	var n := int(MUSIC_LEN * RATE)
 	var samples := PackedFloat32Array()
 	samples.resize(n)
-	var beat := 60.0 / maxf(tempo, 30.0)
+	var beat := 60.0 / maxf(tempo, 36.0)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 12345 + layer * 771 + root * 31
 	var notes: Array = []
 	match layer:
-		0: # ambient — длинный пэд
+		0: # ambient — тёплый атмосферный пэд + квинта + суб-бас
 			for step in 2:
-				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root + scale[(step * 2) % scale.size()], "vol": 0.16, "shape": "sine"})
-		1: # tension — пульс
+				var deg: int = scale[(step * 2) % scale.size()]
+				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root + deg, "vol": 0.14, "shape": "organ"})
+				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root + deg + 7, "vol": 0.08, "shape": "sine"})
+				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root - 12, "vol": 0.12, "shape": "sine"})
+		1: # tension — тревожный басовый пульс + минорные акценты
 			var steps := int(MUSIC_LEN / (beat * 0.5))
 			for s in steps:
-				var deg: int = scale[(s / 2) % scale.size()]
-				notes.append({"t": s * beat * 0.5, "len": beat * 0.45, "note": root + 12 + deg, "vol": 0.10, "shape": "tri"})
-		2: # combat — арпеджио + ритм
+				var deg2: int = scale[(s / 2) % scale.size()]
+				notes.append({"t": s * beat * 0.5, "len": beat * 0.42, "note": root + 12 + deg2, "vol": 0.11, "shape": "tri"})
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.5, "len": beat * 0.45, "note": root - 12 + (0 if s % 4 == 0 else scale[4]), "vol": 0.13, "shape": "sine"})
+				if s % 2 == 1:
+					notes.append({"t": s * beat * 0.5, "len": 0.05, "note": 76, "vol": 0.06, "shape": "sine", "noise": 0.9})
+		2: # combat — энергичное арпеджио + бочка + рабочий барабан
 			var steps2 := int(MUSIC_LEN / (beat * 0.25))
+			var arp := [0, 2, 4, 2, 5, 4, 2, 1]
 			for s in steps2:
-				var deg2: int = scale[(s * 2) % scale.size()]
-				notes.append({"t": s * beat * 0.25, "len": beat * 0.22, "note": root + 12 + deg2 + (12 if s % 8 == 0 else 0), "vol": 0.09, "shape": "saw"})
+				var deg3: int = scale[arp[s % arp.size()] % scale.size()]
+				var oct := 12 if (s % 4 != 3) else 24
+				notes.append({"t": s * beat * 0.25, "len": beat * 0.22, "note": root + oct + deg3, "vol": 0.11, "shape": "saw"})
 				if s % 4 == 0:
-					notes.append({"t": s * beat * 0.25, "len": 0.09, "note": root - 12, "vol": 0.16, "shape": "sine", "noise": 0.5})
-		3: # boss — низкий напор
-			var steps3 := int(MUSIC_LEN / (beat * 0.5))
+					notes.append({"t": s * beat * 0.25, "len": 0.12, "note": root - 24, "vol": 0.22, "shape": "sine", "noise": 0.35})
+				elif s % 4 == 2:
+					notes.append({"t": s * beat * 0.25, "len": 0.08, "note": 62, "vol": 0.12, "shape": "tri", "noise": 0.85})
+		3: # boss — эпичная напряжённая босс-тема: двойная бочка, хоровой аккорд, лид-рифф
+			var steps3 := int(MUSIC_LEN / (beat * 0.25))
+			var riff := [0, 0, 4, 3, 2, 4, 5, 4]
 			for s in steps3:
-				notes.append({"t": s * beat * 0.5, "len": beat * 0.5, "note": root - 12 + (0 if s % 2 == 0 else scale[4]), "vol": 0.13, "shape": "square", "noise": 0.08})
+				var deg4: int = scale[riff[(s / 2) % riff.size()] % scale.size()]
+				# Тяжёлые хоры / брасс каждые 4 шага
 				if s % 4 == 0:
-					notes.append({"t": s * beat * 0.5, "len": 0.14, "note": 30, "vol": 0.20, "shape": "sine", "noise": 0.6})
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root - 12 + deg4, "vol": 0.14, "shape": "saw"})
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root + deg4 + 7, "vol": 0.10, "shape": "organ"})
+				# Срочный боевой лид
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.42, "note": root + 12 + scale[(s + 1) % scale.size()], "vol": 0.11, "shape": "square"})
+				# Двойная литавра / бочка + металлический снейр
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.25, "len": 0.14, "note": 34, "vol": 0.24, "shape": "sine", "noise": 0.45})
+				if s % 8 == 4:
+					notes.append({"t": s * beat * 0.25, "len": 0.11, "note": 65, "vol": 0.16, "shape": "saw", "noise": 0.85})
+
 	for note in notes:
 		var start := int(float(note["t"]) * RATE)
 		var length := int(float(note["len"]) * RATE)
@@ -218,58 +413,58 @@ func _make_layer(layer: int, root: int, scale: Array, tempo: float) -> AudioStre
 		var vol := float(note.get("vol", 0.1))
 		var noise_mix := float(note.get("noise", 0.0))
 		var phase := 0.0
+		var phase2 := 0.0
 		for i in length:
 			var idx := start + i
 			if idx >= n:
 				break
 			var k := float(i) / maxf(float(length), 1.0)
-			var env: float = sin(PI * clampf(k, 0.0, 1.0)) if k < 1.0 else 0.0
+			var atk := minf(1.0, k * 14.0)
+			var env: float = atk * sin(PI * clampf(k, 0.0, 1.0)) if k < 1.0 else 0.0
 			phase += freq / RATE
-			var s := _osc(phase, shape) * env * vol
+			phase2 += (freq * 1.004) / RATE
+			var s := (_osc(phase, shape) * 0.72 + _osc(phase2, shape) * 0.28) * env * vol
 			if noise_mix > 0.0:
 				s = lerpf(s, rng.randf_range(-1.0, 1.0) * env * vol, noise_mix)
 			samples[idx] += s
-	# мягкое ограничение и сглаживание стыка лупа
+
 	for i in n:
-		samples[i] = clampf(samples[i], -0.9, 0.9)
-	var fade := int(0.01 * RATE)
+		samples[i] = clampf(tanh(samples[i] * 1.1), -0.92, 0.92)
+	var fade := int(0.015 * RATE)
 	for i in fade:
-		var a := float(i) / fade
+		var a := float(i) / float(fade)
 		samples[i] *= a
 		samples[n - 1 - i] *= a
 	return _wav(samples, true)
 
 func set_intensity(value: float) -> void:
 	_intensity = clampf(value, 0.0, 1.0)
-	_apply_layer_volumes()
 
 func set_boss_layer(active: bool) -> void:
 	_boss_active = active
-	_apply_layer_volumes()
 
-## Громкость слоёв: ambient всегда, tension при >20 врагов, combat при >50, boss заменяет всё.
+## Плавный баланс слоёв: ambient -> tension -> combat (от числа врагов) -> boss (при боссе) + приглушение на паузе.
 func _apply_layer_volumes() -> void:
 	if not _music_players_ready:
 		return
-	var ambient := lerpf(-18.0, -30.0, _intensity)
-	var tension := lerpf(-60.0, -14.0, clampf(_intensity * 1.6, 0.0, 1.0))
-	var combat := -60.0
-	if _intensity > 0.5:
-		combat = lerpf(-60.0, -10.0, clampf((_intensity - 0.5) * 2.0, 0.0, 1.0))
-	var boss := -60.0
-	if _boss_active:
-		ambient = -60.0
-		tension = -60.0
-		combat = -60.0
-		boss = -8.0
-	_layers[0].volume_db = ambient
-	_layers[1].volume_db = tension
-	_layers[2].volume_db = combat
-	_layers[3].volume_db = boss
+	var pause_duck := -6.5 if (get_tree() != null and get_tree().paused) else 0.0
+	var normal_mix := 1.0 - _cur_boss
+	var ambient_lin := lerpf(0.24, 0.09, _cur_intensity) * normal_mix
+	var tension_lin := clampf(_cur_intensity * 1.4, 0.0, 1.0) * 0.28 * normal_mix
+	var combat_lin := clampf((_cur_intensity - 0.35) / 0.65, 0.0, 1.0) * 0.36 * normal_mix
+	var boss_lin := _cur_boss * 0.44
+	_layers[0].volume_db = linear_to_db(maxf(0.0005, ambient_lin)) + pause_duck
+	_layers[1].volume_db = linear_to_db(maxf(0.0005, tension_lin)) + pause_duck
+	_layers[2].volume_db = linear_to_db(maxf(0.0005, combat_lin)) + pause_duck
+	_layers[3].volume_db = linear_to_db(maxf(0.0005, boss_lin)) + pause_duck
+	if _amb_player != null:
+		var amb_lin := lerpf(0.20, 0.09, _cur_intensity) * (1.0 - _cur_boss * 0.55)
+		_amb_player.volume_db = linear_to_db(maxf(0.0005, amb_lin)) + pause_duck
 
 func stop_music() -> void:
 	for p in _layers:
 		p.stop()
+	stop_ambience()
 	_mood_key = ""
 
 func apply_settings(music: float, sfx: float) -> void:

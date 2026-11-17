@@ -3,12 +3,16 @@ extends RefCounted
 ## Процедурный вид препятствий по теме карты: только фигуры и цвета, без ассетов.
 ## Возвращает узел-визуал, который кладётся в world.
 
-static func build(parent: Node, shape: String, size: Vector2, color: Color, accent: Color) -> Node2D:
+static func build(parent: Node, shape: String, size: Vector2, color: Color, accent: Color, map_id: String = "") -> Node2D:
 	var n := Node2D.new()
 	color = Gfx.gothic(color, 0.22)
 	accent = Gfx.gothic(accent, 0.22)
 	parent.add_child(n)
-	var otex := Assets.icon("obs_" + shape)
+	var otex: Texture2D = null
+	if map_id != "":
+		otex = Assets.icon("obs_%s__%s" % [shape, map_id])
+	if otex == null:
+		otex = Assets.icon("obs_" + shape)
 	if otex != null:
 		var sp := Sprite2D.new()
 		sp.texture = otex
@@ -22,8 +26,11 @@ static func build(parent: Node, shape: String, size: Vector2, color: Color, acce
 		else:
 			var sc := maxf(0.55, maxf(size.x, size.y) * 1.15 / maxf(tw, th))
 			sp.scale = Vector2(sc, sc)
-		sp.modulate = Color.WHITE.lerp(color, 0.14)
+		sp.modulate = Color.WHITE.lerp(color, 0.08)
 		n.add_child(sp)
+		if shape in ["crystal", "lava", "obelisk", "mushroom", "pumpkin"]:
+			var g_col := accent if shape in ["crystal", "obelisk"] else (Color(1.0, 0.45, 0.14) if shape in ["lava", "pumpkin"] else Color(0.5, 0.9, 0.55))
+			_glow(n, maxf(size.x, size.y) * 1.85, Color(g_col.r, g_col.g, g_col.b, 0.16))
 		return n
 	var w := size.x
 	var h := size.y

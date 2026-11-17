@@ -28,6 +28,7 @@ func _ready() -> void:
 		call_deferred("_open_overlay", OS.get_environment("SURW_MENU_OVERLAY"))
 	_build()
 	AudioManager.set_boss_layer(false)
+	AudioManager.stop_ambience()
 	AudioManager.play_music({"root": 50, "scale": "minor", "tempo": 64, "wave": "lute"})
 	AudioManager.set_intensity(0.0)
 
@@ -71,9 +72,16 @@ func _build() -> void:
 				add_child(hr)
 	UI.label(self, "версия 1.4.16", 8, UI.MUTED, Vector2(42, 283))
 
-	# --- правая часть: меню
+	# --- правая часть: меню на полупрозрачной готической раме поверх живого геймплея
+	var menu_frame := Panel.new()
+	menu_frame.position = Vector2(342, 46)
+	menu_frame.size = Vector2(272, 246)
+	menu_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_frame.add_theme_stylebox_override("panel", UI.style(Color(0.045, 0.048, 0.062, 0.72), UI.GOLD_DEEP, 1, 0))
+	add_child(menu_frame)
+
 	var menu := Control.new()
-	menu.position = Vector2(352, 58)
+	menu.position = Vector2(352, 56)
 	menu.size = Vector2(252, 240)
 	menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu)

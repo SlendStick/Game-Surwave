@@ -230,7 +230,7 @@ func _build_choice_layer() -> void:
 	choice_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	choice_layer.add_child(choice_box)
 
-## Меню паузы: слева хронология взятых перков, справа сводка по забегу.
+## Меню паузы: готическая сводка билда и характеристик забега.
 func _build_pause_layer() -> void:
 	pause_layer = Control.new()
 	pause_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -238,52 +238,59 @@ func _build_pause_layer() -> void:
 	root.add_child(pause_layer)
 	_dim(pause_layer)
 
-	var title := UI.label(pause_layer, Loc.t("paused"), 16, UI.GOLD, Vector2(0, 10))
-	title.size = Vector2(640, 20)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var hint := UI.label(pause_layer, "Esc — продолжить · Tab — список взятого", 8, UI.DIM, Vector2(0, 30))
-	hint.size = Vector2(640, 10)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var header := UI.panel_striped(pause_layer, Rect2(14, 10, 612, 34), UI.GOLD)
+	var crest := TextureRect.new()
+	crest.texture = Assets.icon("ui_crest")
+	crest.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	crest.position = Vector2(10, 6)
+	crest.size = Vector2(22, 22)
+	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(crest)
+	var title := UI.title(header, Loc.t("paused"), 15, Vector2(38, 4), UI.GOLD_BRIGHT)
+	title.size = Vector2(200, 22)
+	var hint := UI.crisp_label(header, "Esc — продолжить · Tab — древо билда · F12 / P — фото", 8, UI.DIM, Vector2(246, 11))
+	hint.size = Vector2(354, 14)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
-	# --- левая колонка: перки по порядку получения
-	var left := UI.panel(pause_layer, Rect2(10, 44, 350, 258))
-	UI.label(left, "ВЗЯТЫЕ ПЕРКИ ПО ПОРЯДКУ", 9, UI.GOLD, Vector2(8, 6))
-	pause_perks_count = UI.label(left, "", 8, UI.DIM, Vector2(200, 6))
-	pause_perks_count.size = Vector2(140, 10)
+	# --- левая колонка: хроника билда с иконками
+	var left := UI.panel_striped(pause_layer, Rect2(14, 50, 346, 260), UI.ACCENT)
+	UI.crisp_label(left, "ХРОНИКА БИЛДА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
+	pause_perks_count = UI.crisp_label(left, "", 8, UI.DIM, Vector2(190, 9))
+	pause_perks_count.size = Vector2(146, 12)
 	pause_perks_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(6, 22)
-	scroll.size = Vector2(338, 228)
+	scroll.position = Vector2(8, 26)
+	scroll.size = Vector2(330, 226)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left.add_child(scroll)
 	pause_perk_list = VBoxContainer.new()
-	pause_perk_list.custom_minimum_size = Vector2(330, 0)
-	pause_perk_list.add_theme_constant_override("separation", 1)
+	pause_perk_list.custom_minimum_size = Vector2(322, 0)
+	pause_perk_list.add_theme_constant_override("separation", 3)
 	scroll.add_child(pause_perk_list)
 
-	# --- правая колонка: сводка забега
-	var right := UI.panel(pause_layer, Rect2(368, 44, 262, 176))
-	UI.label(right, "ЗАБЕГ", 9, UI.GOLD, Vector2(8, 6))
+	# --- правая колонка: сводка забега + кнопки
+	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 174), UI.GOLD_DEEP)
+	UI.crisp_label(right, "СВОДКА ЗАБЕГА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
 	pause_stats = VBoxContainer.new()
-	pause_stats.position = Vector2(8, 22)
-	pause_stats.size = Vector2(246, 148)
-	pause_stats.add_theme_constant_override("separation", 1)
+	pause_stats.position = Vector2(10, 26)
+	pause_stats.size = Vector2(238, 142)
+	pause_stats.add_theme_constant_override("separation", 2)
 	right.add_child(pause_stats)
 
-	# --- кнопки
-	var buttons := UI.vbox(pause_layer, 6)
-	buttons.position = Vector2(368, 228)
-	buttons.size = Vector2(262, 74)
-	var resume := UI.button(buttons, Loc.t("resume"), 10, Vector2(262, 22))
+	var buttons := UI.vbox(pause_layer, 5)
+	buttons.position = Vector2(368, 230)
+	buttons.size = Vector2(258, 80)
+	var resume := UI.primary_button(buttons, Loc.t("resume"), 11, Vector2(258, 26))
 	resume.pressed.connect(toggle_pause)
-	var to_menu := UI.button(buttons, Loc.t("main_menu"), 10, Vector2(262, 22))
+	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 23))
 	to_menu.pressed.connect(_pause_to_menu)
-	var quit := UI.button(buttons, Loc.t("quit"), 10, Vector2(262, 22))
+	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 23))
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
-	# --- подсказка внизу
-	var foot := UI.label(pause_layer, "Пробел — автоприцел · R — перезарядка · ЛКМ — огонь · F12 / P — фоторежим", 7, UI.DIM, Vector2(0, 312))
-	foot.size = Vector2(640, 10)
+	var foot := UI.crisp_label(pause_layer, "Пробел — автоприцел · R — перезарядка · ПКМ/Q — способность · 1–5 — выбор карты", 7, UI.MUTED, Vector2(0, 316))
+	foot.size = Vector2(640, 12)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 func _build_end_layer() -> void:
@@ -292,10 +299,7 @@ func _build_end_layer() -> void:
 	end_layer.visible = false
 	root.add_child(end_layer)
 	_dim(end_layer)
-	var panel := UI.panel(end_layer, Rect2(150, 60, 340, 240))
-	var v := UI.vbox(panel, 4)
-	v.position = Vector2(16, 12)
-	v.size = Vector2(308, 210)
+	UI.panel_striped(end_layer, Rect2(88, 28, 464, 304), UI.GOLD)
 
 func _build_syn_layer() -> void:
 	syn_layer = Control.new()
@@ -702,7 +706,7 @@ func toggle_pause() -> void:
 		_refresh_pause_menu()
 		AudioManager.play_sfx("ui", 0.9)
 
-## Заполняет меню паузы: хронология перков и сводка по забегу.
+## Заполняет меню паузы: хронология перков с иконками и сводка по забегу.
 func _refresh_pause_menu() -> void:
 	if game == null or game.player == null:
 		return
@@ -716,50 +720,67 @@ func _refresh_pause_menu() -> void:
 		var data: Dictionary = _find_entry_data(kind, id)
 		var nm := String(data.get("name", id))
 		var mult := float(entry.get("mult", 1.0))
-		var suffix := ""
-		if mult > 1.0:
-			suffix = " ×%d" % int(mult)
-		var row := UI.label(pause_perk_list, "%2d. [%s] %s%s" % [idx, UI.kind_name(kind), nm, suffix], 8, UI.kind_color(kind))
-		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		row.custom_minimum_size = Vector2(326, 0)
+		var suffix := " ×%d" % int(mult) if mult > 1.0 else ""
+		var col := UI.kind_color(kind)
+
+		var card_row := Panel.new()
+		card_row.custom_minimum_size = Vector2(318, 18)
+		card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_row.add_theme_stylebox_override("panel", UI.style(Color(0.08, 0.085, 0.11, 0.85), Color(col.r, col.g, col.b, 0.35), 1, 0))
+		pause_perk_list.add_child(card_row)
+
+		var ico := _card_icon({"kind": kind, "id": id, "data": data})
+		var text_x := 6.0
+		if ico != null:
+			var tr := TextureRect.new()
+			tr.texture = ico
+			tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.position = Vector2(4, 2)
+			tr.size = Vector2(14, 14)
+			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card_row.add_child(tr)
+			text_x = 22.0
+		var lbl := UI.crisp_label(card_row, "%2d. %s%s" % [idx, nm, suffix], 8, col, Vector2(text_x, 3))
+		lbl.size = Vector2(226 - text_x, 12)
+		lbl.clip_text = true
+		var badge := UI.crisp_label(card_row, UI.kind_name(kind), 7, UI.DIM, Vector2(230, 4))
+		badge.size = Vector2(82, 11)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	if log.is_empty():
-		UI.label(pause_perk_list, "Пока ничего не выбрано", 9, UI.DIM)
+		UI.crisp_label(pause_perk_list, "Пока ничего не выбрано — повышайте уровень!", 8, UI.DIM)
 	var upg: UpgradeSystem = game.player.upg
-	pause_perks_count.text = "всего %d" % log.size()
+	pause_perks_count.text = "всего %d · синергий %d" % [log.size(), upg.taken_synergies.size()]
 
 	UI.clear(pause_stats)
 	var map_name := String(game.map_data.get("name", ""))
 	var char_name := String(game.player.char_data.get("name", ""))
 	var weapon_name := String(game.player.weapon.get("name", ""))
-	var mode_names := {"standard": "Стандартный 30 мин", "quick": "Быстрый 10 мин", "endless": "Бесконечный", "coop": "Кооператив"}
+	var mode_names := {"standard": "Стандарт 30м", "quick": "Быстрый 10м", "endless": "Бесконечный", "coop": "Кооп"}
 	var mode_name := String(mode_names.get(String(game.mode), String(game.mode)))
 	var total_time := float(game.elapsed)
 	if game.mode != "endless":
 		total_time = maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed))
 	var rows := [
-		["Карта", map_name],
-		["Персонаж", char_name],
-		["Оружие", "%s · ур. %d" % [weapon_name, game.player.weapon_level]],
+		["Карта · Тьма", "%s · Т%d" % [map_name, int(GameManager.run_config.get("darkness", 1))]],
+		["Герой", char_name],
+		["Оружие", "%s (ур.%d)" % [weapon_name, game.player.weapon_level]],
 		["Режим", mode_name],
-		["Осталось", UI.fmt_time(total_time) if game.mode != "endless" else UI.fmt_time(float(game.elapsed))],
-		["Уровень", str(game.level)],
-		["Убийства", str(game.kills)],
-		["Урон нанесён", str(int(game.damage_dealt))],
-		["Урон получен", str(int(game.damage_taken))],
-		["Золото", str(game.gold)],
-		["Души", str(int(game.souls))],
-		["Осколки", str(int(SaveManager.data.get("crystals", 0)))],
-		["Перки", "%d · синергий %d" % [upg.taken.size(), upg.taken_synergies.size()]],
-		["Тьма", str(int(GameManager.run_config.get("darkness", 1)))],
+		["Время" if game.mode == "endless" else "Осталось", UI.fmt_time(total_time)],
+		["Уровень · Убийства", "ур.%d · %d" % [game.level, game.kills]],
+		["Урон / Крит", "%.0f · %d%%" % [game.player.current_damage(), int(round(float(game.player.S.crit) * 100.0))]],
+		["Нанесено / Получено", "%d / %d" % [int(game.damage_dealt), int(game.damage_taken)]],
+		["Золото / Души", "%d / %d" % [game.gold, int(game.souls)]],
 	]
 	for pair in rows:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
-		row.custom_minimum_size = Vector2(246, 9)
-		var a := UI.label(row, String(pair[0]), 8, UI.DIM)
-		a.custom_minimum_size = Vector2(96, 0)
-		var b := UI.label(row, String(pair[1]), 8, UI.TEXT)
-		b.custom_minimum_size = Vector2(140, 0)
+		row.custom_minimum_size = Vector2(238, 12)
+		var a := UI.crisp_label(row, String(pair[0]), 8, UI.DIM)
+		a.custom_minimum_size = Vector2(110, 0)
+		var b := UI.crisp_label(row, String(pair[1]), 8, UI.TEXT)
+		b.custom_minimum_size = Vector2(124, 0)
 		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		pause_stats.add_child(row)
 
@@ -800,53 +821,136 @@ func show_end(results: Dictionary, win: bool, secret_win: bool) -> void:
 	syn_layer.visible = false
 	get_tree().paused = false
 	end_layer.visible = true
+	AudioManager.stop_ambience()
+	AudioManager.set_boss_layer(false)
+	AudioManager.play_sfx("victory" if win else "defeat", 1.0)
 	var panel: Panel = end_layer.get_child(1)
 	UI.clear(panel)
 	var title_txt := Loc.t("victory") if win else Loc.t("defeat")
-	var accent := UI.GOLD if win else UI.DANGER
+	var sub_txt := "Владыка Тьмы повержен — рассвет наступил" if win else "Тьма поглотила странника..."
+	var accent := UI.GOLD_BRIGHT if win else UI.DANGER
 	if secret_win:
-		title_txt = "СЕКРЕТНАЯ ПОБЕДА"
-	# цветная полоса сверху панели
+		title_txt = "ТАЙНАЯ ПОБЕДА"
+		sub_txt = "Сам САТАНАИЛ пал в бездне Пустоты!"
+		accent = Color("#d89bff")
+	panel.set("accent", accent.darkened(0.25))
+	panel.queue_redraw()
+
+	# Верхняя цветная кайма и готический заголовок
 	var stripe := ColorRect.new()
-	stripe.color = Color(accent.r, accent.g, accent.b, 0.85)
-	stripe.position = Vector2(1, 1)
-	stripe.size = Vector2(panel.size.x - 2, 2)
+	stripe.color = Color(accent.r, accent.g, accent.b, 0.92)
+	stripe.position = Vector2(3, 3)
+	stripe.size = Vector2(panel.size.x - 6, 3)
 	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(stripe)
-	var title := UI.label(panel, title_txt, 20, accent, Vector2(18, 12))
-	title.size = Vector2(panel.size.x - 36, 22)
-	UI.label(panel, "итоги забега", 8, UI.MUTED, Vector2(19, 34))
-	var lines := [
+
+	# Портрет героя, герб и иконка оружия
+	var hero_cls := String(game.player.char_data.get("cls", "paladin")) if (game != null and game.player != null) else "paladin"
+	var w_id := String(game.player.weapon.get("id", "revolver")) if (game != null and game.player != null) else "revolver"
+	var htex := Assets.icon("portrait_" + hero_cls)
+	if htex == null:
+		htex = Assets.icon(hero_cls)
+	if htex != null:
+		var hp_box := Panel.new()
+		hp_box.position = Vector2(20, 14)
+		hp_box.size = Vector2(46, 46)
+		hp_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hp_box.add_theme_stylebox_override("panel", UI.style(Color("#0c0d12"), accent, 1, 0))
+		panel.add_child(hp_box)
+		var htr := TextureRect.new()
+		htr.texture = htex
+		htr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		htr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		htr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		htr.position = Vector2(3, 3)
+		htr.size = Vector2(40, 40)
+		htr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hp_box.add_child(htr)
+	var wtex := Assets.icon("icon_weapon_" + w_id)
+	if wtex != null:
+		var wtr := TextureRect.new()
+		wtr.texture = wtex
+		wtr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		wtr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		wtr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		wtr.position = Vector2(panel.size.x - 58, 16)
+		wtr.size = Vector2(36, 36)
+		wtr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(wtr)
+
+	var title := UI.title(panel, title_txt, 22, Vector2(76, 12), accent)
+	title.size = Vector2(panel.size.x - 144, 26)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var sub := UI.crisp_label(panel, sub_txt, 8, UI.DIM, Vector2(76, 42))
+	sub.size = Vector2(panel.size.x - 144, 14)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UI.divider(panel, Vector2(24, 64), panel.size.x - 48, accent.darkened(0.2))
+
+	# Двухколоночная таблица итогов забега
+	var map_name := String(game.map_data.get("name", "")) if (game != null and game.map_data is Dictionary) else ""
+	var char_name := String(game.player.char_data.get("name", "")) if (game != null and game.player != null) else ""
+	var perk_cnt := int(game.player.upg.taken.size()) if (game != null and game.player != null) else 0
+	var syn_cnt := int(game.player.upg.taken_synergies.size()) if (game != null and game.player != null) else 0
+	var left_lines := [
+		["Карта", map_name],
+		["Герой", char_name],
 		[Loc.t("time"), UI.fmt_time(float(results.get("time", 0.0)))],
+		[Loc.t("level"), str(int(results.get("level", 1)))],
+		["Перки / Синергии", "%d / %d" % [perk_cnt, syn_cnt]],
+	]
+	var right_lines := [
 		[Loc.t("kills"), str(int(results.get("kills", 0)))],
 		[Loc.t("damage_dealt"), str(int(results.get("damage_dealt", 0)))],
 		[Loc.t("damage_taken"), str(int(results.get("damage_taken", 0)))],
-		[Loc.t("level"), str(int(results.get("level", 1)))],
-		[Loc.t("gold"), str(int(results.get("gold", 0)))],
-		[Loc.t("souls"), str(int(results.get("souls", 0)))],
+		[Loc.t("gold"), "+%d" % int(results.get("gold", 0))],
+		[Loc.t("souls"), "+%d" % int(results.get("souls", 0))],
 	]
-	var y := 52
-	for pair in lines:
-		var row := HBoxContainer.new()
-		row.position = Vector2(18, y)
-		row.size = Vector2(panel.size.x - 36, 10)
-		var a := UI.label(row, String(pair[0]), 9, UI.DIM)
-		a.custom_minimum_size = Vector2(170, 0)
-		var b := UI.label(row, String(pair[1]), 9, UI.TEXT)
-		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		b.custom_minimum_size = Vector2(130, 0)
-		panel.add_child(row)
-		y += 14
-	var buttons := UI.vbox(panel, 5)
-	buttons.position = Vector2(18, y + 8)
-	buttons.size = Vector2(panel.size.x - 36, 80)
-	var retry := UI.primary_button(buttons, Loc.t("restart"), 10, Vector2(panel.size.x - 36, 24))
+	for col_idx in 2:
+		var col_data: Array = left_lines if col_idx == 0 else right_lines
+		var cx := 20.0 if col_idx == 0 else 238.0
+		var box := UI.panel(panel, Rect2(cx, 78, 206, 128), Color("#0b0c11"), Color(0.28, 0.30, 0.36, 0.85))
+		var cy := 10.0
+		for pair in col_data:
+			var a := UI.crisp_label(box, String(pair[0]), 8, UI.DIM, Vector2(10, cy))
+			a.size = Vector2(96, 16)
+			var val_col := UI.GOLD_BRIGHT if String(pair[0]) in [Loc.t("gold"), Loc.t("souls")] else UI.TEXT
+			var b := UI.crisp_label(box, String(pair[1]), 9, val_col, Vector2(106, cy))
+			b.size = Vector2(90, 16)
+			b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			cy += 22.0
+
+	# Полоса иконок собранных синергий (если есть)
+	if game != null and game.player != null and not game.player.upg.taken_synergies.is_empty():
+		var sx := 24.0
+		UI.crisp_label(panel, "СИНЕРГИИ:", 8, UI.GOLD, Vector2(22, 214))
+		sx = 94.0
+		for sid in game.player.upg.taken_synergies:
+			var stex := Assets.icon("icon_" + String(sid))
+			if stex != null:
+				var str_ic := TextureRect.new()
+				str_ic.texture = stex
+				str_ic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				str_ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				str_ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				str_ic.position = Vector2(sx, 211)
+				str_ic.size = Vector2(16, 16)
+				panel.add_child(str_ic)
+				sx += 20.0
+				if sx > 420.0:
+					break
+
+	# Кнопки действий
+	var buttons := UI.hbox(panel, 8)
+	buttons.position = Vector2(20, 240)
+	buttons.size = Vector2(panel.size.x - 40, 44)
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	var retry := UI.primary_button(buttons, Loc.t("restart"), 10, Vector2(142, 28))
 	retry.pressed.connect(func() -> void: GameManager.start_run(GameManager.run_config.duplicate()))
-	var menu := UI.button(buttons, Loc.t("main_menu"), 10, Vector2(panel.size.x - 36, 22))
-	menu.pressed.connect(func() -> void: GameManager.goto_menu())
 	if GameManager.is_endless_unlocked() and not win:
-		var endless := UI.button(buttons, Loc.t("continue_endless"), 9, Vector2(panel.size.x - 36, 22))
+		var endless := UI.button(buttons, Loc.t("continue_endless"), 9, Vector2(150, 28))
 		endless.pressed.connect(_continue_endless)
+	var menu := UI.button(buttons, Loc.t("main_menu"), 10, Vector2(118, 28))
+	menu.pressed.connect(func() -> void: GameManager.goto_menu())
 
 func _continue_endless() -> void:
 	var cfg: Dictionary = GameManager.run_config.duplicate()

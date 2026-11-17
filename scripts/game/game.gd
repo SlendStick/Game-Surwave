@@ -42,6 +42,8 @@ var hazards: Array = []
 var hazard_pool: Array = []
 var fx_list: Array = []
 var fx_pool: Array = []
+var dmg_nums: Array = []
+var dmg_pool: Array = []
 
 var obstacles: Array = []
 var obstacle_grid: Dictionary = {}
@@ -191,6 +193,7 @@ func _ready() -> void:
 	_apply_map_mods()
 	_apply_trials()
 	AudioManager.play_music(map_data.get("mood", {}))
+	AudioManager.play_ambience(String(map_data.get("id", "sands")))
 	AudioManager.set_boss_layer(false)
 	GameManager.add_album_enemy("")
 	run_started = true
@@ -347,6 +350,7 @@ func _build_obstacles(md: Dictionary) -> void:
 	solid_cells.clear()
 	for k in hazard_stats.keys():
 		hazard_stats[k] = 0
+	var mid := String(md.get("id", ""))
 	var accent := Gfx.hex(String(md.get("palette", {}).get("accent", "#ffffff")))
 	var base_col := Gfx.hex(String(md.get("palette", {}).get("obstacle", "#404050")))
 	for def in md.get("obstacles", []):
@@ -365,7 +369,7 @@ func _build_obstacles(md: Dictionary) -> void:
 				continue
 			var rect := Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h))
 			if kind == "decor":
-				var vis := ObstacleVis.build(world, shape, Vector2(w, h), col, accent)
+				var vis := ObstacleVis.build(world, shape, Vector2(w, h), col, accent, mid)
 				vis.position = pos
 				if shape == "flower" or shape == "reeds":
 					vis.modulate = Color(0.9, 0.9, 0.9, 0.85)
@@ -384,7 +388,7 @@ func _build_obstacles(md: Dictionary) -> void:
 				"node": null,
 				"color": col,
 			}
-			var vis2 := ObstacleVis.build(world, shape, Vector2(w, h), col, accent)
+			var vis2 := ObstacleVis.build(world, shape, Vector2(w, h), col, accent, mid)
 			vis2.position = pos
 			match kind:
 				"solid":
@@ -1522,6 +1526,22 @@ func _tick_fx(delta: float) -> void:
 	for f in fx_list:
 		if f.active:
 			f.tick(delta)
+	for i in range(dmg_nums.size() - 1, -1, -1):
+		var d: Dictionary = dmg_nums[i]
+		d["t"] = float(d["t"]) + delta
+		var lbl: Label = d["lbl"]
+		var k := float(d["t"]) / float(d["dur"])
+		if k >= 1.0 or not is_instance_valid(lbl):
+			if is_instance_valid(lbl):
+				lbl.visible = false
+				if dmg_pool.size() < 28:
+					dmg_pool.append(lbl)
+				else:
+					lbl.queue_free()
+			dmg_nums.remove_at(i)
+		else:
+			lbl.position += Vector2(float(d["vx"]), -24.0 * (1.0 - k * 0.5)) * delta
+			lbl.modulate.a = clampf(1.0 - pow(k, 1.8), 0.0, 1.0)
 
 func _tick_map(delta: float) -> void:
 	# течения/события карты
@@ -1573,14 +1593,14 @@ func _tick_audio(delta: float) -> void:
 	last_intensity_check -= delta
 	if last_intensity_check > 0.0:
 		return
-	last_intensity_check = 0.5
-	var near := enemies_in_radius(player.global_position, 300.0).size()
-	var intensity := 0.0
-	if near >= 50:
-		intensity = 1.0
-	elif near >= 20:
-		intensity = 0.5
-	intensity = maxf(intensity, clampf(float(near) / 50.0, 0.0, 1.0))
+	last_intensity_check = 0.25
+	var near := enemies_in_radius(player.global_position, 340.0).size()
+	var total_active := enemies.size()
+	var intensity := clampf(float(near) / 42.0, 0.0, 1.0)
+	if total_active >= 65:
+		intensity = maxf(intensity, 0.55)
+	if player != null and player.hp <= 1:
+		intensity = maxf(intensity, 0.65)
 	AudioManager.set_intensity(intensity)
 	if boss_enemy != null and boss_enemy.active:
 		AudioManager.set_boss_layer(true)
@@ -2057,6 +2077,37 @@ func spawn_event_fx(ev_kind: String, pos: Vector2, tele: float, radius: float, e
 	world.add_child(node)
 	node.setup(self, ev_kind, pos, tele, radius, extra)
 
+func spawn_dmg_number(pos: Vector2, amount: float, is_crit: bool = false, source: String = "") -> void:
+	if world == null or dmg_nums.size() >= 28:
+		return
+	var lbl: Label = null
+	if not dmg_pool.is_empty():
+		lbl = dmg_pool.pop_back()
+	else:
+		lbl = Label.new()
+		lbl.z_index = 14
+		lbl.add_theme_font_override("font", UI.crisp_font())
+		lbl.add_theme_color_override("font_outline_color", Color(0.04, 0.03, 0.03, 0.95))
+		lbl.add_theme_constant_override("outline_size", 2)
+		world.add_child(lbl)
+	var col := Color("#f2e6cf")
+	if is_crit:
+		col = Color("#ffcf4a")
+	elif source in ["lightning", "chain"]:
+		col = Color("#9ad8ff")
+	elif source in ["curse", "dot"]:
+		col = Color("#c87cff")
+	elif source in ["smite", "holy", "divine"]:
+		col = Color("#fff0a8")
+	lbl.text = ("%d!" % int(round(amount))) if is_crit else ("%d" % int(round(amount)))
+	lbl.add_theme_font_size_override("font_size", 11 if is_crit else 9)
+	lbl.add_theme_color_override("font_color", col)
+	lbl.position = pos + Vector2(randf_range(-8.0, 8.0), -14.0)
+	lbl.scale = Vector2.ONE * (1.18 if is_crit else 1.0)
+	lbl.modulate = Color(1, 1, 1, 1)
+	lbl.visible = true
+	dmg_nums.append({"lbl": lbl, "t": 0.0, "dur": 0.55 if is_crit else 0.42, "vx": randf_range(-12.0, 12.0)})
+
 func spawn_perk_fx(fx_kind: String, pos: Vector2, size_px: float = 48.0, dur: float = 0.32) -> void:
 	if world == null or not is_instance_valid(world):
 		return
@@ -2118,6 +2169,8 @@ func damage_enemy(enemy: Node2D, amount: float, opts: Dictionary = {}) -> void:
 	if enemy.boss and enemy.active and enemy.hp / maxf(1.0,enemy.max_hp) <= 0.05 and qte_target == null and GameManager.setting("qte",true) and not GameManager.autoplay:
 		_start_final_qte(enemy)
 	damage_dealt += dmg
+	if not bool(opts.get("silent", false)) and (dmg >= 2.0 or bool(opts.get("crit", false)) or enemy.boss):
+		spawn_dmg_number(enemy.global_position, dmg, bool(opts.get("crit", false)), String(opts.get("source", "")))
 	if player != null:
 		player.on_enemy_hit(enemy, dmg)
 	# распространение проклятия (Моровая Чума)
@@ -2171,7 +2224,9 @@ func apply_status(enemy: Node2D, key: String, dur: float, params: Dictionary = {
 				frac = 0.03
 			enemy.hp -= enemy.max_hp * frac
 		if player != null and player.upg.flag_on("iceflame_passive"):
-			pass
+			apply_status(enemy, "burn", dur, {"dps": 6.0})
+	if key == "curse":
+		spawn_perk_fx("curse", enemy.global_position, 28.0, 0.24)
 	if key == "burn":
 		AudioManager.play_sfx("fire", randf_range(0.8, 1.2))
 		if player != null and player.upg.flag_num("burn_explode") > 0.0:
@@ -2430,6 +2485,7 @@ func shake(amount: float) -> void:
 
 func boss_phase_transition(boss_node: Node2D, new_phase: int, mega: bool) -> void:
 	print("[SURWAVE] boss_phase id=%s phase=%d mega=%s t=%.1f" % [String(boss_node.boss_def.get("id","")),new_phase,str(mega),elapsed])
+	AudioManager.play_sfx("phase" if not mega else "sathan", 1.0)
 	if player != null:
 		player.iframes = maxf(player.iframes, 1.2)
 	for b in ebullets:
@@ -2522,6 +2578,7 @@ func add_xp(amount: float) -> void:
 		pending_level_ups += 1
 		player.on_level_up(level)
 		AudioManager.play_sfx("levelup")
+		spawn_perk_fx("holy", player.global_position, 72.0, 0.42)
 	if pending_level_ups > 0:
 		_open_level_up()
 	EventBus.xp_changed.emit(xp, xp_need, level)
@@ -2877,6 +2934,10 @@ func run_map_event(ev: Dictionary) -> void:
 			for i in int(p.get("count", 1)):
 				var pos := player.global_position + Vector2(randf_range(-80, 80), randf_range(-80, 80))
 				spawn_delayed_aoe(pos, float(p.get("radius", 48.0)), float(p.get("damage", 20)), 0.8, Color(0.8, 0.9, 1.0))
+				var pos_copy := pos
+				run_later(0.8, func() -> void:
+					spawn_perk_fx("lightning", pos_copy, 56.0, 0.34)
+					AudioManager.play_sfx("shot_lightning", 0.65))
 		"pull":
 			var dir := (map_rect.get_center() - player.global_position).normalized()
 			player.global_position += dir * float(p.get("force", 120.0)) * 0.5
@@ -2888,9 +2949,10 @@ func run_map_event(ev: Dictionary) -> void:
 				if enemy.active:
 					enemy.speed *= 1.0 + float(p.get("speed", 0.0))
 		"cursed_ground":
+			var c_pat := "void" if String(map_data.get("id", "")) in ["void", "rift", "chaos"] else "rune"
 			for i in int(p.get("count", 2)):
 				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_hazard_zone(pos, float(p.get("dot", 3.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 48.0)), Color(0.4, 0.2, 0.5), {"slow": float(p.get("slow", 0.0))})
+				spawn_hazard_zone(pos, float(p.get("dot", 3.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 48.0)), Color(0.4, 0.2, 0.5), {"slow": float(p.get("slow", 0.0)), "pattern": c_pat})
 		"obstacle_toggle":
 			notify("Обвал!")
 			_collapse_obstacles(int(p.get("count", 4)), float(p.get("duration", 15.0)))
@@ -2903,6 +2965,7 @@ func run_map_event(ev: Dictionary) -> void:
 			for i in int(p.get("count", 3)):
 				var pos := Vector2(rng.randf_range(100, map_rect.size.x - 100), player.global_position.y - 120.0)
 				spawn_delayed_aoe(pos, 34.0, float(p.get("damage", 3)), 1.4, Color(0.7, 0.7, 0.7))
+				spawn_event_fx("boulder", pos, 1.4, 34.0)
 		"meteor":
 			var m_count := int(p.get("count", 8))
 			var tele := float(p.get("telegraph", 2.5))
@@ -3081,6 +3144,9 @@ func run_map_event(ev: Dictionary) -> void:
 			for i in int(p.get("count", 5)):
 				var pos := player.global_position + Vector2(randf_range(-140, 140), randf_range(-140, 140))
 				spawn_delayed_aoe(pos, 32.0, float(p.get("damage", 8)), 1.5, Color(1, 0.2, 0.1), 4.0)
+				var p_copy := pos
+				run_later(1.5, func() -> void:
+					spawn_perk_fx("blood", p_copy, 48.0, 0.35))
 
 func _band_event(dmg: float, width: float, burn: bool) -> void:
 	notify("Волна!")
@@ -3093,6 +3159,9 @@ func _band_event(dmg: float, width: float, burn: bool) -> void:
 
 func _collapse_obstacles(count: int, duration: float) -> void:
 	var added := 0
+	var mid := String(map_data.get("id", ""))
+	var obs_col := Gfx.hex(String(map_data.get("palette", {}).get("obstacle", "#504a45")))
+	var acc_col := Gfx.hex(String(map_data.get("palette", {}).get("accent", "#908070")))
 	for i in count:
 		var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
 		var rect := Rect2(pos - Vector2(30, 30), Vector2(60, 60))
@@ -3106,7 +3175,7 @@ func _collapse_obstacles(count: int, duration: float) -> void:
 		shape.shape = rs
 		body.add_child(shape)
 		world.add_child(body)
-		Gfx.square(body, Vector2(60, 60), Color(0.3, 0.3, 0.32))
+		ObstacleVis.build(body, "rock", Vector2(56, 56), obs_col, acc_col, mid)
 		_register_obstacle({"rect": rect, "kind": "solid", "hp": 100.0, "max_hp": 100.0, "slow": 0.0, "damage": 0.0, "interval": 0.5, "timer": 0.0, "node": body, "temp": duration})
 		added += 1
 	if added > 0:

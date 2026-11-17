@@ -19,6 +19,8 @@ var color := Color.WHITE
 var stuck := false
 var traveled := 0.0
 var returned := false
+var spin_speed := 0.0
+var wave_phase := 0.0
 
 func setup(g: Node) -> void:
 	game = g
@@ -33,6 +35,9 @@ func spawn_bullet(pos: Vector2, dir: Vector2, dmg: float, o: Dictionary) -> void
 	visible = true
 	hit_list.clear()
 	stuck = false
+	traveled = 0.0
+	returned = false
+	wave_phase = randf() * TAU
 	color = opts.get("color", Color.WHITE)
 	radius = float(opts.get("radius", 3.0))
 	pierce = int(opts.get("pierce", 0))
@@ -45,6 +50,7 @@ func spawn_bullet(pos: Vector2, dir: Vector2, dmg: float, o: Dictionary) -> void
 	var behavior := String(opts.get("behavior", ""))
 	var source := String(opts.get("source", ""))
 	var wid := String(opts.get("weapon_id", ""))
+	spin_speed = 15.0 if (behavior == "dagger" or behavior == "hammer" or opts.has("boomerang")) else 0.0
 	if bool(opts.get("holy", false)) or wid == "holy_spears":
 		cls = "projectile_spear"
 	elif wid == "shadow_daggers" or behavior == "dagger":
@@ -84,7 +90,7 @@ func deactivate() -> void:
 func tick(delta: float) -> void:
 	if not active:
 		return
-	# самонаведение
+	# самонаведение и уникальные траектории
 	if homing:
 		if target == null or not is_instance_valid(target) or not target.active:
 			var near: Array = game.nearest_enemy(global_position, 260.0)
@@ -92,6 +98,20 @@ func tick(delta: float) -> void:
 		if target != null and is_instance_valid(target):
 			var want := (target.global_position - global_position).normalized() * vel.length()
 			vel = vel.lerp(want, clampf(9.0 * delta, 0.0, 1.0))
+	elif bool(opts.get("is_orb", false)):
+		wave_phase += delta * 7.5
+		var perp := Vector2(-vel.y, vel.x).normalized()
+		global_position += perp * sin(wave_phase) * 28.0 * delta
+		if target == null or not is_instance_valid(target) or not target.active:
+			var near_orb: Array = game.nearest_enemy(global_position, 150.0)
+			target = near_orb[0] if not near_orb.is_empty() else null
+		if target != null and is_instance_valid(target):
+			var want_orb := (target.global_position - global_position).normalized() * vel.length()
+			vel = vel.lerp(want_orb, clampf(2.6 * delta, 0.0, 1.0))
+	if spin_speed != 0.0:
+		rotation += spin_speed * delta
+	elif not opts.has("angle"):
+		rotation = vel.angle()
 	var prev := global_position
 	global_position += vel * delta
 	life -= delta
@@ -177,12 +197,13 @@ func _hit(enemy: Node2D) -> void:
 		game.apply_status(enemy, "burn", float(b.get("dur", 3.0)), {"dps": float(b.get("dps", 3.0))})
 	if bool(opts.get("curse", false)):
 		game.apply_status(enemy, "curse", 3.0, {"dps": damage * 2.0 / 3.0})
+		game.spawn_perk_fx("curse", enemy.global_position, 32.0, 0.26)
 	if float(opts.get("stun", 0.0)) > 0.0:
 		enemy.stun = maxf(float(enemy.stun), float(opts["stun"]))
 	if opts.has("gas"):
 		var g: Dictionary = opts["gas"]
 		game.spawn_hazard_zone(global_position, float(g.get("dps", 4.0)), float(g.get("dur", 4.0)),
-			float(g.get("radius", 40.0)), Color(0.5, 1.0, 0.2), {"poison": float(g.get("dps", 4.0))})
+			float(g.get("radius", 40.0)), Color(0.5, 1.0, 0.2), {"poison": float(g.get("dps", 4.0)), "pattern": "poison"})
 	if opts.has("poison"):
 		var pz: Dictionary = opts["poison"]
 		game.apply_status(enemy, "poison", float(pz.get("dur", 4.0)), {"dps": float(pz.get("dps", 4.0))})
@@ -192,6 +213,11 @@ func _hit(enemy: Node2D) -> void:
 		game.freeze_enemy(enemy, float(DB.balance["player"].get("freeze_dur", 2.0)))
 	if float(opts.get("tornado", 0.0)) > 0.0:
 		game.spawn_ally("tornado", {"damage": float(opts["tornado"]), "duration": 2.0, "radius": 34.0, "pos": enemy.global_position})
+		game.spawn_perk_fx("wind", enemy.global_position, 36.0, 0.28)
+	if String(opts.get("behavior", "")) == "lightning":
+		game.spawn_perk_fx("lightning", enemy.global_position, 34.0, 0.26)
+	elif bool(opts.get("crit", false)):
+		game.spawn_perk_fx("blood", enemy.global_position, 28.0, 0.22)
 	if opts.has("explode"):
 		_explode()
 	if int(opts.get("split", 0)) > 0:
@@ -228,10 +254,10 @@ func _explode() -> void:
 	if opts.has("burn") or String(opts.get("behavior", "")) == "fireball" or bool(opts.get("napalm", false)):
 		game.spawn_perk_fx("fireball", global_position, r * 1.1, 0.30)
 	elif bool(opts.get("holy", false)):
-		game.spawn_perk_fx("smite", global_position, r * 0.9, 0.28)
+		game.spawn_perk_fx("holy", global_position, r * 0.95, 0.30)
 	AudioManager.play_sfx("shot_heavy", 1.25)
 	if bool(opts.get("napalm", false)):
-		game.spawn_hazard_zone(global_position, 5.0, 4.0, r * 0.7, Color(1.0, 0.45, 0.1))
+		game.spawn_hazard_zone(global_position, 5.0, 4.0, r * 0.7, Color(1.0, 0.45, 0.1), {"pattern": "fire"})
 	if int(opts.get("cluster", 0)) > 0:
 		var n := int(opts["cluster"])
 		for i in n:

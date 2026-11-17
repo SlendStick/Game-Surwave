@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
 from pixel_art_lib import Canvas, Color, c, mix, mul
 
-OUT = Path(__file__).resolve().parent.parent / "assets" / "sprites"
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "assets" / "sprites"
 
 
 def _save_anim(
@@ -450,6 +452,115 @@ def _draw_enemy(kind: str, phase: int = 0) -> Canvas:
     return cv
 
 
+def _biome_themes() -> dict:
+    return {
+        "sands":     (c("sand"), c("bronze"), c("amber"), "desert"),
+        "tundra":    (c("ice_blue"), c("frost_blue"), c("ice_glow"), "frost"),
+        "peak":      (c("stone_dk"), c("lava"), c("gold_glow"), "magma"),
+        "abyss":     (c("slate_dk"), c("violet_lt"), c("ghost_violet"), "crystal"),
+        "forest":    (c("moss_dk"), c("moss"), c("amber"), "forest"),
+        "rift":      (c("arcane_dk"), c("violet_lt"), c("ember_red"), "rift"),
+        "graveyard": (c("stone"), c("moss"), c("glow_green"), "grave"),
+        "hive":      (c("swamp_dk"), c("poison"), c("pale_green"), "hive"),
+        "bloodmoon": (c("crimson_dk"), c("crimson"), c("ember_red"), "blood"),
+        "chaos":     (c("arcane"), c("gold"), c("ice_glow"), "chaos"),
+        "temple":    (c("sand_dk"), c("gold"), c("ice_glow"), "temple"),
+        "throne":    (c("slate_vd"), c("crimson"), c("gold_glow"), "infernal"),
+        "void":      (c("#1b1326"), c("violet_lt"), c("ember_red"), "void"),
+    }
+
+
+def _draw_themed_enemy(kind: str, map_id: str, phase: int = 0) -> Canvas:
+    cv = _draw_enemy(kind, phase)
+    themes = _biome_themes()
+    if map_id not in themes:
+        return cv
+    tint_c, acc_c, eye_c, prop = themes[map_id]
+    # Shift non-black interior pixels toward the biome palette while preserving contrast & shading
+    for y in range(cv.h):
+        for x in range(cv.w):
+            r, g, b, a = cv.get(x, y)
+            if a < 180:
+                continue
+            if r + g + b <= 45:
+                continue  # preserve black outline
+            nr = int(r * 0.56 + tint_c[0] * 0.44)
+            ng = int(g * 0.56 + tint_c[1] * 0.44)
+            nb = int(b * 0.56 + tint_c[2] * 0.44)
+            cv.buf[y * cv.w + x] = (min(255, nr), min(255, ng), min(255, nb), a)
+
+    cx = 16
+    bob = -1 if phase in (1, 3) else 0
+    if prop == "desert":
+        cv.rect(cx - 4, 5 + bob, 8, 2, c("sand_lt"))
+        cv.px(cx, 5 + bob, c("gold"))
+        cv.px(cx - 6, 15 + bob, acc_c)
+        cv.px(cx + 6, 15 + bob, acc_c)
+    elif prop == "frost":
+        cv.line(cx - 5, 6 + bob, cx - 7, 2 + bob, acc_c)
+        cv.line(cx + 5, 6 + bob, cx + 7, 2 + bob, acc_c)
+        cv.px(cx, 3 + bob, c("snow_lt"))
+        cv.px(cx - 2, 9 + bob, eye_c)
+        cv.px(cx + 2, 9 + bob, eye_c)
+    elif prop == "magma":
+        cv.px(cx - 2, 14 + bob, acc_c)
+        cv.px(cx + 1, 16 + bob, acc_c)
+        cv.px(cx, 18 + bob, eye_c)
+        cv.px(cx - 3, 4 + bob, acc_c)
+        cv.px(cx + 3, 4 + bob, eye_c)
+    elif prop == "crystal":
+        cv.poly([(cx - 5, 7 + bob), (cx - 7, 2 + bob), (cx - 3, 5 + bob)], acc_c)
+        cv.poly([(cx + 5, 7 + bob), (cx + 7, 2 + bob), (cx + 3, 5 + bob)], acc_c)
+        cv.px(cx, 15 + bob, eye_c)
+    elif prop == "forest":
+        cv.rect(cx - 3, 4 + bob, 6, 2, acc_c)
+        cv.px(cx - 5, 13 + bob, c("moss"))
+        cv.px(cx + 5, 14 + bob, c("crimson"))
+    elif prop == "rift":
+        cv.px(cx, 3 + bob, eye_c)
+        cv.px(cx - 7, 11 + bob, acc_c)
+        cv.px(cx + 7, 11 + bob, acc_c)
+        cv.px(cx, 16 + bob, acc_c)
+    elif prop == "grave":
+        cv.px(cx - 7, 9 + bob, eye_c)
+        cv.px(cx + 7, 12 + bob, eye_c)
+        cv.rect(cx - 3, 15 + bob, 6, 1, c("moss"))
+    elif prop == "hive":
+        cv.px(cx - 4, 13 + bob, acc_c)
+        cv.px(cx + 4, 16 + bob, acc_c)
+        cv.px(cx - 2, 4 + bob, acc_c)
+        cv.px(cx + 2, 4 + bob, acc_c)
+        cv.px(cx - 1, 9 + bob, eye_c)
+        cv.px(cx + 2, 9 + bob, eye_c)
+    elif prop == "blood":
+        cv.line(cx - 4, 5 + bob, cx - 6, 2 + bob, acc_c)
+        cv.line(cx + 4, 5 + bob, cx + 6, 2 + bob, acc_c)
+        cv.px(cx - 2, 12 + bob, acc_c)
+        cv.px(cx + 2, 12 + bob, acc_c)
+    elif prop == "chaos":
+        cv.px(cx - 6, 5 + bob, eye_c)
+        cv.px(cx + 6, 6 + bob, acc_c)
+        cv.px(cx - 7, 18 + bob, acc_c)
+        cv.px(cx + 7, 15 + bob, eye_c)
+    elif prop == "temple":
+        cv.rect(cx - 4, 4 + bob, 8, 2, acc_c)
+        cv.px(cx, 3 + bob, eye_c)
+        cv.rect(cx - 5, 14 + bob, 2, 3, acc_c)
+        cv.rect(cx + 3, 14 + bob, 2, 3, acc_c)
+    elif prop == "infernal":
+        cv.rect(cx - 7, 12 + bob, 3, 3, acc_c)
+        cv.rect(cx + 4, 12 + bob, 3, 3, acc_c)
+        cv.px(cx - 3, 4 + bob, eye_c)
+        cv.px(cx + 3, 4 + bob, eye_c)
+    elif prop == "void":
+        cv.line(cx - 5, 3 + bob, cx + 5, 3 + bob, acc_c)
+        cv.px(cx, 3 + bob, (0, 0, 0, 0))
+        cv.px(cx - 2, 9 + bob, eye_c)
+        cv.px(cx + 2, 9 + bob, eye_c)
+    cv.outline(c("black"))
+    return cv
+
+
 def generate_enemies() -> int:
     total = 0
     enemies = [
@@ -461,6 +572,23 @@ def generate_enemies() -> int:
         idle = [_draw_enemy(kind, 0), _draw_enemy(kind, 2)]
         walk = [_draw_enemy(kind, p) for p in range(4)]
         total += _save_anim(kind, idle[0], idle, walk)
+
+    maps = json.loads((ROOT / "data" / "maps.json").read_text(encoding="utf-8"))
+    for m in maps:
+        mid = m["id"]
+        roster = m.get("roster", {})
+        e_set: set[str] = set()
+        for k in ("fodder", "shooter", "elite"):
+            for eid in roster.get(k, []):
+                e_set.add(str(eid))
+        if "slime" in e_set:
+            e_set.add("slime_small")
+        for eid in sorted(e_set):
+            if eid not in enemies:
+                continue
+            idle = [_draw_themed_enemy(eid, mid, 0), _draw_themed_enemy(eid, mid, 2)]
+            walk = [_draw_themed_enemy(eid, mid, p) for p in range(4)]
+            total += _save_anim(f"{eid}__{mid}", idle[0], idle, walk)
     return total
 
 

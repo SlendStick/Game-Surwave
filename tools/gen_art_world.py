@@ -255,15 +255,133 @@ def _draw_obstacle(shape: str) -> Canvas:
     return cv
 
 
+def _obs_biome_palette() -> dict:
+    return {
+        "sands":     (c("sand"), c("bronze"), c("amber")),
+        "tundra":    (c("ice_blue"), c("snow_lt"), c("ice_glow")),
+        "peak":      (c("slate_vd"), c("lava"), c("gold_glow")),
+        "abyss":     (c("slate_dk"), c("violet_lt"), c("ghost_violet")),
+        "forest":    (c("moss_dk"), c("moss"), c("amber")),
+        "rift":      (c("arcane_dk"), c("violet_lt"), c("ember_red")),
+        "graveyard": (c("stone_dk"), c("moss"), c("glow_green")),
+        "hive":      (c("swamp_dk"), c("poison"), c("pale_green")),
+        "bloodmoon": (c("crimson_dk"), c("crimson"), c("ember_red")),
+        "chaos":     (c("arcane"), c("gold"), c("ice_glow")),
+        "temple":    (c("sand_dk"), c("gold"), c("ice_glow")),
+        "throne":    (c("slate_vd"), c("crimson"), c("gold_glow")),
+        "void":      (c("#1b1326"), c("violet_lt"), c("ember_red")),
+    }
+
+
+def _draw_obstacle_themed(shape: str, map_id: str) -> Canvas:
+    cv = _draw_obstacle(shape)
+    themes = _obs_biome_palette()
+    if map_id not in themes:
+        return cv
+    tint, acc, glow = themes[map_id]
+    # Recolor interior subtly while keeping key silhouette & outline
+    for y in range(cv.h):
+        for x in range(cv.w):
+            r, g, b, a = cv.get(x, y)
+            if a < 160 or (r + g + b <= 45):
+                continue
+            nr = int(r * 0.62 + tint[0] * 0.38)
+            ng = int(g * 0.62 + tint[1] * 0.38)
+            nb = int(b * 0.62 + tint[2] * 0.38)
+            cv.buf[y * cv.w + x] = (min(255, nr), min(255, ng), min(255, nb), a)
+
+    # Biome-specific decorative overlays per obstacle type
+    if shape == "tree":
+        if map_id == "tundra":
+            cv.poly([(11, 14), (16, 3), (21, 14)], c("snow_lt"))
+            cv.px(13, 10, c("ice_glow"))
+        elif map_id in ("rift", "chaos", "void"):
+            cv.px(14, 9, glow)
+            cv.px(18, 12, acc)
+            cv.px(16, 6, glow)
+        elif map_id == "bloodmoon":
+            cv.px(13, 12, c("crimson"))
+            cv.px(19, 14, c("crimson"))
+            cv.px(16, 8, c("ember_red"))
+        elif map_id == "hive":
+            cv.px(12, 16, c("poison"))
+            cv.px(19, 15, c("glow_green"))
+    elif shape == "water":
+        if map_id == "sands":
+            cv.ellipse(24, 24, 15, 9, c("water_lt"))
+            cv.line(16, 22, 24, 22, c("ice_lt"))
+            cv.px(10, 14, c("moss"))
+            cv.px(11, 13, c("moss_dk"))
+        elif map_id == "bloodmoon":
+            cv.ellipse(24, 24, 17, 11, c("crimson_dk"))
+            cv.line(15, 22, 26, 22, c("crimson"))
+        elif map_id in ("abyss", "void"):
+            cv.ellipse(24, 24, 15, 10, c("arcane_vd"))
+            cv.px(20, 22, glow)
+            cv.px(29, 25, acc)
+    elif shape == "swamp":
+        if map_id in ("bloodmoon", "throne"):
+            cv.ellipse(24, 24, 16, 10, c("crimson_dk"))
+            cv.px(20, 22, c("ember_red"))
+        elif map_id in ("void", "rift"):
+            cv.ellipse(24, 24, 16, 10, c("arcane_vd"))
+            cv.px(19, 22, c("violet_lt"))
+            cv.px(29, 25, glow)
+    elif shape == "pillar":
+        if map_id == "peak":
+            cv.line(15, 10, 17, 20, c("lava"))
+            cv.px(16, 15, c("gold_glow"))
+        elif map_id == "temple":
+            cv.rect(11, 6, 10, 2, c("gold"))
+            cv.px(16, 14, c("ice_glow"))
+        elif map_id == "throne":
+            cv.rect(10, 6, 12, 3, c("crimson"))
+            cv.px(16, 14, c("gold_glow"))
+        elif map_id in ("rift", "chaos", "void"):
+            cv.line(16, 9, 16, 20, glow)
+    elif shape == "crystal":
+        cv.poly([(12, 24), (11, 14), (15, 6), (17, 24)], acc)
+        cv.line(14, 8, 14, 17, glow)
+    elif shape in ("rock", "stalagmite", "cliff"):
+        if map_id == "peak":
+            cv.px(15, 16, c("lava"))
+            cv.px(17, 19, c("gold_glow"))
+        elif map_id == "tundra":
+            cv.line(11, 13, 18, 11, c("snow_lt"))
+        elif map_id in ("abyss", "rift", "void"):
+            cv.px(16, 15, glow)
+    elif shape == "ash":
+        if map_id == "tundra":
+            cv.ellipse(24, 25, 13, 7, c("snow_dk"))
+            cv.px(21, 23, c("snow_lt"))
+        elif map_id == "graveyard":
+            cv.ellipse(24, 25, 13, 7, c("soil_dark"))
+            cv.px(22, 23, c("bone"))
+    elif shape == "bone" and map_id in ("bloodmoon", "throne"):
+        cv.px(14, 19, c("crimson"))
+        cv.px(19, 23, c("crimson"))
+    return cv
+
+
 def generate_obstacles() -> int:
     shapes = [
         "tree", "bush", "flower", "mushroom", "cactus", "rock", "bone", "water",
         "crystal", "pillar", "grave", "cross", "pumpkin", "reeds", "lava", "swamp",
         "ice", "ash", "stalagmite", "scrap", "cliff", "obelisk",
     ]
+    count = 0
     for sh in shapes:
         _draw_obstacle(sh).save(OUT / f"obs_{sh}.png")
-    return len(shapes)
+        count += 1
+    maps = json.loads((ROOT / "data" / "maps.json").read_text(encoding="utf-8"))
+    for m in maps:
+        mid = m["id"]
+        for item in m.get("obstacles", []):
+            sh = item.get("shape", "") if isinstance(item, dict) else str(item)
+            if sh in shapes:
+                _draw_obstacle_themed(sh, mid).save(OUT / f"obs_{sh}__{mid}.png")
+                count += 1
+    return count
 
 
 def generate_ui_and_fx() -> int:
@@ -638,6 +756,44 @@ def _generate_event_and_vfx_sprites() -> int:
             fr.line(16, 16, int(16 + math.cos(rad_a) * r), int(16 + math.sin(rad_a) * r), c("ice_glow"), 2 if f == 0 else 1)
         fr.ring(16, 16, r, max(1, r - 2), c("snow_lt"))
         fr.save(OUT / f"vfx_frost_{f}.png")
+        count += 1
+
+    # 7. Additional Perk VFX: Curse hex (4 frames), Holy nova (4 frames), Wind slash (3 frames), Blood slash (3 frames)
+    for f in range(4):
+        cu = Canvas(36, 36)
+        r = 6 + f * 4
+        cu.ring(18, 18, r, max(1, r - 2), (c("violet_lt")[0], c("violet_lt")[1], c("violet_lt")[2], 210 - f * 35))
+        for k in range(6):
+            a = k * math.tau / 6.0 + f * 0.35
+            cu.line(18, 18, int(18 + math.cos(a) * r), int(18 + math.sin(a) * r), c("arcane"), 2 if f < 2 else 1)
+        cu.ellipse(18, 18, max(2, 6 - f), max(2, 6 - f), c("ghost_violet"))
+        cu.save(OUT / f"vfx_curse_{f}.png")
+        count += 1
+
+        ho = Canvas(36, 36)
+        r = 6 + f * 4
+        ho.ring(18, 18, r + 1, max(1, r - 2), (c("gold_glow")[0], c("gold_glow")[1], c("gold_glow")[2], 220 - f * 40))
+        ho.line(18, max(2, 18 - r), 18, min(33, 18 + r), c("white"), 2 if f < 2 else 1)
+        ho.line(max(2, 18 - r), 18, min(33, 18 + r), 18, c("white"), 2 if f < 2 else 1)
+        ho.save(OUT / f"vfx_holy_{f}.png")
+        count += 1
+
+    for f in range(3):
+        wn = Canvas(32, 32)
+        r = 6 + f * 4
+        for ang in range(-45, 135, 15):
+            a = math.radians(ang + f * 35)
+            wn.rect(int(16 + math.cos(a) * r), int(16 + math.sin(a) * r), 2, 2, c("pale_green"))
+        wn.ring(16, 16, r, max(1, r - 2), (c("ice_lt")[0], c("ice_lt")[1], c("ice_lt")[2], 170 - f * 40))
+        wn.save(OUT / f"vfx_wind_{f}.png")
+        count += 1
+
+        bl = Canvas(32, 32)
+        r = 6 + f * 4
+        bl.line(6 + f * 2, 26 - f * 2, 26 - f * 2, 6 + f * 2, c("crimson"), 3 if f == 0 else 2)
+        bl.line(8 + f * 2, 26 - f * 2, 26 - f * 2, 8 + f * 2, c("ember_red"), 1)
+        bl.ring(16, 16, r, max(1, r - 2), (c("crimson")[0], c("crimson")[1], c("crimson")[2], 180 - f * 45))
+        bl.save(OUT / f"vfx_blood_{f}.png")
         count += 1
 
     return count

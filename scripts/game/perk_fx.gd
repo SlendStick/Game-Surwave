@@ -48,6 +48,22 @@ func setup(fx_kind: String, pos: Vector2, sz: float = 48.0, dur: float = 0.32) -
 			sprite.scale = Vector2.ONE * (size_px / 26.0)
 			glow.modulate = Color(0.65, 0.92, 1.0, 0.65)
 			glow.scale = Vector2.ONE * (size_px / 16.0)
+		"curse":
+			sprite.scale = Vector2.ONE * (size_px / 30.0)
+			glow.modulate = Color(0.68, 0.34, 0.92, 0.7)
+			glow.scale = Vector2.ONE * (size_px / 15.0)
+		"holy":
+			sprite.scale = Vector2.ONE * (size_px / 30.0)
+			glow.modulate = Color(1.0, 0.88, 0.45, 0.78)
+			glow.scale = Vector2.ONE * (size_px / 14.0)
+		"wind":
+			sprite.scale = Vector2.ONE * (size_px / 26.0)
+			glow.modulate = Color(0.65, 0.95, 0.78, 0.58)
+			glow.scale = Vector2.ONE * (size_px / 16.0)
+		"blood":
+			sprite.scale = Vector2.ONE * (size_px / 26.0)
+			glow.modulate = Color(0.95, 0.22, 0.25, 0.72)
+			glow.scale = Vector2.ONE * (size_px / 16.0)
 	_apply_frame(0)
 
 func _apply_frame(idx: int) -> void:
@@ -62,11 +78,19 @@ func _apply_frame(idx: int) -> void:
 			sprite.texture = Assets.icon("vfx_fireball_%d" % clampi(idx, 0, 3))
 		"frost":
 			sprite.texture = Assets.icon("vfx_frost_%d" % clampi(idx, 0, 2))
+		"curse":
+			sprite.texture = Assets.icon("vfx_curse_%d" % clampi(idx, 0, 3))
+		"holy":
+			sprite.texture = Assets.icon("vfx_holy_%d" % clampi(idx, 0, 3))
+		"wind":
+			sprite.texture = Assets.icon("vfx_wind_%d" % clampi(idx, 0, 2))
+		"blood":
+			sprite.texture = Assets.icon("vfx_blood_%d" % clampi(idx, 0, 2))
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	var k := clampf(elapsed / duration, 0.0, 1.0)
-	var frames := 3 if kind == "frost" else 4
+	var frames := 3 if kind in ["frost", "wind", "blood"] else 4
 	_apply_frame(mini(frames - 1, int(k * float(frames))))
 	var alpha := 1.0 - pow(k, 1.8)
 	if sprite != null:
