@@ -217,16 +217,16 @@ func _build_choice_layer() -> void:
 	choice_layer.visible = false
 	root.add_child(choice_layer)
 	_dim(choice_layer)
-	choice_title = UI.label(choice_layer, "", 15, UI.GOLD, Vector2(0, 22))
-	choice_title.size = Vector2(640, 20)
+	choice_title = UI.label(choice_layer, "", 14, UI.GOLD, Vector2(0, 12))
+	choice_title.size = Vector2(640, 18)
 	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	choice_hint = UI.label(choice_layer, "ЛКМ — выбрать · игра на паузе", 8, UI.MUTED, Vector2(0, 44))
+	choice_hint = UI.label(choice_layer, "ЛКМ — выбрать · игра на паузе", 8, UI.MUTED, Vector2(0, 31))
 	choice_hint.size = Vector2(640, 12)
 	choice_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	choice_box = HBoxContainer.new()
-	choice_box.position = Vector2(20, 64)
-	choice_box.size = Vector2(600, 210)
-	choice_box.add_theme_constant_override("separation", 8)
+	choice_box.position = Vector2(10, 46)
+	choice_box.size = Vector2(620, 302)
+	choice_box.add_theme_constant_override("separation", 6)
 	choice_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	choice_layer.add_child(choice_box)
 
@@ -322,70 +322,196 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 	current_cards = cards
 	UI.clear(choice_box)
 	choice_title.text = title
-	var card_w := 112.0
+	var card_w := 118.0
 	if cards.size() <= 3:
-		card_w = 140.0
+		card_w = 186.0
+	elif cards.size() == 4:
+		card_w = 148.0
+	var card_h := 296.0
 	for i in cards.size():
 		var card: Dictionary = cards[i]
 		var kind := String(card.get("kind", "perk"))
 		var data: Dictionary = card.get("data", {})
+		var cid := String(card.get("id", ""))
 		var accent := UI.kind_color(kind)
-		var b := UI.card(choice_box, Vector2(card_w, 198), accent)
-		# цветная полоса сверху — сразу видно вид награды
+		var b := UI.card(choice_box, Vector2(card_w, card_h), accent)
+
 		var stripe := ColorRect.new()
 		stripe.color = accent
 		stripe.position = Vector2(2, 2)
 		stripe.size = Vector2(card_w - 4, 2)
 		stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(stripe)
-		var v := UI.vbox(b, 2)
+
+		var v := UI.vbox(b, 3)
 		v.set_anchors_preset(Control.PRESET_FULL_RECT)
-		v.offset_left = 7
-		v.offset_top = 7
-		v.offset_right = -7
+		v.offset_left = 6
+		v.offset_top = 6
+		v.offset_right = -6
 		v.offset_bottom = -6
-		# номер + иконка предмета/перка
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		# --- верх карточки: иллюстрация + #N + тип + название
+		var illus_tex := _card_illustration(card)
+		var illus_h := 54.0 if cards.size() <= 4 else 48.0
+		var illus_frame := UI.panel(v, Rect2(0, 0, card_w - 12, illus_h), Color("#0d0e13"), Color(accent.r, accent.g, accent.b, 0.75))
+		illus_frame.custom_minimum_size = Vector2(card_w - 12, illus_h)
+		illus_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if illus_tex != null:
+			var itex := TextureRect.new()
+			itex.texture = illus_tex
+			itex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			itex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			itex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			itex.set_anchors_preset(Control.PRESET_FULL_RECT)
+			itex.offset_left = 2
+			itex.offset_top = 2
+			itex.offset_right = -2
+			itex.offset_bottom = -2
+			itex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			illus_frame.add_child(itex)
+
 		var hdr := UI.hbox(v, 4)
-		hdr.custom_minimum_size = Vector2(card_w - 14, 18)
+		hdr.custom_minimum_size = Vector2(card_w - 12, 13)
 		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var ctex := _card_icon(card)
-		if ctex != null:
-			var ico := TextureRect.new()
-			ico.texture = ctex
-			ico.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			ico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			ico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			ico.custom_minimum_size = Vector2(18, 18)
-			ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			hdr.add_child(ico)
-		var hdr_txt := UI.vbox(hdr, 0)
-		hdr_txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hdr_txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var num := UI.label(hdr_txt, "#%d" % (i + 1), 8, accent)
+		var num := UI.label(hdr, "#%d %s" % [i + 1, UI.kind_name(kind).to_upper()], 7, accent)
 		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var kind_txt := UI.kind_name(kind).to_upper()
-		var badge_fs := 6 if kind_txt.length() > 10 else 7
-		var badge := UI.label(hdr_txt, kind_txt, badge_fs, accent)
-		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
-		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var title_lbl := UI.label(v, String(data.get("name", card.get("id", ""))), 10, UI.TEXT)
+		num.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var meta_short := _card_tier_badge(card)
+		if meta_short != "":
+			var mbadge := UI.label(hdr, meta_short, 7, UI.GOLD)
+			mbadge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			mbadge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var title_lbl := UI.label(v, String(data.get("name", cid)), 10, UI.TEXT)
 		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		var meta_txt := _card_meta(card)
-		if meta_txt != "":
-			var meta_lbl := UI.label(v, meta_txt, 7, UI.GOLD)
-			meta_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title_lbl.custom_minimum_size = Vector2(card_w - 12, 24)
+		title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		var div1 := ColorRect.new()
+		div1.color = Color(accent.r, accent.g, accent.b, 0.35)
+		div1.custom_minimum_size = Vector2(card_w - 12, 1)
+		div1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.add_child(div1)
+
+		# --- низ карточки: описание + ветвь улучшений
 		var desc_lbl := UI.label(v, String(data.get("desc", "")), 8, UI.DIM)
 		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc_lbl.custom_minimum_size = Vector2(card_w - 18, 84)
-		var req_txt := _card_requires(data)
-		if req_txt != "":
-			var req_lbl := UI.label(v, req_txt, 7, UI.ACCENT)
-			req_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			req_lbl.custom_minimum_size = Vector2(card_w - 18, 20)
+		desc_lbl.custom_minimum_size = Vector2(card_w - 12, 54)
+		desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		_build_card_branch(v, card, card_w - 12, accent)
+
 		b.pressed.connect(_on_card_pressed.bind(card))
 	choice_hint.text = "ЛКМ или клавиши 1–%d · игра на паузе" % cards.size()
 	choice_layer.visible = true
+
+## Иллюстрация для карточки выбора (96x48 pixel art).
+func _card_illustration(card: Dictionary) -> Texture2D:
+	var kind := String(card.get("kind", "perk"))
+	var cid := String(card.get("id", ""))
+	var tex := Assets.icon("illus_" + cid)
+	if tex != null:
+		return tex
+	if kind == "evolution":
+		return Assets.icon("illus_evolution")
+	if kind == "specialization":
+		return Assets.icon("illus_specialization")
+	return _card_icon(card)
+
+func _card_tier_badge(card: Dictionary) -> String:
+	var kind := String(card.get("kind", "perk"))
+	var data: Dictionary = card.get("data", {})
+	var upg: UpgradeSystem = game.player.upg if (game != null and game.player != null) else null
+	if kind == "perk":
+		var tier := int(data.get("tier", 1))
+		var stack := int(upg.taken.get(String(card.get("id", "")), 0)) if upg != null else 0
+		return "T%d ×%d" % [tier, stack] if stack > 0 else "T%d" % tier
+	if kind == "specialization" and upg != null and upg.specialization_pending > 0:
+		return "×%d" % int(upg.spec_mult)
+	return ""
+
+## Визуальная ветвь улучшений в нижней половине карточки (T1 -> T2a / T2b -> T3).
+func _build_card_branch(parent: Control, card: Dictionary, width: float, accent: Color) -> void:
+	var wrap := UI.panel(parent, Rect2(0, 0, width, 118), Color("#0c0d12"), Color(0.28, 0.29, 0.34, 0.75))
+	wrap.custom_minimum_size = Vector2(width, 118)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var kind := String(card.get("kind", "perk"))
+	var data: Dictionary = card.get("data", {})
+	var cid := String(card.get("id", ""))
+	var upg: UpgradeSystem = game.player.upg if (game != null and game.player != null) else null
+
+	if kind == "perk":
+		var tree_id := String(data.get("tree", ""))
+		var tree: Dictionary = DB.tree_by_id.get(tree_id, {})
+		var nodes: Array = tree.get("nodes", [])
+		var tname := String(tree.get("name", tree_id))
+		var hdr := UI.label(wrap, "ВЕТВЬ: " + tname.to_upper(), 7, UI.GOLD, Vector2(5, 4))
+		hdr.size = Vector2(width - 10, 10)
+		hdr.clip_text = true
+		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if nodes.size() >= 4:
+			var n0 := String(nodes[0])
+			var n1 := String(nodes[1])
+			var n2 := String(nodes[2])
+			var n3 := String(nodes[3])
+			var graph := Control.new()
+			graph.position = Vector2(4, 16)
+			graph.size = Vector2(width - 8, 98)
+			graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			wrap.add_child(graph)
+			var gw := width - 8.0
+			var box_w := clampf(gw * 0.46, 48.0, 78.0)
+			var box_h := 22.0
+			var p0 := Vector2((gw - box_w) * 0.5, 2.0)
+			var p1 := Vector2(2.0, 38.0)
+			var p2 := Vector2(gw - box_w - 2.0, 38.0)
+			var p3 := Vector2((gw - box_w) * 0.5, 74.0)
+			graph.draw.connect(func() -> void:
+				var line_col := Color(accent.r, accent.g, accent.b, 0.55)
+				var c0 := p0 + Vector2(box_w * 0.5, box_h)
+				var c1 := p1 + Vector2(box_w * 0.5, 0.0)
+				var c2 := p2 + Vector2(box_w * 0.5, 0.0)
+				var b1 := p1 + Vector2(box_w * 0.5, box_h)
+				var b2 := p2 + Vector2(box_w * 0.5, box_h)
+				var c3 := p3 + Vector2(box_w * 0.5, 0.0)
+				graph.draw_line(c0, c1, line_col, 1.5)
+				graph.draw_line(c0, c2, line_col, 1.5)
+				graph.draw_line(b1, c3, line_col, 1.5)
+				graph.draw_line(b2, c3, line_col, 1.5))
+			var pairs := [[n0, p0], [n1, p1], [n2, p2], [n3, p3]]
+			for pr in pairs:
+				var nid := String(pr[0])
+				var npos: Vector2 = pr[1]
+				var pdata: Dictionary = DB.perk(nid)
+				var taken_cnt := int(upg.taken.get(nid, 0)) if upg != null else 0
+				var is_cur := nid == cid
+				var bg := Color("#1f1b10") if is_cur else (Color("#121f16") if taken_cnt > 0 else Color("#121319"))
+				var bd := UI.GOLD if is_cur else (UI.GREEN if taken_cnt > 0 else Color(0.28, 0.30, 0.36))
+				var nb := UI.panel(graph, Rect2(npos, Vector2(box_w, box_h)), bg, bd)
+				nb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				var short_name := String(pdata.get("name", nid))
+				var tc := UI.GOLD if is_cur else (UI.GREEN if taken_cnt > 0 else UI.DIM)
+				var nl := UI.label(nb, short_name, 6, tc, Vector2(3, 2))
+				nl.size = Vector2(box_w - 6, box_h - 4)
+				nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				nl.clip_text = true
+				nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
+
+	# Для синергий, печатей, эволюций, спецов и апгрейдов
+	var hdr2 := UI.label(wrap, "ЭФФЕКТ И УСЛОВИЯ", 7, UI.GOLD, Vector2(6, 5))
+	hdr2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var body_txt := _card_meta(card)
+	var req_txt := _card_requires(data)
+	if req_txt != "":
+		body_txt += "\n\n" + req_txt
+	var blbl := UI.label(wrap, body_txt, 7, UI.TEXT, Vector2(6, 20))
+	blbl.size = Vector2(width - 12, 92)
+	blbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	blbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 ## Выбор карточки с клавиатуры (1–5).
 func _input_choice_hotkey(event: InputEvent) -> bool:

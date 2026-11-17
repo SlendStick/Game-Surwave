@@ -446,7 +446,199 @@ def generate_ui_and_fx() -> int:
     bg.save(OUT / "ui_title_bg.png")
     count += 1
 
+    count += _generate_event_and_vfx_sprites()
     return count
+
+
+def _generate_event_and_vfx_sprites() -> int:
+    count = 0
+
+    # 1. Mover: Tumbleweed (32x32 woven thorny desert bush)
+    tw = Canvas(32, 32)
+    tw.ellipse(16, 16, 12.5, 12.0, c("soil_dark"))
+    tw.ellipse(16, 16, 10.5, 10.0, c("leather"))
+    rng = random.Random(31415)
+    for _ in range(26):
+        a1 = rng.uniform(0, math.tau)
+        a2 = a1 + rng.uniform(0.9, 2.3)
+        r1 = rng.uniform(4.0, 11.0)
+        r2 = rng.uniform(4.0, 11.0)
+        col = c("sand_dk") if rng.random() < 0.45 else (c("leather_lt") if rng.random() < 0.6 else c("soil_dark"))
+        tw.line(int(16 + math.cos(a1) * r1), int(16 + math.sin(a1) * r1),
+                int(16 + math.cos(a2) * r2), int(16 + math.sin(a2) * r2), col)
+    # Outer thorny twigs poking out
+    for i in range(10):
+        ang = i * math.tau / 10.0 + 0.2
+        tw.line(int(16 + math.cos(ang) * 9), int(16 + math.sin(ang) * 9),
+                int(16 + math.cos(ang) * 14), int(16 + math.sin(ang) * 14), c("sand_dk"))
+    tw.ellipse(13, 12, 4, 3, (c("sand_lt")[0], c("sand_lt")[1], c("sand_lt")[2], 95), True)
+    tw.outline(c("black"))
+    tw.save(OUT / "mover_tumbleweed.png")
+    count += 1
+
+    # Mover: Wisp, Insects, Shard
+    wp = Canvas(24, 24)
+    wp.ellipse(12, 12, 9, 9, (c("glow_green")[0], c("glow_green")[1], c("glow_green")[2], 70), True)
+    wp.ellipse(12, 12, 5, 5, c("pale_green"))
+    wp.ellipse(12, 11, 2.5, 2.5, c("white"))
+    wp.save(OUT / "mover_wisp.png")
+    count += 1
+
+    ins = Canvas(32, 32)
+    irng = random.Random(7711)
+    for _ in range(18):
+        ix = irng.randint(5, 26)
+        iy = irng.randint(5, 26)
+        ins.rect(ix, iy, 2, 2, c("black"))
+        ins.px(ix + 1, iy - 1, c("parchment"))
+    ins.save(OUT / "mover_insects.png")
+    count += 1
+
+    sh = Canvas(24, 24)
+    sh.poly([(12, 2), (20, 14), (12, 22), (4, 14)], c("ice_blue"))
+    sh.poly([(12, 4), (16, 13), (12, 20)], c("snow_lt"))
+    sh.outline(c("night"))
+    sh.save(OUT / "mover_shard.png")
+    count += 1
+
+    # 2. WorldBox-style Falling Meteor (4 frames 32x32) + Scorched Crater (48x48)
+    for f in range(4):
+        mt = Canvas(32, 32)
+        # Flaming diagonal tail up-left -> boulder at bottom-right (20, 21)
+        mt.poly([(2, 2 + f), (14, 10), (24, 18), (16, 26), (8, 16)], c("crimson"))
+        mt.poly([(5, 4 + (f % 2)), (18, 14), (20, 22), (12, 18)], c("lava"))
+        mt.poly([(9, 8), (18, 17), (15, 20)], c("gold_glow"))
+        mt.ellipse(21, 22, 6, 6, c("stone_dk"))
+        mt.ellipse(20, 21, 4.5, 4.5, c("maroon"))
+        mt.px(19, 20, c("gold_glow"))
+        mt.px(22, 23, c("ember_red"))
+        mt.outline(c("black"))
+        mt.save(OUT / f"event_meteor_{f}.png")
+        count += 1
+
+    cr = Canvas(48, 48)
+    cr.ellipse(24, 24, 18, 13, (c("black")[0], c("black")[1], c("black")[2], 140), True)
+    cr.ellipse(24, 24, 13, 9, c("slate_vd"))
+    cr.ellipse(24, 24, 7, 5, c("maroon"))
+    cr.ellipse(24, 24, 3, 2, c("lava"))
+    cr.save(OUT / "event_crater.png")
+    count += 1
+
+    # 3. Rockfall Boulders & Stalactites
+    for f in range(2):
+        bl = Canvas(32, 32)
+        bl.poly([(7 + f, 24), (6, 12), (15, 5), (25, 11), (26 - f, 24), (16, 27)], c("stone_dk"))
+        bl.poly([(8, 12), (15, 6), (20, 16), (10, 21)], c("stone"))
+        bl.line(10, 11, 15, 7, c("stone_lt"))
+        bl.outline(c("black"))
+        bl.save(OUT / f"event_boulder_{f}.png")
+        count += 1
+
+    st = Canvas(24, 32)
+    st.poly([(6, 2), (18, 2), (14, 20), (12, 30), (10, 20)], c("stone_dk"))
+    st.poly([(8, 3), (12, 3), (12, 28), (10, 19)], c("stone"))
+    st.line(9, 4, 11, 24, c("stone_lt"))
+    st.outline(c("black"))
+    st.save(OUT / "event_stalactite.png")
+    count += 1
+
+    # 4. Ice Spikes (3 eruption frames) & Avalanche Wave
+    for f in range(3):
+        sp = Canvas(32, 32)
+        h_s = 8 + f * 9
+        sp.poly([(9, 29), (16, 29 - h_s), (23, 29)], c("ice_blue"))
+        sp.poly([(11, 29), (16, 30 - h_s), (17, 29)], c("snow_lt"))
+        if f >= 1:
+            sp.poly([(4, 29), (9, 29 - h_s // 2), (13, 29)], c("frost_blue"))
+            sp.poly([(19, 29), (24, 29 - h_s // 2), (28, 29)], c("frost_blue"))
+        sp.outline(c("night"))
+        sp.save(OUT / f"event_ice_spike_{f}.png")
+        count += 1
+
+    av = Canvas(64, 32)
+    av.ellipse(32, 20, 29, 10, c("frost_dk"))
+    av.ellipse(32, 16, 27, 9, c("snow_dk"))
+    for bx in range(8, 57, 8):
+        av.ellipse(bx, 13 + (bx % 3), 6, 5, c("snow_lt"))
+    av.outline(c("slate"))
+    av.save(OUT / "event_avalanche_wave.png")
+    count += 1
+
+    # 5. Poison Geyser & Ghost Hands (3 frames each)
+    for f in range(3):
+        gy = Canvas(32, 32)
+        h_g = 7 + f * 9
+        gy.ellipse(16, 27, 10, 4, c("swamp_dk"))
+        gy.rect(12, 27 - h_g, 8, h_g, c("moss"))
+        gy.rect(14, 27 - h_g, 4, h_g, c("glow_green"))
+        gy.ellipse(16, 27 - h_g, 6 + f * 2, 3, c("pale_green"))
+        gy.outline(c("black"))
+        gy.save(OUT / f"event_geyser_{f}.png")
+        count += 1
+
+        gh = Canvas(32, 32)
+        rise = 6 + f * 7
+        gh.ellipse(16, 28, 9, 3, c("arcane_vd"))
+        gh.rect(13, 28 - rise, 6, rise, c("bone"))
+        for fx_off in (-4, -1, 2, 5):
+            gh.line(16 + fx_off // 2, 28 - rise, 16 + fx_off, max(2, 22 - rise), c("parchment"))
+        gh.outline(c("black"))
+        gh.save(OUT / f"event_ghost_hand_{f}.png")
+        count += 1
+
+    # 6. Perk VFX: Lightning Strike (32x64, 4 frames), Fireball Blast (40x40, 4 frames), Heavenly Smite (32x64, 4 frames), Frost Burst (32x32, 3 frames)
+    for f in range(4):
+        lt = Canvas(32, 64)
+        thick = 3 if f in (0, 1) else (2 if f == 2 else 1)
+        col = c("white") if f == 1 else c("ice_glow")
+        pts = [(16, 0), (11 + (f % 2) * 2, 16), (20 - (f % 2) * 2, 32), (13, 46), (16, 60)]
+        for i in range(len(pts) - 1):
+            lt.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], c("ice_blue"), thick + 2)
+            lt.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], col, thick)
+        if f in (1, 2):
+            lt.line(11, 16, 4, 28, c("ice_glow"), 1)
+            lt.line(20, 32, 28, 44, c("ice_glow"), 1)
+        lt.ellipse(16, 59, 6 + f * 3, 3, (c("ice_glow")[0], c("ice_glow")[1], c("ice_glow")[2], 180 - f * 35), True)
+        lt.save(OUT / f"vfx_lightning_{f}.png")
+        count += 1
+
+        fb = Canvas(40, 40)
+        rad = 6 + f * 4
+        fb.ellipse(20, 20, rad + 2, rad + 2, (c("crimson")[0], c("crimson")[1], c("crimson")[2], 210 - f * 35), True)
+        fb.ellipse(20, 20, rad, rad, (c("lava")[0], c("lava")[1], c("lava")[2], 220 - f * 35), True)
+        if f < 3:
+            fb.ellipse(20, 20, max(2, rad - 4), max(2, rad - 4), c("gold_glow"))
+        if f == 0:
+            fb.ellipse(20, 20, 3, 3, c("white"))
+        for k in range(8):
+            a = k * math.tau / 8.0 + f * 0.4
+            fb.rect(int(20 + math.cos(a) * (rad + 2)), int(20 + math.sin(a) * (rad + 2)), 2, 2, c("gold_glow"))
+        fb.save(OUT / f"vfx_fireball_{f}.png")
+        count += 1
+
+        sm = Canvas(32, 64)
+        bw = 10 - f * 2
+        sm.rect(16 - bw, 0, bw * 2, 60, (c("gold")[0], c("gold")[1], c("gold")[2], 170 - f * 35), True)
+        sm.rect(16 - max(1, bw // 2), 0, max(2, bw), 60, (c("white")[0], c("white")[1], c("white")[2], 220 - f * 45), True)
+        if f in (0, 1):
+            sm.line(16, 40, 16, 62, c("white"), 2)
+            sm.line(6, 50, 26, 50, c("white"), 2)
+        sm.ellipse(16, 58, 7 + f * 3, 4, (c("gold_glow")[0], c("gold_glow")[1], c("gold_glow")[2], 190 - f * 40), True)
+        sm.save(OUT / f"vfx_smite_{f}.png")
+        count += 1
+
+    for f in range(3):
+        fr = Canvas(32, 32)
+        r = 5 + f * 5
+        for ang in range(0, 360, 45):
+            rad_a = math.radians(ang)
+            fr.line(16, 16, int(16 + math.cos(rad_a) * r), int(16 + math.sin(rad_a) * r), c("ice_glow"), 2 if f == 0 else 1)
+        fr.ring(16, 16, r, max(1, r - 2), c("snow_lt"))
+        fr.save(OUT / f"vfx_frost_{f}.png")
+        count += 1
+
+    return count
+
 
 
 def run() -> int:

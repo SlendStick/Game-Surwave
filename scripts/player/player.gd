@@ -195,7 +195,7 @@ func recalc() -> void:
 	EventBus.hp_changed.emit(hp, max_hp)
 
 func _refresh_visual() -> void:
-	var size := Vector2(18, 18) * float(S.get("size", 1.0))
+	var size := Vector2(24, 24) * float(S.get("size", 1.0))
 	var col := Gfx.hex(String(char_data.get("color", "#ffffff")))
 	var cls := String(char_data.get("cls", "square"))
 	var state := "walk" if moving_now else "idle"
@@ -1000,6 +1000,7 @@ func _on_last_shot() -> void:
 		var dmg := retribution + upg.flag_num("retribution_per_hp") * float(hp)
 		game.aoe_damage(global_position, 96.0, dmg, {"holy": true, "source": "retribution"})
 		game.spawn_fx(global_position, Color(1, 0.95, 0.7), 96.0, 0.3)
+		game.spawn_perk_fx("smite", global_position, 72.0, 0.36)
 		AudioManager.play_sfx("lightning", 1.2)
 	if upg.flag_num("smite") > 0.0:
 		var p_cfg: Dictionary = DB.balance.get("player", {})
@@ -1014,6 +1015,7 @@ func _on_last_shot() -> void:
 				break
 			game.damage_enemy(e, s_damage, {"source": "smite", "holy": true})
 			game.spawn_fx(e.global_position, Color(1, 0.95, 0.7), 18.0, 0.2)
+			game.spawn_perk_fx("smite", e.global_position, 38.0, 0.32)
 			smite_count += 1
 	if upg.flag_num("last_shot_lightning") > 0.0:
 		game.lightning_strike_nearest(global_position, 300.0, upg.flag_num("last_shot_lightning") * dmg_multiplier())
@@ -1171,6 +1173,7 @@ func _meteor_rain(center: Vector2, count: int, dmg: float) -> void:
 	for i in count:
 		var pos := center + Vector2(randf_range(-60, 60), randf_range(-60, 60))
 		game.spawn_delayed_aoe(pos, 26.0, dmg * dmg_multiplier(), 0.45, Color(1, 0.5, 0.1))
+		game.spawn_event_fx("meteor", pos, 0.45, 26.0)
 
 # ------------------------------------------------------------------ УРОН ИГРОКУ
 func take_damage(amount: int, from_pos: Vector2, ignore_iframes: bool = false) -> void:

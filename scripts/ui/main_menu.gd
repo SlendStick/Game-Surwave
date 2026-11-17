@@ -34,17 +34,8 @@ func _ready() -> void:
 func _build() -> void:
 	UI.full_rect(self)
 	UI.backdrop(self, Color("#0b0c10"))
-	var bg_tex := Assets.icon("ui_title_bg")
-	if bg_tex != null:
-		var bg_img := TextureRect.new()
-		bg_img.texture = bg_tex
-		bg_img.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		bg_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		bg_img.stretch_mode = TextureRect.STRETCH_SCALE
-		bg_img.modulate = Color(0.82, 0.80, 0.85, 0.72)
-		bg_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UI.full_rect(bg_img)
-		add_child(bg_img)
+	var slideshow: Control = load("res://scripts/ui/menu_gameplay_bg.gd").new()
+	add_child(slideshow)
 
 	# --- левая часть: логотип и подпись
 	var logo := UI.title(self, "SURWAVE", 40, Vector2(38, 54), UI.GOLD)
@@ -345,42 +336,66 @@ func _build_album(body: Control) -> void:
 			for e in DB.enemies:
 				var eid := String(e["id"])
 				var seen: bool = (GameManager.meta.get("album_enemies", []) as Array).has(eid)
-				var h := UI.hbox(v, 6)
+				var h := UI.hbox(v, 8)
+				var p_name := "portrait_" + eid
 				if seen:
-					_add_icon(h, eid, 18)
-				var text := "%s — %s" % [String(e["name"]), String(e.get("desc", ""))] if seen else Loc.t("not_met")
-				UI.label(h, text, 8, UI.TEXT if seen else UI.DIM)
+					_add_icon(h, p_name if Assets.has_real_sprite(p_name) else eid, 40)
+				else:
+					var lock_box := UI.panel(h, Rect2(0, 0, 40, 40), Color("#0b0c10"), UI.BORDER)
+					lock_box.custom_minimum_size = Vector2(40, 40)
+				var text := "%s — %s" % [String(e["name"]), String(e.get("desc", ""))] if seen else ("%s — %s" % [String(e["name"]), Loc.t("not_met")])
+				var lbl := UI.label(h, text, 8, UI.TEXT if seen else UI.DIM)
+				lbl.custom_minimum_size = Vector2(490, 0)
+				lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		"bosses":
 			var keys := (DB.bosses as Dictionary).keys()
 			for k in keys:
 				var bd: Dictionary = DB.bosses[k]
 				var bid := String(bd.get("id", ""))
 				var seen := (GameManager.meta.get("album_bosses", []) as Array).has(bid)
-				var h := UI.hbox(v, 6)
+				var h := UI.hbox(v, 8)
 				if seen:
-					var bicon := bid if Assets.has_real_sprite(bid) else ("boss_" + String(k) if Assets.has_real_sprite("boss_" + String(k)) else "boss_champion")
-					_add_icon(h, bicon, 20)
-				UI.label(h, "%s — HP %d%s" % [String(bd.get("name", "")), int(bd.get("hp", 0)), (" · " + String(bd.get("desc", ""))) if seen else " · " + Loc.t("not_met")], 8, UI.TEXT if seen else UI.DIM)
+					var bp := "portrait_" + bid
+					var bmap := "portrait_boss_" + String(k)
+					var bicon := bp if Assets.has_real_sprite(bp) else (bmap if Assets.has_real_sprite(bmap) else "portrait_boss_champion")
+					_add_icon(h, bicon, 44)
+				else:
+					var lock_b := UI.panel(h, Rect2(0, 0, 44, 44), Color("#0b0c10"), UI.BORDER)
+					lock_b.custom_minimum_size = Vector2(44, 44)
+				var b_lbl := UI.label(h, "%s — HP %d%s" % [String(bd.get("name", "")), int(bd.get("hp", 0)), (" · " + String(bd.get("desc", ""))) if seen else " · " + Loc.t("not_met")], 8, UI.TEXT if seen else UI.DIM)
+				b_lbl.custom_minimum_size = Vector2(486, 0)
+				b_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			var st: Dictionary = DB.sathan
 			var seen2 := bool(GameManager.meta.get("sathan_defeated", false))
-			var hs := UI.hbox(v, 6)
+			var hs := UI.hbox(v, 8)
 			if seen2:
-				_add_icon(hs, "boss_satan", 20)
-			UI.label(hs, "%s — HP %d · %s" % [String(st.get("name", "САТАН")), int(st.get("hp", 0)), String(st.get("desc", "")) if seen2 else Loc.t("not_met")], 8, UI.TEXT if seen2 else UI.DIM)
+				_add_icon(hs, "portrait_boss_satan", 44)
+			else:
+				var lock_s := UI.panel(hs, Rect2(0, 0, 44, 44), Color("#0b0c10"), UI.BORDER)
+				lock_s.custom_minimum_size = Vector2(44, 44)
+			var s_lbl := UI.label(hs, "%s — HP %d · %s" % [String(st.get("name", "САТАН")), int(st.get("hp", 0)), String(st.get("desc", "")) if seen2 else Loc.t("not_met")], 8, UI.TEXT if seen2 else UI.DIM)
+			s_lbl.custom_minimum_size = Vector2(486, 0)
+			s_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		"chars":
 			for ch in DB.characters:
 				var unlocked := GameManager.is_char_unlocked(String(ch["id"]))
-				var h := UI.hbox(v, 6)
+				var h := UI.hbox(v, 8)
+				var cls_name := String(ch.get("cls", ""))
 				if unlocked:
-					_add_icon(h, String(ch.get("cls", "")), 18)
-				UI.label(h, "%s (%s) — %s" % [String(ch["name"]), String(ch["role"]), String(ch.get("passive", {}).get("desc", ""))] if unlocked else Loc.t("not_met"), 8, UI.TEXT if unlocked else UI.DIM)
+					_add_icon(h, "portrait_" + cls_name if Assets.has_real_sprite("portrait_" + cls_name) else cls_name, 42)
+				else:
+					var lock_c := UI.panel(h, Rect2(0, 0, 42, 42), Color("#0b0c10"), UI.BORDER)
+					lock_c.custom_minimum_size = Vector2(42, 42)
+				var c_lbl := UI.label(h, "%s (%s) — %s" % [String(ch["name"]), String(ch["role"]), String(ch.get("passive", {}).get("desc", ""))] if unlocked else Loc.t("not_met"), 8, UI.TEXT if unlocked else UI.DIM)
+				c_lbl.custom_minimum_size = Vector2(488, 0)
+				c_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		"weapons":
 			for w in DB.weapons:
 				var wid := String(w["id"])
 				var owned := GameManager.is_weapon_unlocked(wid)
 				var h := UI.hbox(v, 6)
 				if owned:
-					_add_icon(h, "icon_weapon_" + wid, 18)
+					_add_icon(h, "icon_weapon_" + wid, 22)
 				UI.label(h, "%s — %s" % [String(w["name"]), String(w.get("desc", ""))] if owned else Loc.t("not_met"), 8, UI.TEXT if owned else UI.DIM)
 
 func _build_achievements(body: Control) -> void:

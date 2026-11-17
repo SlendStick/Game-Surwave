@@ -64,7 +64,7 @@ func init_hazard(g: Node, pos: Vector2, r: float, dmg: float, dot: float, tele: 
 	tick_cd = 0.0
 	if vis == null:
 		setup(g)
-	_set_visual(0.32 if armed else 0.24)
+	_set_visual(0.24 if armed else 0.16)
 	if armed and damage > 0.0:
 		_apply_hit()
 		damage = 0.0
@@ -81,12 +81,12 @@ func tick(delta: float) -> void:
 	var total_life := telegraph + duration
 	var fade := clampf((total_life - elapsed) / 0.5, 0.0, 1.0)
 	if vis != null and visible:
-		_set_visual(clampf(0.32 + (0.10 if armed else 0.0), 0.0, 0.6) * fade)
+		_set_visual(clampf(0.22 + (0.06 if armed else 0.0), 0.0, 0.38) * fade)
 	if not armed:
-		# телеграф: мигание рисует сам визуал
+		# телеграф
 		if elapsed >= telegraph:
 			armed = true
-			_set_visual(0.42)
+			_set_visual(0.26)
 			if damage > 0.0:
 				_apply_hit()
 				damage = 0.0

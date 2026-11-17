@@ -1,7 +1,7 @@
 class_name Mover
 extends Node2D
 ## Подвижное препятствие-угроза: перекати-поле, блуждающий огонёк, рой насекомых,
-## ледяные осколки. Двигается, наносит урон при касании и исчезает по времени.
+## ледяные осколки. Двигается с покадровым пиксель-арт визуалом и следом.
 
 var game: Node = null
 var kind := "tumbleweed"
@@ -16,7 +16,11 @@ var hit_cd := 0.0
 var color := Color(0.6, 0.45, 0.2)
 var active := false
 var body: Node2D = null
+var sprite: Sprite2D = null
+var shadow: Sprite2D = null
 var spin := 0.0
+var bounce_t := 0.0
+var dust_cd := 0.0
 
 func setup(g: Node, kind_name: String, pos: Vector2, v: Vector2, opts: Dictionary = {}) -> void:
 	game = g
@@ -33,33 +37,40 @@ func setup(g: Node, kind_name: String, pos: Vector2, v: Vector2, opts: Dictionar
 	active = true
 	visible = true
 	hit_cd = 0.0
+	spin = 0.0
+	bounce_t = randf() * TAU
+	dust_cd = 0.1
 	_build()
 
 func _build() -> void:
 	if body != null and is_instance_valid(body):
 		body.queue_free()
+	if shadow != null and is_instance_valid(shadow):
+		shadow.queue_free()
+	shadow = Sprite2D.new()
+	shadow.centered = true
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadow.texture = Assets.tex("fx_burst", Color(0.05, 0.04, 0.03, 0.42))
+	shadow.scale = Vector2(radius * 1.3 / 16.0, radius * 0.55 / 16.0)
+	shadow.position = Vector2(0, radius * 0.65)
+	shadow.modulate = Color(0.05, 0.04, 0.03, 0.42)
+	add_child(shadow)
+
 	body = Node2D.new()
 	add_child(body)
-	match kind:
-		"tumbleweed":
-			for i in 3:
-				var s := Gfx.square(body, Vector2(radius * 1.6, 2), color, Vector2(0, -radius * 0.5 + float(i) * radius * 0.5))
-				s.rotation = float(i) * 0.7
-			Gfx.square(body, Vector2(radius * 1.9, radius * 1.9), Color(color.r, color.g, color.b, 0.25))
-		"wisp":
-			Gfx.square(body, Vector2(radius * 3.4, radius * 3.4), Color(0.45, 0.95, 0.55, 0.13))
-			Gfx.square(body, Vector2(radius, radius), Color(0.72, 1.0, 0.75, 0.95))
-		"insects":
-			for i in 6:
-				var ang := TAU * float(i) / 6.0
-				Gfx.square(body, Vector2(2, 2), color, Vector2(cos(ang), sin(ang)) * radius * 0.8)
-		"shard":
-			var p := Polygon2D.new()
-			p.polygon = PackedVector2Array([Vector2(-radius * 0.5, radius * 0.6), Vector2(radius * 0.5, radius * 0.6), Vector2(0, -radius * 0.9)])
-			p.color = color
-			body.add_child(p)
-		_:
-			Gfx.square(body, Vector2(radius * 1.6, radius * 1.6), color)
+	var spr_name := "mover_" + kind
+	var tex: Texture2D = Assets.icon(spr_name)
+	if tex != null:
+		sprite = Sprite2D.new()
+		sprite.texture = tex
+		sprite.centered = true
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var target_px: float = maxf(20.0, radius * 2.15)
+		var w: float = float(maxi(1, tex.get_width()))
+		sprite.scale = Vector2(target_px / w, target_px / w)
+		body.add_child(sprite)
+	else:
+		Gfx.square(body, Vector2(radius * 1.6, radius * 1.6), color)
 
 func deactivate() -> void:
 	active = false
@@ -79,12 +90,27 @@ func tick(delta: float) -> void:
 		var want: Vector2 = (game.player.global_position - global_position).normalized() * vel.length()
 		vel = vel.lerp(want * chase, clampf(delta * 1.5, 0.0, 1.0))
 	global_position += vel * delta
+	bounce_t += delta * 7.5
 	if body != null:
 		if kind == "tumbleweed":
-			spin += delta * 6.0 * signf(vel.x if absf(vel.x) > 1.0 else 1.0)
+			var spd_sign: float = signf(vel.x) if absf(vel.x) > 1.0 else 1.0
+			spin += delta * 7.2 * spd_sign
 			body.rotation = spin
+			var hop: float = absf(sin(bounce_t)) * 5.0
+			body.position = Vector2(0, -hop)
+			if shadow != null:
+				var sscale: float = clampf(1.0 - hop * 0.06, 0.65, 1.0)
+				shadow.scale = Vector2(radius * 1.3 / 16.0 * sscale, radius * 0.55 / 16.0 * sscale)
+			dust_cd -= delta
+			if dust_cd <= 0.0 and game != null:
+				dust_cd = 0.22
+				game.spawn_fx(global_position + Vector2(0, radius * 0.45), Color(0.68, 0.56, 0.36, 0.42), 14.0, 0.32, true)
 		elif kind == "wisp":
-			body.modulate.a = 0.7 + 0.3 * sin(life * 5.0)
+			body.modulate.a = 0.72 + 0.28 * sin(life * 5.5)
+			body.position = Vector2(0, sin(bounce_t * 0.8) * 3.0)
+		elif kind == "insects":
+			body.rotation += delta * 2.4
+			body.position = Vector2(cos(bounce_t * 1.8) * 2.0, sin(bounce_t * 2.2) * 2.0)
 	# границы карты: отражаемся
 	if game != null:
 		var r: Rect2 = game.map_rect

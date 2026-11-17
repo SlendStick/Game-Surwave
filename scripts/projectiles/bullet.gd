@@ -225,6 +225,10 @@ func _explode() -> void:
 	var r := float(opts.get("explode_radius", 64.0))
 	game.aoe_damage(global_position, r, power, {"source": "explosion", "holy": bool(opts.get("holy", false))})
 	game.spawn_fx(global_position, color, r, 0.28)
+	if opts.has("burn") or String(opts.get("behavior", "")) == "fireball" or bool(opts.get("napalm", false)):
+		game.spawn_perk_fx("fireball", global_position, r * 1.1, 0.30)
+	elif bool(opts.get("holy", false)):
+		game.spawn_perk_fx("smite", global_position, r * 0.9, 0.28)
 	AudioManager.play_sfx("shot_heavy", 1.25)
 	if bool(opts.get("napalm", false)):
 		game.spawn_hazard_zone(global_position, 5.0, 4.0, r * 0.7, Color(1.0, 0.45, 0.1))

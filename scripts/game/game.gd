@@ -11,6 +11,8 @@ const ALLY_SCENE := preload("res://scenes/game/ally.tscn")
 const HAZARD_SCENE := preload("res://scenes/game/hazard.tscn")
 const FX_SCENE := preload("res://scenes/game/fx.tscn")
 const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
+const MAP_EVENT_FX_SCRIPT := preload("res://scripts/game/map_event_fx.gd")
+const PERK_FX_SCRIPT := preload("res://scripts/game/perk_fx.gd")
 
 const CELL := 64.0
 
@@ -2038,7 +2040,7 @@ func spawn_ally(kind: String, opts: Dictionary) -> void:
 			extra.init_ally(self, kind, o)
 			allies.append(extra)
 
-func spawn_fx(pos: Vector2, color: Color, size: float, dur: float) -> void:
+func spawn_fx(pos: Vector2, color: Color, size: float, dur: float, is_square: bool = false) -> void:
 	var f: Fx
 	if fx_pool.is_empty():
 		f = FX_SCENE.instantiate()
@@ -2046,8 +2048,22 @@ func spawn_fx(pos: Vector2, color: Color, size: float, dur: float) -> void:
 	else:
 		f = fx_pool.pop_back()
 	f.global_position = pos
-	f.setup(size, color, dur)
+	f.setup(size, color, dur, is_square)
 	fx_list.append(f)
+
+func spawn_event_fx(ev_kind: String, pos: Vector2, tele: float, radius: float, extra: Dictionary = {}) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	var node: MapEventFx = MAP_EVENT_FX_SCRIPT.new()
+	world.add_child(node)
+	node.setup(self, ev_kind, pos, tele, radius, extra)
+
+func spawn_perk_fx(fx_kind: String, pos: Vector2, size_px: float = 48.0, dur: float = 0.32) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	var node: PerkFx = PERK_FX_SCRIPT.new()
+	world.add_child(node)
+	node.setup(fx_kind, pos, size_px, dur)
 
 func spawn_hazard_zone(pos: Vector2, dps: float, dur: float, radius: float, color: Color, extra: Dictionary = {}) -> void:
 	var h: Hazard
@@ -2187,6 +2203,8 @@ func _tick_pulls(delta: float) -> void:
 
 func freeze_enemy(enemy: Node2D, dur: float) -> void:
 	apply_status(enemy, "freeze", dur, {})
+	if enemy != null and enemy.active:
+		spawn_perk_fx("frost", enemy.global_position, 28.0, 0.25)
 	if player != null and player.upg.flag_num("freeze_burn") > 0.0:
 		apply_status(enemy, "burn", dur, {"dps": player.upg.flag_num("freeze_burn")})
 
@@ -2216,12 +2234,14 @@ func lightning_strike_at(pos: Vector2, radius: float, dmg: float) -> bool:
 	radius*=1.0+float(player.upg.add.get("shock_radius",0.0))
 	var hit := aoe_damage(pos, radius + float(player.S.shock_dmg) * 3.0, dmg, {"source": "lightning"})
 	spawn_fx(pos, Color(0.8, 0.9, 1.0), radius * 1.6, 0.2)
+	spawn_perk_fx("lightning", pos, radius * 2.1, 0.30)
 	if hit > 0:
 		AudioManager.play_sfx("lightning", randf_range(0.9, 1.2))
 		if player != null and player.upg.flag_num("overload") > 0.0:
 			for enemy in enemies_in_radius(pos, radius):
 				if enemy.has_status("burn"):
 					aoe_damage(enemy.global_position, 50.0, player.upg.flag_num("overload"), {"source": "overload"})
+					spawn_perk_fx("fireball", enemy.global_position, 54.0, 0.32)
 	return hit > 0
 
 func lightning_strike_nearest(pos: Vector2, max_range: float, dmg: float) -> bool:
@@ -2235,6 +2255,8 @@ func lightning_volley(center: Vector2, count: int, dmg: float, radius: float) ->
 	for i in count:
 		var pos := center + Vector2(randf_range(-90, 90), randf_range(-90, 90))
 		spawn_delayed_aoe(pos, radius, dmg, 0.7, Color(0.8, 0.9, 1.0))
+		var p_copy := pos
+		run_later(0.7, func() -> void: spawn_perk_fx("lightning", p_copy, radius * 2.0, 0.28))
 
 func chain_lightning(from_enemy: Node2D, jumps: int, dmg: float) -> void:
 	var current := from_enemy
@@ -2253,13 +2275,16 @@ func chain_lightning(from_enemy: Node2D, jumps: int, dmg: float) -> void:
 			break
 		damage_enemy(next, dmg, {"source": "chain"})
 		spawn_fx(next.global_position, Color(0.8, 0.9, 1.0), 16.0, 0.15)
+		spawn_perk_fx("lightning", next.global_position, 32.0, 0.24)
 		hit.append(next)
 		current = next
 
 func apocalypse(dmg: float) -> void:
 	notify("АПОКАЛИПСИС")
 	for i in 12:
-		spawn_delayed_aoe(player.global_position + Vector2(randf_range(-140, 140), randf_range(-140, 140)), 48.0, dmg, 1.2, Color(1, 0.2, 0.1))
+		var pos := player.global_position + Vector2(randf_range(-140, 140), randf_range(-140, 140))
+		spawn_delayed_aoe(pos, 48.0, dmg, 1.2, Color(1, 0.2, 0.1))
+		spawn_event_fx("meteor", pos, 1.2, 48.0)
 
 # ------------------------------------------------------------------ ЗАПРОСЫ
 ## Перестройка пространственной сетки врагов (раз в кадр).
@@ -2882,11 +2907,10 @@ func run_map_event(ev: Dictionary) -> void:
 			for i in m_count:
 				var pos := player.global_position + Vector2(randf_range(-170, 170), randf_range(-170, 170))
 				spawn_delayed_aoe(pos, m_rad, float(p.get("damage", 2)), tele, Color(1, 0.45, 0.15))
+				spawn_event_fx("meteor", pos, tele, m_rad)
 				if destroy:
 					var p_copy := pos
 					run_later(tele, func() -> void:
-						spawn_fx(p_copy, Color(1, 0.5, 0.2, 0.8), m_rad * 2.2, 0.35)
-						shake(6.0)
 						_destroy_obstacles_in(p_copy, m_rad, 3))
 			notify("Метеоритный дождь!")
 		"weather":
@@ -2941,14 +2965,17 @@ func run_map_event(ev: Dictionary) -> void:
 		"ice_spikes":
 			for i in int(p.get("count", 6)):
 				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_delayed_aoe(pos, float(p.get("radius", 18.0)), float(p.get("damage", 2)), float(p.get("telegraph", 1.6)), Color(0.66, 0.85, 0.95))
-				spawn_fx(pos, Color(0.7, 0.9, 1.0, 0.5), 26.0, 0.4)
+				var sp_tele := float(p.get("telegraph", 1.6))
+				var sp_rad := float(p.get("radius", 18.0))
+				spawn_delayed_aoe(pos, sp_rad, float(p.get("damage", 2)), sp_tele, Color(0.66, 0.85, 0.95))
+				spawn_event_fx("ice_spike", pos, sp_tele, sp_rad)
 		"avalanche":
 			notify("Лавина!")
 			shake(14.0)
 			flash_screen(Color(0.9, 0.95, 1.0))
 			var width := float(p.get("width", 140.0))
 			var damage := float(p.get("damage", 3))
+			spawn_event_fx("avalanche", player.global_position, 0.8, width)
 			for i in 3:
 				var pos := Vector2(player.global_position.x + randf_range(-60, 60), player.global_position.y - 190.0 + float(i) * 70.0)
 				spawn_delayed_aoe(pos, width * 0.5, damage, 0.8 + float(i) * 0.25, Color(0.92, 0.96, 1.0))
@@ -2958,29 +2985,37 @@ func run_map_event(ev: Dictionary) -> void:
 			notify("Камнепад!")
 			var r_dmg := float(p.get("damage", 2))
 			var r_tele := float(p.get("telegraph", 2.0))
+			var r_rad := float(p.get("radius", 26.0))
 			for i in int(p.get("count", 8)):
 				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
-				spawn_delayed_aoe(pos, float(p.get("radius", 26.0)), r_dmg, r_tele, Color(0.55, 0.5, 0.45))
+				spawn_delayed_aoe(pos, r_rad, r_dmg, r_tele, Color(0.55, 0.5, 0.45))
+				spawn_event_fx("boulder", pos, r_tele, r_rad)
 				var p_copy := pos
 				run_later(r_tele, func() -> void:
-					shake(5.0)
 					_destroy_obstacles_in(p_copy, 30.0, 2))
 		"eruption":
 			notify("Извержение вулкана!")
 			shake(22.0)
 			flash_screen(Color(1.0, 0.45, 0.15))
 			var center := map_rect.get_center() if bool(p.get("at_center", false)) else player.global_position + Vector2(randf_range(-90, 90), randf_range(-90, 90))
-			spawn_delayed_aoe(center, float(p.get("radius", 150.0)), float(p.get("damage", 3)), float(p.get("telegraph", 3.0)), Color(1, 0.4, 0.1), float(p.get("dot", 2.0)))
+			var er_rad := float(p.get("radius", 150.0))
+			var er_tele := float(p.get("telegraph", 3.0))
+			spawn_delayed_aoe(center, er_rad, float(p.get("damage", 3)), er_tele, Color(1, 0.4, 0.1), float(p.get("dot", 2.0)))
+			run_later(er_tele, func() -> void:
+				spawn_perk_fx("fireball", center, er_rad * 1.15, 0.50))
 			for i in int(p.get("pools", 5)):
-				var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(40, float(p.get("radius", 150.0)))
-				spawn_hazard_zone(pos, float(p.get("dot", 2.0)), 5.0, 26.0, Color(1, 0.35, 0.1))
+				var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(40, er_rad)
+				spawn_hazard_zone(pos, float(p.get("dot", 2.0)), 5.0, 26.0, Color(1, 0.35, 0.1), {"pattern": "fire"})
 		"cave_in":
 			notify("Обвал!")
 			shake(12.0)
 			var c_dmg := float(p.get("damage", 2))
+			var c_tele := float(p.get("telegraph", 2.2))
+			var c_rad := float(p.get("radius", 32.0))
 			for i in int(p.get("count", 6)):
 				var pos := player.global_position + Vector2(randf_range(-130, 130), randf_range(-130, 130))
-				spawn_delayed_aoe(pos, float(p.get("radius", 32.0)), c_dmg, float(p.get("telegraph", 2.2)), Color(0.45, 0.45, 0.46))
+				spawn_delayed_aoe(pos, c_rad, c_dmg, c_tele, Color(0.45, 0.45, 0.46))
+				spawn_event_fx("stalactite", pos, c_tele, c_rad)
 			_collapse_obstacles(int(p.get("count", 6)) / 2, float(p.get("duration", 12.0)))
 		"crystal_flash":
 			flash_screen(Color(0.85, 0.95, 1.0))
@@ -2993,12 +3028,15 @@ func run_map_event(ev: Dictionary) -> void:
 						break
 		"poison_geyser":
 			notify("Гейзер!")
+			var g_tele := float(p.get("telegraph", 1.4))
+			var g_rad := float(p.get("radius", 34.0))
 			for i in int(p.get("count", 5)):
 				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
-				spawn_delayed_aoe(pos, float(p.get("radius", 34.0)), float(p.get("damage", 2)), float(p.get("telegraph", 1.4)), Color(0.6, 0.95, 0.2))
+				spawn_delayed_aoe(pos, g_rad, float(p.get("damage", 2)), g_tele, Color(0.6, 0.95, 0.2))
+				spawn_event_fx("geyser", pos, g_tele, g_rad)
 				var p_copy := pos
-				run_later(float(p.get("telegraph", 1.4)), func() -> void:
-					if player.global_position.distance_to(p_copy) < float(p.get("radius", 34.0)):
+				run_later(g_tele, func() -> void:
+					if player.global_position.distance_to(p_copy) < g_rad:
 						player.add_status("poison", 5.0, {"dps": float(p.get("poison", 1.5))}))
 		"madness":
 			flash_screen(Color(0.9, 0.1, 0.45))
@@ -3008,7 +3046,9 @@ func run_map_event(ev: Dictionary) -> void:
 		"ghost_hands":
 			for i in int(p.get("count", 6)):
 				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_hazard_zone(pos, 0.0, 3.5, float(p.get("radius", 22.0)), Color(0.75, 0.78, 0.8), {"telegraph": 1.0, "root": 1.2, "hits_enemies": false})
+				var gh_rad := float(p.get("radius", 22.0))
+				spawn_hazard_zone(pos, 0.0, 3.5, gh_rad, Color(0.75, 0.78, 0.8), {"telegraph": 1.0, "root": 1.2, "hits_enemies": false})
+				spawn_event_fx("ghost_hand", pos, 1.0, gh_rad, {"dur": 3.5})
 		"necro_fog":
 			start_weather("Некромантский туман", "fog", Color(0.35, 0.75, 0.35), float(p.get("duration", 20.0)),
 				{"vision": 0.35, "dps": 0.4, "amount": 90, "flash": true})

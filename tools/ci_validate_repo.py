@@ -193,6 +193,12 @@ def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
         "projectile_bolt.png", "projectile_fire.png", "projectile_ice.png",
         "projectile_lightning.png", "projectile_orb.png", "projectile_gas.png",
         "projectile_spear.png", "projectile_dagger.png", "projectile_enemy.png", "projectile_boss.png",
+        "mover_tumbleweed.png", "mover_wisp.png", "mover_insects.png", "mover_shard.png",
+        "event_meteor_0.png", "event_meteor_3.png", "event_crater.png", "event_boulder_0.png",
+        "event_stalactite.png", "event_ice_spike_0.png", "event_avalanche_wave.png",
+        "event_geyser_0.png", "event_ghost_hand_0.png",
+        "vfx_lightning_0.png", "vfx_fireball_0.png", "vfx_smite_0.png", "vfx_frost_0.png",
+        "illus_evolution.png", "illus_specialization.png",
     }
     chars = loaded.get("data/characters.json")
     if isinstance(chars, list):
@@ -202,6 +208,9 @@ def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
                 required.add(f"{cls}.png")
                 required.add(f"{cls}_idle_0.png")
                 required.add(f"{cls}_walk_0.png")
+                required.add(f"portrait_{cls}.png")
+            for u in ch.get("upgrades", []):
+                required.add(f"illus_{u['id']}.png")
     weaps = loaded.get("data/weapons.json")
     if isinstance(weaps, list):
         for w in weaps:
@@ -215,6 +224,18 @@ def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
             eid = str(e.get("id", ""))
             if eid:
                 required.add(f"{eid}.png")
+                required.add(f"portrait_{eid}.png")
+    bosses_doc = loaded.get("data/bosses.json")
+    if isinstance(bosses_doc, dict):
+        for mk, bd in bosses_doc.get("bosses", {}).items():
+            bid = str(bd.get("id", ""))
+            if bid:
+                required.add(f"portrait_{bid}.png")
+            required.add(f"portrait_boss_{mk}.png")
+        for bname in ("boss_shemhaz", "boss_satanail", "boss_satan"):
+            for st_name, cnt in (("idle", 4), ("walk", 4), ("attack", 4), ("hurt", 3), ("death", 5)):
+                for fi in range(cnt):
+                    required.add(f"{bname}_{st_name}_{fi}.png")
     maps = loaded.get("data/maps.json")
     if isinstance(maps, list):
         for m in maps:
@@ -229,10 +250,14 @@ def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
     if isinstance(perks, dict):
         for t in perks.get("trees", []):
             required.add(f"icon_tree_{t['id']}.png")
+        for p in perks.get("perks", []):
+            required.add(f"illus_{p['id']}.png")
     for s in (loaded.get("data/synergies.json") or []):
         required.add(f"icon_{s['id']}.png")
+        required.add(f"illus_{s['id']}.png")
     for s in (loaded.get("data/seals.json") or []):
         required.add(f"icon_{s['id']}.png")
+        required.add(f"illus_{s['id']}.png")
     amulets = loaded.get("data/amulets.json")
     if isinstance(amulets, dict):
         for a in amulets.get("amulets", []):

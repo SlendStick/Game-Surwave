@@ -50,6 +50,8 @@ var spawn_anim := 0.0
 var elite_ring: Sprite2D = null
 var tick_phase := 0
 var transition_left := 0.0
+var attack_anim := 0.0
+var hurt_anim := 0.0
 
 func setup(g: Node) -> void:
 	game = g
@@ -116,6 +118,8 @@ func init_boss(g: Node, gb: Dictionary, pos: Vector2, hp_override: float = -1.0,
 	color = Gfx.gothic(Gfx.hex(String(gb.get("color", "#ff4040"))), 0.4)
 	phase = 0
 	transition_left = 0.0
+	attack_anim = 0.0
+	hurt_anim = 0.0
 	pattern_timers.clear()
 	for p in _phase_patterns():
 		pattern_timers.append(float(p.get("interval", 2.0)) * 0.6)
@@ -160,7 +164,8 @@ func apply_map_tint(tint: Color) -> void:
 	_setup_visual()
 
 func _setup_visual() -> void:
-	var size := Vector2(radius * 2.0, radius * 2.0)
+	var vis_px := maxf(56.0, radius * 2.4) if boss else (maxf(38.0, radius * 2.2) if role == "miniboss" else maxf(20.0, radius * 2.4))
+	var size := Vector2(vis_px, vis_px)
 	var vcls := visual_class()
 	var tex := Assets.tex(vcls, color)
 	if sprite == null:
@@ -215,12 +220,27 @@ func tick(delta: float) -> void:
 		return
 	spawn_anim = minf(0.15, spawn_anim + delta)
 	walk_phase += delta * (8.0 if id == "bat" else 5.0)
+	attack_anim = maxf(0.0, attack_anim - delta)
+	hurt_anim = maxf(0.0, hurt_anim - delta)
 	if sprite:
 		var vcls := visual_class()
-		var fr := Assets.frames(vcls, "walk")
-		if not fr.is_empty():
-			var idx := int(floor(walk_phase * 1.4)) % fr.size()
-			sprite.texture = fr[idx]
+		var fr: Array = []
+		if boss and hurt_anim > 0.0:
+			fr = Assets.frames(vcls, "hurt")
+			if not fr.is_empty():
+				var h_idx := clampi(int((1.0 - hurt_anim / 0.28) * float(fr.size())), 0, fr.size() - 1)
+				sprite.texture = fr[h_idx]
+		elif boss and attack_anim > 0.0:
+			fr = Assets.frames(vcls, "attack")
+			if not fr.is_empty():
+				var a_idx := clampi(int((1.0 - attack_anim / 0.42) * float(fr.size())), 0, fr.size() - 1)
+				sprite.texture = fr[a_idx]
+		if fr.is_empty():
+			var state := "idle" if (boss and transition_left > 0.0) else "walk"
+			fr = Assets.frames(vcls, state)
+			if not fr.is_empty():
+				var idx := int(floor(walk_phase * 1.4)) % fr.size()
+				sprite.texture = fr[idx]
 		sprite.position.y = sin(walk_phase) * (1.8 if id == "bat" else 0.5)
 		if game.player != null:
 			sprite.flip_h = game.player.global_position.x < global_position.x
@@ -616,6 +636,7 @@ func _update_boss_bar() -> void:
 	EventBus.boss_damaged.emit(maxf(hp, 0.0), max_hp)
 
 func _exec_pattern(p: Dictionary) -> void:
+	attack_anim = 0.42
 	var kind := String(p.get("type", ""))
 	var pr: Dictionary = p.get("params", {})
 	var player_pos: Vector2 = game.player.global_position
@@ -774,6 +795,8 @@ func take_damage(amount: float, opts: Dictionary = {}) -> void:
 	hp -= amount
 	last_source = String(opts.get("source", ""))
 	hit_flash = 0.06
+	if boss:
+		hurt_anim = 0.28
 	if sprite:
 		sprite.modulate = Color(1.8, 1.8, 1.8)
 	if float(opts.get("knockback", 0.0)) > 0.0 and not boss:
@@ -817,5 +840,30 @@ func _die() -> void:
 	if float(flags.get("ice_puddle_radius", 0.0)) > 0.0:
 		game.spawn_hazard_zone(global_position, 0.0, float(flags.get("ice_puddle_dur", 3.0)),
 			float(flags.get("ice_puddle_radius", 32.0)), Color(0.65, 0.85, 1.0), {"slow": float(flags.get("ice_puddle_slow", 0.3))})
+	if boss and game != null and game.world != null:
+		_spawn_boss_death_anim(visual_class(), global_position, sprite.scale if sprite != null else Vector2.ONE)
 	game.on_enemy_death(self)
 	deactivate()
+
+func _spawn_boss_death_anim(vcls: String, pos: Vector2, sc: Vector2) -> void:
+	var fr := Assets.frames(vcls, "death")
+	if fr.is_empty():
+		return
+	var holder := Node2D.new()
+	holder.global_position = pos
+	holder.z_index = 8
+	var sp := Sprite2D.new()
+	sp.centered = true
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sp.scale = sc
+	sp.texture = fr[0]
+	holder.add_child(sp)
+	game.world.add_child(holder)
+	for i in fr.size():
+		var idx := i
+		game.run_later(float(idx) * 0.14, func() -> void:
+			if is_instance_valid(sp):
+				sp.texture = fr[idx])
+	game.run_later(float(fr.size()) * 0.14 + 0.15, func() -> void:
+		if is_instance_valid(holder):
+			holder.queue_free())
