@@ -438,7 +438,7 @@ func _unregister_obstacle(obstacle: Dictionary) -> void:
 	for item in keep:
 		_register_obstacle(item)
 
-## Фактура пола: у каждой карты свой мотив (травы, дюны, трещины, камни, грядки).
+## Фактура пола: тайловая пиксель-арт текстура карты (Diablo 2 gothic ground tileset).
 func _build_map_texture() -> void:
 	var pal: Dictionary = map_data.get("palette", {})
 	var bg2 := Gfx.hex(String(pal.get("bg2", "#14161c")))
@@ -448,6 +448,18 @@ func _build_map_texture() -> void:
 	layer.z_index = -9
 	world.add_child(layer)
 	map_floor_node = layer
+	var ttex := Assets.tile(String(map_data.get("id", "sands")))
+	if ttex != null:
+		var tr := TextureRect.new()
+		tr.texture = ttex
+		tr.stretch_mode = TextureRect.STRETCH_TILE
+		tr.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tr.position = Vector2.ZERO
+		tr.size = map_rect.size
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(tr)
+		return
 	# общая подложка: редкие крупные плиты
 	for i in 54:
 		var w := rng.randf_range(90.0, 260.0)

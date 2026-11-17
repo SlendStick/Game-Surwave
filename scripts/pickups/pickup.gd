@@ -29,9 +29,14 @@ func spawn_at(pos: Vector2, k: String, val: float, c: Color, s: float = 5.0) -> 
 	visible = true
 	magnet = false
 	age = 0.0
-	var cls:={"xp":"pickup_xp","gold":"pickup_gold","soul":"pickup_soul","heart":"pickup_heart","chest":"pickup_chest"}.get(kind,"pickup_xp")
-	sprite.texture=Assets.tex(String(cls),color); sprite.modulate=Color.WHITE; sprite.scale=Vector2(size/Assets.BASE_PX,size/Assets.BASE_PX)
-	rotation=PI/4.0 if kind=="xp" else 0.0
+	var cls: String = String({"xp": ("pickup_xp_big" if value >= 5.0 else "pickup_xp"), "gold": "pickup_gold", "soul": "pickup_soul", "heart": "pickup_heart", "chest": "pickup_chest", "item": "pickup_item"}.get(kind, "pickup_xp"))
+	var ptex := Assets.tex(cls, color)
+	sprite.texture = ptex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.modulate = Color.WHITE
+	var sc := maxf(0.55, (size * 2.1) / float(maxi(1, ptex.get_width())))
+	sprite.scale = Vector2(sc, sc)
+	rotation = 0.0
 
 func deactivate() -> void:
 	active = false

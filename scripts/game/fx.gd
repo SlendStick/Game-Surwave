@@ -19,8 +19,15 @@ func setup(max_s: float, col: Color, dur: float, is_square: bool = false) -> voi
 	active = true
 	visible = true
 	if sprite == null:
-		sprite = Gfx.square(self, Vector2(4, 4), color)
-	Gfx.set_square(sprite, Vector2(6, 6), color)
+		sprite = Sprite2D.new()
+		sprite.centered = true
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(sprite)
+	var ftex := Assets.tex("fx_burst" if square else "fx_ring", color)
+	sprite.texture = ftex
+	var bw := float(maxi(1, ftex.get_width()))
+	sprite.scale = Vector2(6.0 / bw, 6.0 / bw)
+	sprite.modulate = color
 
 func deactivate() -> void:
 	active = false
@@ -36,6 +43,8 @@ func tick(delta: float) -> void:
 	var size := lerpf(6.0, max_size, k)
 	var alpha := 1.0 - k
 	if sprite:
-		Gfx.set_square(sprite, Vector2(size, size), Color(color.r, color.g, color.b, alpha * 0.8))
+		var bw := float(maxi(1, sprite.texture.get_width())) if sprite.texture != null else 16.0
+		sprite.scale = Vector2(size / bw, size / bw)
+		sprite.modulate = Color(color.r, color.g, color.b, alpha * 0.85)
 	if k >= 1.0:
 		deactivate()

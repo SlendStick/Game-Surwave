@@ -8,6 +8,23 @@ static func build(parent: Node, shape: String, size: Vector2, color: Color, acce
 	color = Gfx.gothic(color, 0.22)
 	accent = Gfx.gothic(accent, 0.22)
 	parent.add_child(n)
+	var otex := Assets.icon("obs_" + shape)
+	if otex != null:
+		var sp := Sprite2D.new()
+		sp.texture = otex
+		sp.centered = true
+		sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var tw := float(maxi(1, otex.get_width()))
+		var th := float(maxi(1, otex.get_height()))
+		if shape in ["water", "lava", "swamp", "ice", "ash", "cliff"]:
+			sp.scale = Vector2(maxf(0.5, size.x * 1.15 / tw), maxf(0.5, size.y * 1.15 / th))
+			sp.z_index = -3
+		else:
+			var sc := maxf(0.55, maxf(size.x, size.y) * 1.15 / maxf(tw, th))
+			sp.scale = Vector2(sc, sc)
+		sp.modulate = Color.WHITE.lerp(color, 0.14)
+		n.add_child(sp)
+		return n
 	var w := size.x
 	var h := size.y
 	var dark := color.darkened(0.35)

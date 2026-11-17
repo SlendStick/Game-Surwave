@@ -34,6 +34,17 @@ func _ready() -> void:
 func _build() -> void:
 	UI.full_rect(self)
 	UI.backdrop(self, Color("#0b0c10"))
+	var bg_tex := Assets.icon("ui_title_bg")
+	if bg_tex != null:
+		var bg_img := TextureRect.new()
+		bg_img.texture = bg_tex
+		bg_img.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		bg_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_img.stretch_mode = TextureRect.STRETCH_SCALE
+		bg_img.modulate = Color(0.82, 0.80, 0.85, 0.72)
+		bg_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UI.full_rect(bg_img)
+		add_child(bg_img)
 
 	# --- левая часть: логотип и подпись
 	var logo := UI.title(self, "SURWAVE", 40, Vector2(38, 54), UI.GOLD)
@@ -41,22 +52,31 @@ func _build() -> void:
 	UI.label(self, "выживание · рогалик · ручная стрельба", 9, UI.DIM, Vector2(42, 100))
 	UI.divider(self, Vector2(42, 114), 250.0, UI.GOLD_DEEP)
 
-	# --- карточка героя дня: просто эмблема и версия
-	var emblem := Control.new()
-	emblem.position = Vector2(66, 168)
-	emblem.size = Vector2(120, 120)
-	emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(emblem)
-	emblem.draw.connect(func() -> void:
-		var c := Vector2(60, 60)
-		for i in 4:
-			var r := 56.0 - float(i) * 12.0
-			emblem.draw_arc(c, r, 0.0, TAU, 48, Color(0.72, 0.64, 0.42, 0.08 + 0.045 * float(i)), 1.5)
-		emblem.draw_circle(c, 30.0, Color(0.05, 0.05, 0.06, 0.96))
-		emblem.draw_arc(c, 30.0, 0.0, TAU, 48, Color(0.70, 0.62, 0.42, 0.6), 2.0)
-		emblem.draw_colored_polygon(PackedVector2Array([
-			c + Vector2(-9, -12), c + Vector2(9, -12), c + Vector2(0, 26)]), Color(0.70, 0.61, 0.40, 0.95))
-		emblem.draw_circle(c + Vector2(0, -6), 5.0, Color(0.46, 0.13, 0.11, 0.95)))
+	# --- карточка героя дня: готический герб и герои в пиксель-арте
+	var crest_tex := Assets.icon("ui_crest")
+	if crest_tex != null:
+		var crest := TextureRect.new()
+		crest.texture = crest_tex
+		crest.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		crest.position = Vector2(90, 152)
+		crest.size = Vector2(76, 76)
+		crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(crest)
+		for idx_h in 3:
+			var h_cls := ["paladin", "mage", "necromancer"][idx_h]
+			var htex := Assets.icon(h_cls)
+			if htex != null:
+				var hr := TextureRect.new()
+				hr.texture = htex
+				hr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				hr.position = Vector2(68 + idx_h * 42, 232)
+				hr.size = Vector2(36, 36)
+				hr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				add_child(hr)
 	UI.label(self, "версия 1.4.16", 8, UI.MUTED, Vector2(42, 283))
 
 	# --- правая часть: меню
@@ -162,6 +182,19 @@ func _shops_tabs(parent: Control) -> void:
 		x += 100
 	UI.label(parent, "%s: %d" % [Loc.t("souls"), int(GameManager.meta.get("souls", 0))], 10, UI.PURPLE, Vector2(440, 2))
 
+func _add_icon(parent: Control, icon_name: String, sz: int = 18) -> void:
+	var t := Assets.icon(icon_name)
+	if t == null:
+		return
+	var r := TextureRect.new()
+	r.texture = t
+	r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(sz, sz)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(r)
+
 func _build_shops(body: Control) -> void:
 	_shops_tabs(body)
 	var scroll := ScrollContainer.new()
@@ -179,11 +212,12 @@ func _build_shops(body: Control) -> void:
 				var owned := GameManager.is_char_unlocked(id)
 				var price := int(ch.get("price", 0))
 				var h := UI.hbox(v, 6)
+				_add_icon(h, String(ch.get("cls", "")), 18)
 				var txt := "%s (%s) — HP %d" % [String(ch["name"]), String(ch["role"]), int(ch["hp"])]
 				if String(ch.get("unlock", "")) != "":
 					txt = "%s — открывается особым условием" % String(ch["name"])
 				var l := UI.label(h, txt, 9, UI.TEXT if owned else UI.DIM)
-				l.custom_minimum_size = Vector2(380, 16)
+				l.custom_minimum_size = Vector2(356, 16)
 				if owned:
 					UI.label(h, "куплен", 8, UI.GREEN)
 				elif String(ch.get("unlock", "")) != "":
@@ -203,8 +237,9 @@ func _build_shops(body: Control) -> void:
 				var owned := GameManager.is_weapon_unlocked(wid)
 				var price := int(w.get("price", 0))
 				var h := UI.hbox(v, 6)
+				_add_icon(h, "icon_weapon_" + wid, 18)
 				var l := UI.label(h, "%s — %s" % [String(w["name"]), String(w.get("desc", ""))], 9, UI.TEXT if owned else UI.DIM)
-				l.custom_minimum_size = Vector2(380, 16)
+				l.custom_minimum_size = Vector2(356, 16)
 				if owned:
 					UI.label(h, "куплен", 8, UI.GREEN)
 				elif String(w.get("unlock", "")) != "":
@@ -224,8 +259,9 @@ func _build_shops(body: Control) -> void:
 				var rank := GameManager.amulet_rank(aid)
 				var cost := GameManager.amulet_cost(aid)
 				var h := UI.hbox(v, 6)
+				_add_icon(h, "icon_" + aid, 18)
 				var l := UI.label(h, "%s [%s] (%s %d/5) — %s" % [String(amu["name"]), String(amu["type"]), Loc.t("rank"), rank, String(amu.get("desc", ""))], 8, UI.TEXT if rank > 0 else UI.DIM)
-				l.custom_minimum_size = Vector2(370, 16)
+				l.custom_minimum_size = Vector2(346, 16)
 				if cost > 0:
 					var b := UI.button(h, "%s (%d)" % [Loc.t("upgrade_rank"), cost], 8, Vector2(100, 18))
 					b.disabled = int(GameManager.meta.get("souls", 0)) < cost
@@ -306,26 +342,45 @@ func _build_album(body: Control) -> void:
 	match album_tab:
 		"enemies":
 			for e in DB.enemies:
-				var seen: bool = (GameManager.meta.get("album_enemies", []) as Array).has(String(e["id"]))
+				var eid := String(e["id"])
+				var seen: bool = (GameManager.meta.get("album_enemies", []) as Array).has(eid)
+				var h := UI.hbox(v, 6)
+				if seen:
+					_add_icon(h, eid, 18)
 				var text := "%s — %s" % [String(e["name"]), String(e.get("desc", ""))] if seen else Loc.t("not_met")
-				UI.label(v, text, 8, UI.TEXT if seen else UI.DIM)
+				UI.label(h, text, 8, UI.TEXT if seen else UI.DIM)
 		"bosses":
 			var keys := (DB.bosses as Dictionary).keys()
 			for k in keys:
 				var bd: Dictionary = DB.bosses[k]
-				var seen := (GameManager.meta.get("album_bosses", []) as Array).has(String(bd.get("id", "")))
-				UI.label(v, "%s — HP %d%s" % [String(bd.get("name", "")), int(bd.get("hp", 0)), (" · " + String(bd.get("desc", ""))) if seen else " · " + Loc.t("not_met")], 8, UI.TEXT if seen else UI.DIM)
+				var bid := String(bd.get("id", ""))
+				var seen := (GameManager.meta.get("album_bosses", []) as Array).has(bid)
+				var h := UI.hbox(v, 6)
+				if seen:
+					var bicon := bid if Assets.has_real_sprite(bid) else ("boss_" + String(k) if Assets.has_real_sprite("boss_" + String(k)) else "boss_champion")
+					_add_icon(h, bicon, 20)
+				UI.label(h, "%s — HP %d%s" % [String(bd.get("name", "")), int(bd.get("hp", 0)), (" · " + String(bd.get("desc", ""))) if seen else " · " + Loc.t("not_met")], 8, UI.TEXT if seen else UI.DIM)
 			var st: Dictionary = DB.sathan
 			var seen2 := bool(GameManager.meta.get("sathan_defeated", false))
-			UI.label(v, "%s — HP %d · %s" % [String(st.get("name", "САТАН")), int(st.get("hp", 0)), String(st.get("desc", "")) if seen2 else Loc.t("not_met")], 8, UI.TEXT if seen2 else UI.DIM)
+			var hs := UI.hbox(v, 6)
+			if seen2:
+				_add_icon(hs, "boss_satan", 20)
+			UI.label(hs, "%s — HP %d · %s" % [String(st.get("name", "САТАН")), int(st.get("hp", 0)), String(st.get("desc", "")) if seen2 else Loc.t("not_met")], 8, UI.TEXT if seen2 else UI.DIM)
 		"chars":
 			for ch in DB.characters:
 				var unlocked := GameManager.is_char_unlocked(String(ch["id"]))
-				UI.label(v, "%s (%s) — %s" % [String(ch["name"]), String(ch["role"]), String(ch.get("passive", {}).get("desc", ""))] if unlocked else Loc.t("not_met"), 8, UI.TEXT if unlocked else UI.DIM)
+				var h := UI.hbox(v, 6)
+				if unlocked:
+					_add_icon(h, String(ch.get("cls", "")), 18)
+				UI.label(h, "%s (%s) — %s" % [String(ch["name"]), String(ch["role"]), String(ch.get("passive", {}).get("desc", ""))] if unlocked else Loc.t("not_met"), 8, UI.TEXT if unlocked else UI.DIM)
 		"weapons":
 			for w in DB.weapons:
-				var owned := GameManager.is_weapon_unlocked(String(w["id"]))
-				UI.label(v, "%s — %s" % [String(w["name"]), String(w.get("desc", ""))] if owned else Loc.t("not_met"), 8, UI.TEXT if owned else UI.DIM)
+				var wid := String(w["id"])
+				var owned := GameManager.is_weapon_unlocked(wid)
+				var h := UI.hbox(v, 6)
+				if owned:
+					_add_icon(h, "icon_weapon_" + wid, 18)
+				UI.label(h, "%s — %s" % [String(w["name"]), String(w.get("desc", ""))] if owned else Loc.t("not_met"), 8, UI.TEXT if owned else UI.DIM)
 
 func _build_achievements(body: Control) -> void:
 	UI.label(body, Loc.t("achievements_empty"), 8, UI.DIM, Vector2(0, 2))
@@ -414,3 +469,10 @@ func _build_settings(body: Control) -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_info()
+
+func _input(event: InputEvent) -> void:
+	if overlay != null and event.is_action_pressed("pause"):
+		overlay.queue_free()
+		overlay = null
+		_refresh_info()
+		get_viewport().set_input_as_handled()

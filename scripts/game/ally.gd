@@ -61,7 +61,11 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 	var cls:={"spirit":"ally_spirit","skeleton":"ally_skeleton","turret":"ally_turret","blade":"ally_blade","orbit_blade":"ally_blade","tornado":"ally_tornado","phoenix":"ally_phoenix","moth":"ally_moth","scythe":"ally_scythe","holy_spear":"ally_spear","thunder_beetle":"ally_beetle","shadow_clone":"ally_clone","dragonling":"ally_dragon","aura":"ally_aura"}.get(kind,"ally_spirit")
 	if sprite == null:
 		sprite=Sprite2D.new(); sprite.centered=true; sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST; add_child(sprite)
-	sprite.texture=Assets.tex(String(cls),color); sprite.modulate=Color.WHITE; sprite.scale=Vector2(radius*2.0/Assets.BASE_PX,radius*2.0/Assets.BASE_PX)
+	var atex := Assets.tex(String(cls), color)
+	sprite.texture = atex
+	sprite.modulate = Color.WHITE
+	var sc := maxf(0.65, (radius * 2.2) / float(maxi(1, atex.get_width())))
+	sprite.scale = Vector2(sc, sc)
 
 func deactivate() -> void:
 	active = false

@@ -10,6 +10,8 @@ const SPRITE_DIR := "res://assets/sprites/"
 const BASE_PX := 32
 
 static var _cache: Dictionary = {}
+static var _frames_cache: Dictionary = {}
+static var _exists_cache: Dictionary = {}
 static var _manifest: Dictionary = {}
 
 ## Загрузить манифест ассетов (список требуемых файлов и анимаций).
@@ -25,7 +27,23 @@ static func manifest() -> Dictionary:
 
 ## Есть ли настоящий спрайт для класса объекта.
 static func has_real_sprite(cls: String) -> bool:
-	return ResourceLoader.exists(SPRITE_DIR + cls + ".png")
+	if _exists_cache.has(cls):
+		return bool(_exists_cache[cls])
+	var ok := ResourceLoader.exists(SPRITE_DIR + cls + ".png")
+	_exists_cache[cls] = ok
+	return ok
+
+## Загрузить текстуру по точному имени файла в assets/sprites (без .png).
+static func icon(name: String) -> Texture2D:
+	if name == "":
+		return null
+	if not has_real_sprite(name):
+		return null
+	return load(SPRITE_DIR + name + ".png") as Texture2D
+
+## Текстура тайла пола карты.
+static func tile(map_id: String) -> Texture2D:
+	return icon("tile_" + map_id)
 
 ## Форма-заглушка по классу объекта (нужна, чтобы враги различались).
 static func shape_of(cls: String) -> String:
@@ -215,11 +233,14 @@ static func _paint_details(img: Image, cls: String, color: Color, n: int) -> voi
 		"pickup_chest": _rect(img,3*u,c-u,n-6*u,2*u,Color("#ffd75a"))
 
 ## Кадры анимации для класса и состояния ("idle"/"walk"/"attack"/"hurt"/"death").
-## Пока настоящих кадров нет — возвращается пустой массив, и спрайт остаётся статичным.
 static func frames(cls: String, state: String) -> Array:
+	var key := cls + "|" + state
+	if _frames_cache.has(key):
+		return _frames_cache[key]
 	var out: Array = []
 	for i in 8:
 		var path := SPRITE_DIR + "%s_%s_%d.png" % [cls, state, i]
 		if ResourceLoader.exists(path):
 			out.append(load(path))
+	_frames_cache[key] = out
 	return out

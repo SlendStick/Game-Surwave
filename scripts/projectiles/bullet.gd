@@ -42,14 +42,36 @@ func spawn_bullet(pos: Vector2, dir: Vector2, dmg: float, o: Dictionary) -> void
 	target = null
 	vel = dir.normalized() * float(opts.get("speed", 400.0))
 	var cls := "projectile_orb"
-	var behavior:=String(opts.get("behavior","")); var source:=String(opts.get("source",""))
-	if behavior in ["arrow","dagger"] or source in ["aimed","split"]: cls="projectile_arrow"
-	elif bool(opts.get("holy",false)): cls="projectile_spear"
-	elif opts.has("burn") or behavior=="fireball": cls="projectile_fire"
-	elif opts.has("freeze"): cls="projectile_ice"
-	sprite.texture=Assets.tex(cls,color); sprite.modulate=Color.WHITE
-	var stretch:=1.8 if cls in ["projectile_arrow","projectile_spear"] else 1.0
-	sprite.scale=Vector2(radius*2.0/Assets.BASE_PX*stretch,radius*2.0/Assets.BASE_PX)
+	var behavior := String(opts.get("behavior", ""))
+	var source := String(opts.get("source", ""))
+	var wid := String(opts.get("weapon_id", ""))
+	if bool(opts.get("holy", false)) or wid == "holy_spears":
+		cls = "projectile_spear"
+	elif wid == "shadow_daggers" or behavior == "dagger":
+		cls = "projectile_dagger"
+	elif wid == "crossbow":
+		cls = "projectile_bolt"
+	elif wid == "bow" or behavior == "arrow" or source in ["aimed", "split"]:
+		cls = "projectile_arrow"
+	elif wid == "shotgun" or behavior == "shotgun":
+		cls = "projectile_pellet"
+	elif wid == "revolver":
+		cls = "projectile_bullet"
+	elif wid == "lightning_staff" or behavior == "lightning":
+		cls = "projectile_lightning"
+	elif wid == "poison_clouds" or behavior == "gas":
+		cls = "projectile_gas"
+	elif opts.has("burn") or behavior == "fireball":
+		cls = "projectile_fire"
+	elif opts.has("freeze") or wid == "ice_needles":
+		cls = "projectile_ice"
+	var ptex := Assets.tex(cls, color)
+	sprite.texture = ptex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.modulate = Color.WHITE
+	var base_w := float(maxi(1, ptex.get_width()))
+	var sc := maxf(0.55, (radius * 2.6) / base_w)
+	sprite.scale = Vector2(sc, sc)
 	rotation = vel.angle()
 	if opts.has("angle"):
 		rotation = float(opts["angle"])

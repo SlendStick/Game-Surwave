@@ -170,13 +170,28 @@ func _build_characters() -> void:
 	dbox.add_theme_constant_override("separation", 4)
 	dscroll.add_child(dbox)
 	var ch2 := DB.character(String(sel["character"]))
-	var text := "%s — %s\nHP: %d\n\nПассивка: %s\n%s\n\nСкилл: %s (КД %.0f сек)\n%s" % [
-		String(ch2.get("name", "")), String(ch2.get("role", "")), int(ch2.get("hp", 0)),
+	var head := UI.hbox(dbox, 8)
+	var ctex := Assets.icon(String(ch2.get("cls", "mage")))
+	if ctex != null:
+		var frame := UI.panel(head, Rect2(0, 0, 44, 44), UI.PANEL_HI, UI.GOLD_DEEP)
+		frame.custom_minimum_size = Vector2(44, 44)
+		var portrait := TextureRect.new()
+		portrait.texture = ctex
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.position = Vector2(4, 4)
+		portrait.size = Vector2(36, 36)
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.add_child(portrait)
+	var htitle := UI.label(head, "%s — %s\nHP: %d" % [String(ch2.get("name", "")), String(ch2.get("role", "")), int(ch2.get("hp", 0))], 10, UI.GOLD, Vector2.ZERO)
+	htitle.custom_minimum_size = Vector2(340, 40)
+	var text := "Пассивка: %s\n%s\n\nСкилл: %s (КД %.0f сек)\n%s" % [
 		String(ch2.get("passive", {}).get("name", "")), String(ch2.get("passive", {}).get("desc", "")),
 		String(ch2.get("skill", {}).get("name", "")), float(ch2.get("skill", {}).get("cd", 10.0)),
 		String(ch2.get("skill", {}).get("desc", ""))]
 	var l := UI.label(dbox, text, 9, UI.TEXT, Vector2.ZERO)
-	l.custom_minimum_size = Vector2(410, 0)
+	l.custom_minimum_size = Vector2(400, 0)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var ups: Array = ch2.get("upgrades", [])
 	var utxt := "Уникальные апгрейды (из сундуков):"
@@ -223,12 +238,24 @@ func _build_weapons() -> void:
 	dbox.add_theme_constant_override("separation", 4)
 	dscroll.add_child(dbox)
 	var w2 := DB.weapon(String(sel["weapon"]))
+	var wid2 := String(w2.get("id", ""))
+	var wtex := Assets.icon("icon_weapon_" + wid2)
+	if wtex != null:
+		var wico := TextureRect.new()
+		wico.texture = wtex
+		wico.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		wico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		wico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		wico.position = Vector2(8, 6)
+		wico.size = Vector2(36, 36)
+		wico.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		details.add_child(wico)
 	var text := "%s\nУрон: %.0f · Скорострельность: %.1f/сек · Магазин: %d · Перезарядка: %.1f сек\nСнарядов: %d · Пробитие: %d · Скорость снаряда: %.0f\n\n%s" % [
 		String(w2.get("name", "")), float(w2.get("damage", 0)), float(w2.get("fire_rate", 0)),
 		int(w2.get("mag", 0)), float(w2.get("reload", 0)), int(w2.get("projectiles", 1)),
 		int(w2.get("pierce", 0)), float(w2.get("proj_speed", 0)), String(w2.get("desc", ""))]
-	var l := UI.label(details, text, 9, UI.TEXT, Vector2(8, 6))
-	l.size = Vector2(410, 90)
+	var l := UI.label(details, text, 9, UI.TEXT, Vector2(50 if wtex != null else 8, 6))
+	l.size = Vector2(368 if wtex != null else 410, 90)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var evo_txt := "Уровни 1–8: рост урона, темпа, снарядов и пробития."
 	var single_evo: Dictionary = w2.get("evolution", {})
@@ -274,7 +301,32 @@ func _build_maps() -> void:
 				_rebuild())
 	var details := UI.panel(content, Rect2(326, 0, 302, 244))
 	var m2 := DB.map(String(sel["map"]))
-	var boss := DB.boss(String(sel["map"]))
+	var mid2 := String(m2.get("id", "sands"))
+	var boss := DB.boss(mid2)
+	var mtile := Assets.tile(mid2)
+	if mtile != null:
+		var tprev := TextureRect.new()
+		tprev.texture = mtile
+		tprev.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tprev.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tprev.stretch_mode = TextureRect.STRETCH_SCALE
+		tprev.position = Vector2(214, 8)
+		tprev.size = Vector2(38, 38)
+		tprev.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		details.add_child(tprev)
+	var btex := Assets.icon("boss_" + mid2)
+	if btex == null:
+		btex = Assets.icon("boss_champion")
+	if btex != null:
+		var bprev := TextureRect.new()
+		bprev.texture = btex
+		bprev.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		bprev.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bprev.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		bprev.position = Vector2(256, 8)
+		bprev.size = Vector2(38, 38)
+		bprev.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		details.add_child(bprev)
 	var text := "%s\n\n%s\n\nВраги: %d типов\nБосс: %s (HP %d)\n\nИвенты:\n" % [
 		String(m2.get("name", "")), String(m2.get("desc", "")),
 		int(m2.get("roster", {}).get("fodder", []).size()) + 3,
@@ -282,7 +334,7 @@ func _build_maps() -> void:
 	for e in m2.get("events", []):
 		text += "› %s (каждые %.0f сек)\n" % [EVENT_NAMES.get(String(e.get("kind", "")), String(e.get("kind", ""))), float(e.get("interval", 60.0))]
 	var l := UI.label(details, text, 9, UI.TEXT, Vector2(8, 6))
-	l.size = Vector2(286, 220)
+	l.size = Vector2(204, 220)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# Тьма
 	var dk := UI.hbox(content, 6)

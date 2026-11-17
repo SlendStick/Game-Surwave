@@ -324,10 +324,24 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 		v.offset_top = 7
 		v.offset_right = -7
 		v.offset_bottom = -6
-		# номер для выбора с клавиатуры
-		var num := UI.label(v, "%d" % (i + 1), 8, accent)
+		# номер + иконка предмета/перка
+		var hdr := UI.hbox(v, 4)
+		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ctex := _card_icon(card)
+		if ctex != null:
+			var ico := TextureRect.new()
+			ico.texture = ctex
+			ico.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			ico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			ico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			ico.custom_minimum_size = Vector2(18, 18)
+			ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			hdr.add_child(ico)
+		var hdr_txt := UI.vbox(hdr, 0)
+		hdr_txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var num := UI.label(hdr_txt, "%d" % (i + 1), 8, accent)
 		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var badge := UI.label(v, UI.kind_name(kind).to_upper(), 7, accent)
+		var badge := UI.label(hdr_txt, UI.kind_name(kind).to_upper(), 7, accent)
 		badge.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var title_lbl := UI.label(v, String(data.get("name", card.get("id", ""))), 10, UI.TEXT)
 		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -357,6 +371,26 @@ func _input_choice_hotkey(event: InputEvent) -> bool:
 			_on_card_pressed(current_cards[i])
 			return true
 	return false
+
+## Иконка карточки выбора (перк, синергия, печать, эволюция, апгрейд).
+func _card_icon(card: Dictionary) -> Texture2D:
+	var kind := String(card.get("kind", "perk"))
+	var data: Dictionary = card.get("data", {})
+	var cid := String(card.get("id", ""))
+	match kind:
+		"perk":
+			return Assets.icon("icon_tree_" + String(data.get("tree", "")))
+		"synergy", "seal":
+			return Assets.icon("icon_" + cid)
+		"evolution":
+			if game != null and game.player != null:
+				return Assets.icon("icon_weapon_" + String(game.player.weapon.get("id", "")))
+		"char_upgrade":
+			if game != null and game.player != null:
+				return Assets.icon(String(game.player.char_data.get("cls", "")))
+		"specialization":
+			return Assets.icon("ui_crest")
+	return null
 
 ## Подпись карточки: дерево, тир и число уже взятых стаков.
 func _card_meta(card: Dictionary) -> String:
@@ -452,7 +486,7 @@ func _refresh(delta: float) -> void:
 		timer_lbl.text = UI.fmt_time(maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed)))
 	fps_lbl.text = "%s %d" % [Loc.t("fps"), Engine.get_frames_per_second()]
 
-## Кольцо готовности способности: заполняется по мере восстановления, без текста.
+## Кольцо готовности способности: пиксель-арт кристалл + дуга восстановления.
 func _draw_skill_icon() -> void:
 	if skill_icon == null or game == null or game.player == null:
 		return
@@ -461,34 +495,46 @@ func _draw_skill_icon() -> void:
 	var frac := clampf(1.0 - p.skill_cd_left / cd_total, 0.0, 1.0)
 	var c := Vector2(9, 9)
 	var pulse := 0.55 + 0.45 * sin(float(Time.get_ticks_msec()) * 0.004)
-	skill_icon.draw_circle(c, 8.4, Color(0.04, 0.05, 0.09, 0.9))
-	skill_icon.draw_arc(c, 8.0, 0.0, TAU, 28, Color(0.35, 0.38, 0.5, 0.85), 1.0)
-	if frac >= 1.0:
-		# способность готова: тёплое свечение и ромб внутри
-		skill_icon.draw_circle(c, 7.4, Color(0.50, 0.82, 1.0, 0.20 + 0.18 * pulse))
-		skill_icon.draw_arc(c, 7.0, 0.0, TAU, 28, Color(0.55, 0.85, 1.0, 0.95), 1.6)
-		skill_icon.draw_colored_polygon(PackedVector2Array([
-			c + Vector2(0, -3.4), c + Vector2(3.0, 0), c + Vector2(0, 3.4), c + Vector2(-3.0, 0)]),
-			Color(0.85, 0.95, 1.0))
+	var stex := Assets.icon("ui_skill_ready")
+	if stex != null:
+		skill_icon.draw_texture_rect(stex, Rect2(1, 1, 16, 16), false, Color(1, 1, 1, 1.0 if frac >= 1.0 else 0.35))
 	else:
-		skill_icon.draw_arc(c, 6.6, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 2.0)
+		skill_icon.draw_circle(c, 8.4, Color(0.04, 0.05, 0.09, 0.9))
+	if frac >= 1.0:
+		skill_icon.draw_arc(c, 8.2, 0.0, TAU, 28, Color(0.65, 0.88, 1.0, 0.55 + 0.35 * pulse), 1.4)
+	else:
+		skill_icon.draw_arc(c, 7.4, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 2.0)
 
-## Иконка патрона: гильза с пулей.
+## Иконка патрона: пиксель-арт гильза с пулей.
 func _draw_ammo_icon() -> void:
 	if ammo_icon == null:
 		return
-	var gold := Color("#ffffff") if (game != null and game.player != null and game.player.reloading) else Color("#cbbc95")
+	var reloading := (game != null and game.player != null and game.player.reloading)
+	var atex := Assets.icon("ui_ammo")
+	if atex != null:
+		ammo_icon.draw_texture_rect(atex, Rect2(0, 0, 10, 13), false, Color(1.5, 1.5, 1.5) if reloading else Color.WHITE)
+		return
+	var gold := Color("#ffffff") if reloading else Color("#cbbc95")
 	ammo_icon.draw_rect(Rect2(2, 3, 5, 9), gold)
 	ammo_icon.draw_colored_polygon(PackedVector2Array([
 		Vector2(2, 3), Vector2(7, 3), Vector2(4.5, 0)]), gold)
 
-## Сердца здоровья: заполненные — текущее HP, тёмные — потерянные.
+## Сердца здоровья: пиксель-арт рубиновые сердца.
 func _draw_hearts() -> void:
 	if hearts == null or game == null or game.player == null:
 		return
 	var pl: Player = game.player
 	var total: int = clampi(pl.max_hp, 1, 20)
-	var step := minf(18.0, 176.0 / float(total))
+	var step := minf(16.0, 176.0 / float(total))
+	var full_t := Assets.icon("ui_heart_full")
+	var empty_t := Assets.icon("ui_heart_empty")
+	if full_t != null and empty_t != null:
+		var sz := minf(14.0, step - 1.0)
+		for i in total:
+			var t := full_t if i < pl.hp else empty_t
+			var mod := Color(1.25, 0.95, 0.85) if (i < pl.hp and pl.hp <= 2) else Color.WHITE
+			hearts.draw_texture_rect(t, Rect2(step * float(i), 1.0, sz, sz), false, mod)
+		return
 	var r := minf(4.4, step * 0.30)
 	for i in total:
 		var c := Vector2(step * 0.5 + step * float(i), 8.0)

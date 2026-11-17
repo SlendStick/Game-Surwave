@@ -195,10 +195,18 @@ func recalc() -> void:
 	EventBus.hp_changed.emit(hp, max_hp)
 
 func _refresh_visual() -> void:
-	var size := Vector2(14, 14) * float(S.get("size", 1.0))
+	var size := Vector2(18, 18) * float(S.get("size", 1.0))
 	var col := Gfx.hex(String(char_data.get("color", "#ffffff")))
 	var cls := String(char_data.get("cls", "square"))
-	var tex := Assets.tex(cls, col)
+	var state := "walk" if moving_now else "idle"
+	var fr := Assets.frames(cls, state)
+	var tex: Texture2D = null
+	if not fr.is_empty():
+		var fps := 8.0 if moving_now else 3.0
+		var idx := int(floor(float(Time.get_ticks_msec()) * 0.001 * fps)) % fr.size()
+		tex = fr[idx]
+	else:
+		tex = Assets.tex(cls, col)
 	if sprite == null:
 		sprite = Sprite2D.new()
 		sprite.centered = true
@@ -206,9 +214,15 @@ func _refresh_visual() -> void:
 		add_child(sprite)
 	sprite.texture = tex
 	var base := float(maxi(1, tex.get_width()))
-	var bob:=sin(float(Time.get_ticks_msec())*0.008)*0.8 if moving_now else sin(float(Time.get_ticks_msec())*0.003)*0.25
 	sprite.scale = Vector2(maxf(1.0, size.x) / base, maxf(1.0, size.y) / base)
-	sprite.position.y=bob
+	sprite.flip_h = aim_dir.x < -0.1
+	sprite.position.y = 0.0
+	if iframes > 0.0 and int(Time.get_ticks_msec() / 70) % 2 == 0:
+		sprite.modulate = Color(1.4, 0.7, 0.7, 0.75)
+	elif bodiless_left > 0.0:
+		sprite.modulate = Color(0.75, 0.9, 1.3, 0.65)
+	else:
+		sprite.modulate = Color.WHITE
 	# светлое кольцо, чтобы игрок не терялся среди врагов
 	if marker == null:
 		marker = Sprite2D.new()
@@ -216,15 +230,31 @@ func _refresh_visual() -> void:
 		marker.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		marker.z_index = -1
 		add_child(marker)
-	var msize := size + Vector2(10, 10)
+	var msize := size + Vector2(8, 8)
 	marker.scale = Vector2(msize.x / float(Assets.BASE_PX), msize.y / float(Assets.BASE_PX))
-	marker.rotation+=0.012
-	marker.modulate=Color(1,1,1,0.55+0.15*sin(float(Time.get_ticks_msec())*0.006))
-	# ствол: показывает направление прицела
+	marker.rotation += 0.012
+	marker.modulate = Color(1, 1, 1, 0.45 + 0.12 * sin(float(Time.get_ticks_msec()) * 0.006))
+	# экипированное оружие в руках, нацеленное в сторону прицела
+	var wid := String(weapon.get("id", "revolver"))
+	var wtex := Assets.icon("weapon_" + wid)
 	if muzzle == null:
-		muzzle = Gfx.square(self, Vector2(8, 3), Color(1, 1, 1, 0.9))
-	muzzle.position = aim_dir * (size.x * 0.55 + 3.0)
-	muzzle.rotation=aim_dir.angle()
+		if wtex != null:
+			muzzle = Sprite2D.new()
+			muzzle.texture = wtex
+			muzzle.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			muzzle.centered = true
+			muzzle.z_index = 1
+			add_child(muzzle)
+		else:
+			muzzle = Gfx.square(self, Vector2(8, 3), Color(1, 1, 1, 0.9))
+	elif wtex != null and muzzle.texture != wtex:
+		muzzle.texture = wtex
+	var kick := maxf(0.0, 1.0 - since_last_shot / 0.08) * 2.5
+	muzzle.position = aim_dir * (size.x * 0.45 + 2.5 - kick) + Vector2(0, 1.0)
+	muzzle.rotation = aim_dir.angle()
+	if wtex != null:
+		muzzle.scale = Vector2(0.72, 0.72) * float(S.get("size", 1.0))
+		muzzle.flip_v = aim_dir.x < 0.0
 
 # ------------------------------------------------------------------ ВВОД
 func read_input() -> void:
@@ -738,6 +768,7 @@ func _shoot() -> void:
 		"speed": float(S.proj_speed), "pierce": int(S.pierce) + pierce_bonus, "bounce": int(S.bounce),
 		"radius": 3.0 * float(S.size), "color": Gfx.hex(String(weapon.get("color", "#ffffff"))),
 		"crit": is_crit, "knockback": float(S.knockback)+(0.25 if upg.flag_on("unbending") and hp*2<=max_hp else 0.0), "behavior": behavior,
+		"weapon_id": String(weapon.get("id", "")),
 		"life": clampf(560.0 / maxf(60.0, float(S.proj_speed)), 1.0, 4.0),
 		"freeze_chance": float(S.freeze_chance), "burn_mult": float(S.burn_mult), "source": "weapon",
 		"full_hp_bonus": upg.flag_num("full_hp_bonus", 0.0),

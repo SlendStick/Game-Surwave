@@ -177,6 +177,81 @@ def check_data_integrity(loaded: dict[str, object], errors: list[str]) -> None:
         fail("data/amulets.json missing amulets", errors)
 
 
+def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
+    sdir = ROOT / "assets" / "sprites"
+    if not sdir.is_dir():
+        fail("Missing assets/sprites directory", errors)
+        return
+    required: set[str] = {
+        "ring.png", "elite.png", "fx_burst.png", "fx_ring.png",
+        "ui_heart_full.png", "ui_heart_empty.png", "ui_ammo.png",
+        "ui_skill_ready.png", "ui_crest.png", "ui_title_bg.png",
+        "boss_satan.png", "boss_champion.png", "mb.png",
+        "pickup_xp.png", "pickup_xp_big.png", "pickup_gold.png",
+        "pickup_soul.png", "pickup_heart.png", "pickup_chest.png", "pickup_item.png",
+        "projectile_bullet.png", "projectile_pellet.png", "projectile_arrow.png",
+        "projectile_bolt.png", "projectile_fire.png", "projectile_ice.png",
+        "projectile_lightning.png", "projectile_orb.png", "projectile_gas.png",
+        "projectile_spear.png", "projectile_dagger.png", "projectile_enemy.png", "projectile_boss.png",
+    }
+    chars = loaded.get("data/characters.json")
+    if isinstance(chars, list):
+        for ch in chars:
+            cls = str(ch.get("cls", ""))
+            if cls:
+                required.add(f"{cls}.png")
+                required.add(f"{cls}_idle_0.png")
+                required.add(f"{cls}_walk_0.png")
+    weaps = loaded.get("data/weapons.json")
+    if isinstance(weaps, list):
+        for w in weaps:
+            wid = str(w.get("id", ""))
+            if wid:
+                required.add(f"weapon_{wid}.png")
+                required.add(f"icon_weapon_{wid}.png")
+    enems = loaded.get("data/enemies.json")
+    if isinstance(enems, list):
+        for e in enems:
+            eid = str(e.get("id", ""))
+            if eid:
+                required.add(f"{eid}.png")
+    maps = loaded.get("data/maps.json")
+    if isinstance(maps, list):
+        for m in maps:
+            mid = str(m.get("id", ""))
+            if mid:
+                required.add(f"tile_{mid}.png")
+            for o in m.get("obstacles", []):
+                sh = str(o.get("shape", ""))
+                if sh:
+                    required.add(f"obs_{sh}.png")
+    perks = loaded.get("data/perks.json")
+    if isinstance(perks, dict):
+        for t in perks.get("trees", []):
+            required.add(f"icon_tree_{t['id']}.png")
+    for s in (loaded.get("data/synergies.json") or []):
+        required.add(f"icon_{s['id']}.png")
+    for s in (loaded.get("data/seals.json") or []):
+        required.add(f"icon_{s['id']}.png")
+    amulets = loaded.get("data/amulets.json")
+    if isinstance(amulets, dict):
+        for a in amulets.get("amulets", []):
+            required.add(f"icon_{a['id']}.png")
+
+    checked = 0
+    for fn in sorted(required):
+        p = sdir / fn
+        if not p.exists():
+            fail(f"Missing required sprite asset: assets/sprites/{fn}", errors)
+            continue
+        hdr = p.read_bytes()[:8]
+        if hdr != b"\x89PNG\r\n\x1a\n":
+            fail(f"Invalid PNG header in assets/sprites/{fn}", errors)
+            continue
+        checked += 1
+    ok(f"Validated {checked} required pixel-art PNG assets in assets/sprites/")
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -193,6 +268,7 @@ def main() -> int:
     loaded = check_json_files(errors)
     check_text_and_res_paths(errors)
     check_data_integrity(loaded, errors)
+    check_sprites(loaded, errors)
     check_python_tools(errors)
 
     if errors:

@@ -31,9 +31,14 @@ func spawn_at(pos: Vector2, dir: Vector2, dmg: int, opts: Dictionary = {}) -> vo
 	life = float(opts.get("life", 4.0))
 	active = true
 	visible = true
-	var cls:="projectile_fire" if burn else ("projectile_orb" if homing else "projectile_enemy")
-	sprite.texture=Assets.tex(cls,color); sprite.modulate=Color.WHITE; sprite.scale=Vector2(radius*2.0/Assets.BASE_PX,radius*2.0/Assets.BASE_PX)
-	rotation=vel.angle()
+	var cls := "projectile_boss" if radius >= 5.0 else ("projectile_fire" if burn else ("projectile_orb" if homing else "projectile_enemy"))
+	var ptex := Assets.tex(cls, color)
+	sprite.texture = ptex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.modulate = Color.WHITE
+	var sc := maxf(0.6, (radius * 2.6) / float(maxi(1, ptex.get_width())))
+	sprite.scale = Vector2(sc, sc)
+	rotation = vel.angle()
 
 func deactivate() -> void:
 	active = false

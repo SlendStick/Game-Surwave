@@ -132,15 +132,25 @@ func init_boss(g: Node, gb: Dictionary, pos: Vector2, hp_override: float = -1.0,
 	_setup_visual()
 	EventBus.boss_spawned.emit(String(gb.get("name", "БОСС")), max_hp, is_final)
 
-## Класс визуала: имя спрайта/фигуры (mb_* → общий силуэт мини-босса).
+## Класс визуала: имя спрайта/фигуры (каждый мини-босс и босс карты имеет свой спрайт).
 func visual_class() -> String:
 	if boss:
-		if id == "boss_shemhaz": return "boss_shemhaz"
-		if id == "boss_satanail": return "boss_satanail"
+		if id == "boss_satanail" and game != null and game.megaphase:
+			return "boss_satan"
+		if Assets.has_real_sprite(id):
+			return id
+		var map_key := "boss_" + String(boss_def.get("map", ""))
+		if map_key != "boss_" and Assets.has_real_sprite(map_key):
+			return map_key
 		return "boss_champion"
 	if role == "miniboss" or id.begins_with("mb_"):
+		if Assets.has_real_sprite(id):
+			return id
 		return "mb"
 	return id
+
+func _base_modulate() -> Color:
+	return Color.WHITE if Assets.has_real_sprite(visual_class()) else color
 
 ## Тон карты: слегка подкрашивает врагов под палитру, чтобы карты различались.
 func apply_map_tint(tint: Color) -> void:
@@ -151,7 +161,8 @@ func apply_map_tint(tint: Color) -> void:
 
 func _setup_visual() -> void:
 	var size := Vector2(radius * 2.0, radius * 2.0)
-	var tex := Assets.tex(visual_class(), color)
+	var vcls := visual_class()
+	var tex := Assets.tex(vcls, color)
 	if sprite == null:
 		sprite = Sprite2D.new()
 		sprite.centered = true
@@ -163,9 +174,16 @@ func _setup_visual() -> void:
 	sprite.modulate = Color.WHITE
 	if elite:
 		if elite_ring == null:
-			elite_ring = Sprite2D.new(); elite_ring.texture=Assets.tex("ring",Color(1.0,0.85,0.25,0.7)); elite_ring.z_index=-1; add_child(elite_ring)
-		elite_ring.visible=true; elite_ring.scale=Vector2((size.x+9.0)/Assets.BASE_PX,(size.y+9.0)/Assets.BASE_PX); elite_ring.modulate=Color(1,1,1,0.8)
-	elif elite_ring!=null: elite_ring.visible=false
+			elite_ring = Sprite2D.new()
+			elite_ring.texture = Assets.tex("elite", Color(1.0, 0.85, 0.25, 0.7))
+			elite_ring.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			elite_ring.z_index = -1
+			add_child(elite_ring)
+		elite_ring.visible = true
+		elite_ring.scale = Vector2((size.x + 10.0) / float(Assets.BASE_PX), (size.y + 10.0) / float(Assets.BASE_PX))
+		elite_ring.modulate = Color(1, 1, 1, 0.85)
+	elif elite_ring != null:
+		elite_ring.visible = false
 	if boss:
 		if hp_bar == null:
 			hp_bar = Gfx.square(self, Vector2(radius * 2.0, 3), Color(0.95, 0.25, 0.25), Vector2(0, -radius - 8.0))
@@ -196,18 +214,30 @@ func tick(delta: float) -> void:
 	if not active:
 		return
 	spawn_anim = minf(0.15, spawn_anim + delta)
-	walk_phase+=delta*(8.0 if id=="bat" else 5.0)
+	walk_phase += delta * (8.0 if id == "bat" else 5.0)
 	if sprite:
-		sprite.position.y=sin(walk_phase)*(2.0 if id=="bat" else 0.7)
-		if boss: sprite.rotation=sin(walk_phase*0.35)*0.025
-		elif id=="bat": sprite.scale.x=absf(sprite.scale.y)*(0.72+0.28*absf(sin(walk_phase)))
+		var vcls := visual_class()
+		var fr := Assets.frames(vcls, "walk")
+		if not fr.is_empty():
+			var idx := int(floor(walk_phase * 1.4)) % fr.size()
+			sprite.texture = fr[idx]
+		sprite.position.y = sin(walk_phase) * (1.8 if id == "bat" else 0.5)
+		if game.player != null:
+			sprite.flip_h = game.player.global_position.x < global_position.x
+		if boss:
+			sprite.rotation = sin(walk_phase * 0.35) * 0.025
+		elif id == "bat" and fr.is_empty():
+			sprite.scale.x = absf(sprite.scale.y) * (0.72 + 0.28 * absf(sin(walk_phase)))
+	if elite_ring != null and elite_ring.visible:
+		elite_ring.rotation += delta * 1.1
+	var base_mod := _base_modulate()
 	if game.player != null and game.player.has_meta("trial_invisible") and sprite and hit_flash <= 0.0:
 		var a := 1.0 if global_position.distance_to(game.player.global_position) < 128.0 else 0.08
-		sprite.modulate = Color(color.r,color.g,color.b,a)
+		sprite.modulate = Color(base_mod.r, base_mod.g, base_mod.b, a)
 	if hit_flash > 0.0:
 		hit_flash -= delta
 		if sprite:
-			sprite.modulate = Color(1.6, 1.6, 1.6) if hit_flash > 0.0 else color
+			sprite.modulate = Color(1.9, 1.9, 1.9) if hit_flash > 0.0 else base_mod
 	_tick_statuses(delta)
 	if stun > 0.0:
 		stun -= delta
@@ -560,7 +590,7 @@ func _boss_tick(delta: float) -> void:
 		game.shake(5.0)
 		game.spawn_fx(global_position, color, radius * 2.0, 0.5)
 		if sprite:
-			sprite.modulate = color
+			sprite.modulate = _base_modulate()
 	var player_pos: Vector2 = game.player.global_position
 	var to_player := (player_pos - global_position)
 	var dir := to_player.normalized() if to_player.length() > 0.1 else Vector2.RIGHT
