@@ -682,7 +682,7 @@ func _run_perk_effect_test() -> void:
 	assert(checked == DB.perks.size(), "Проверены не все перки")
 	# Проверка реального призыва перков (Серп, Святое Копьё)
 	if player != null:
-		var saved_flags := player.upg.flags.duplicate(true)
+		var saved_flags: Dictionary = player.upg.flags.duplicate(true)
 		player.upg.apply_flags({"summon": "scythe"})
 		player.upg.apply_flags({"summon": "holy_spear"})
 		player._tick_perk_summons()

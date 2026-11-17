@@ -121,10 +121,10 @@ func _spear_hunt(delta: float) -> void:
 				sprite.rotation = move_dir.angle() + PI * 0.25
 	else:
 		orbit_angle += delta * 2.4 * speed_add
-		var home := game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 36.0
-		var to_home := home - global_position
+		var home: Vector2 = game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 36.0
+		var to_home: Vector2 = home - global_position
 		if to_home.length() > 2.0:
-			var mdir := to_home.normalized()
+			var mdir: Vector2 = to_home.normalized()
 			global_position += mdir * minf(to_home.length(), speed * speed_add * delta)
 			if sprite != null:
 				sprite.rotation = mdir.angle() + PI * 0.25
@@ -158,8 +158,8 @@ func _chase_and_shoot(delta: float) -> void:
 	if tgt == null:
 		if game.player != null:
 			orbit_angle += delta * 1.4
-			var follow := game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 44.0
-			var to_f := follow - global_position
+			var follow: Vector2 = game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 44.0
+			var to_f: Vector2 = follow - global_position
 			if to_f.length() > 6.0:
 				global_position += to_f.normalized() * minf(to_f.length(), speed * delta)
 		return
