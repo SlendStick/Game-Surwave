@@ -271,22 +271,22 @@ func _build_pause_layer() -> void:
 	scroll.add_child(pause_perk_list)
 
 	# --- правая колонка: сводка забега + кнопки
-	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 174), UI.GOLD_DEEP)
+	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 184), UI.GOLD_DEEP)
 	UI.crisp_label(right, "СВОДКА ЗАБЕГА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
 	pause_stats = VBoxContainer.new()
-	pause_stats.position = Vector2(10, 26)
-	pause_stats.size = Vector2(238, 142)
-	pause_stats.add_theme_constant_override("separation", 2)
+	pause_stats.position = Vector2(10, 24)
+	pause_stats.size = Vector2(238, 154)
+	pause_stats.add_theme_constant_override("separation", 1)
 	right.add_child(pause_stats)
 
-	var buttons := UI.vbox(pause_layer, 5)
-	buttons.position = Vector2(368, 230)
-	buttons.size = Vector2(258, 80)
-	var resume := UI.primary_button(buttons, Loc.t("resume"), 11, Vector2(258, 26))
+	var buttons := UI.vbox(pause_layer, 4)
+	buttons.position = Vector2(368, 238)
+	buttons.size = Vector2(258, 76)
+	var resume := UI.primary_button(buttons, Loc.t("resume"), 10, Vector2(258, 24))
 	resume.pressed.connect(toggle_pause)
-	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 23))
+	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 22))
 	to_menu.pressed.connect(_pause_to_menu)
-	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 23))
+	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 22))
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
 	var foot := UI.crisp_label(pause_layer, "Пробел — автоприцел · R — перезарядка · ПКМ/Q — способность · 1–5 — выбор карты", 7, UI.MUTED, Vector2(0, 316))
@@ -723,31 +723,21 @@ func _refresh_pause_menu() -> void:
 		var suffix := " ×%d" % int(mult) if mult > 1.0 else ""
 		var col := UI.kind_color(kind)
 
-		var card_row := Panel.new()
-		card_row.custom_minimum_size = Vector2(318, 18)
-		card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card_row.add_theme_stylebox_override("panel", UI.style(Color(0.08, 0.085, 0.11, 0.85), Color(col.r, col.g, col.b, 0.35), 1, 0))
-		pause_perk_list.add_child(card_row)
-
+		var lbl := UI.crisp_label(pause_perk_list, "%2d. [%s] %s%s" % [idx, UI.kind_name(kind), nm, suffix], 8, col)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.custom_minimum_size = Vector2(318, 16)
+		lbl.add_theme_stylebox_override("normal", UI.style(Color(0.08, 0.085, 0.11, 0.85), Color(col.r, col.g, col.b, 0.35), 1, 0))
 		var ico := _card_icon({"kind": kind, "id": id, "data": data})
-		var text_x := 6.0
 		if ico != null:
 			var tr := TextureRect.new()
 			tr.texture = ico
 			tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tr.position = Vector2(4, 2)
+			tr.position = Vector2(300, 1)
 			tr.size = Vector2(14, 14)
 			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			card_row.add_child(tr)
-			text_x = 22.0
-		var lbl := UI.crisp_label(card_row, "%2d. %s%s" % [idx, nm, suffix], 8, col, Vector2(text_x, 3))
-		lbl.size = Vector2(226 - text_x, 12)
-		lbl.clip_text = true
-		var badge := UI.crisp_label(card_row, UI.kind_name(kind), 7, UI.DIM, Vector2(230, 4))
-		badge.size = Vector2(82, 11)
-		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			lbl.add_child(tr)
 	if log.is_empty():
 		UI.crisp_label(pause_perk_list, "Пока ничего не выбрано — повышайте уровень!", 8, UI.DIM)
 	var upg: UpgradeSystem = game.player.upg
@@ -763,24 +753,27 @@ func _refresh_pause_menu() -> void:
 	if game.mode != "endless":
 		total_time = maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed))
 	var rows := [
-		["Карта · Тьма", "%s · Т%d" % [map_name, int(GameManager.run_config.get("darkness", 1))]],
+		["Карта", map_name],
 		["Герой", char_name],
-		["Оружие", "%s (ур.%d)" % [weapon_name, game.player.weapon_level]],
+		["Оружие", "%s · ур. %d" % [weapon_name, game.player.weapon_level]],
 		["Режим", mode_name],
 		["Время" if game.mode == "endless" else "Осталось", UI.fmt_time(total_time)],
-		["Уровень · Убийства", "ур.%d · %d" % [game.level, game.kills]],
+		["Уровень", str(game.level)],
+		["Убийства", str(game.kills)],
 		["Урон / Крит", "%.0f · %d%%" % [game.player.current_damage(), int(round(float(game.player.S.crit) * 100.0))]],
-		["Нанесено / Получено", "%d / %d" % [int(game.damage_dealt), int(game.damage_taken)]],
+		["Нанесено", str(int(game.damage_dealt))],
+		["Получено", str(int(game.damage_taken))],
 		["Золото / Души", "%d / %d" % [game.gold, int(game.souls)]],
+		["Перки / Тьма", "%d · Т%d" % [upg.taken.size(), int(GameManager.run_config.get("darkness", 1))]],
 	]
 	for pair in rows:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
-		row.custom_minimum_size = Vector2(238, 12)
+		row.custom_minimum_size = Vector2(238, 10)
 		var a := UI.crisp_label(row, String(pair[0]), 8, UI.DIM)
-		a.custom_minimum_size = Vector2(110, 0)
+		a.custom_minimum_size = Vector2(96, 0)
 		var b := UI.crisp_label(row, String(pair[1]), 8, UI.TEXT)
-		b.custom_minimum_size = Vector2(124, 0)
+		b.custom_minimum_size = Vector2(138, 0)
 		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		pause_stats.add_child(row)
 
