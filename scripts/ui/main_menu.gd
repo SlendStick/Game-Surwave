@@ -64,8 +64,9 @@ func _build() -> void:
 		crest.size = Vector2(76, 76)
 		crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(crest)
-		for idx_h in 3:
-			var h_cls := ["paladin", "mage", "necromancer"][idx_h]
+		var hero_classes: PackedStringArray = ["paladin", "mage", "necromancer"]
+		for idx_h in hero_classes.size():
+			var h_cls: String = hero_classes[idx_h]
 			var htex := Assets.icon(h_cls)
 			if htex != null:
 				var hr := TextureRect.new()
