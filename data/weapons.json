@@ -1,0 +1,828 @@
+[
+ {
+  "id": "revolver",
+  "name": "Револьвер",
+  "role": "Оружие",
+  "price": 0,
+  "unlock": "",
+  "damage": 2.0,
+  "fire_rate": 2.0,
+  "mag": 6,
+  "reload": 0.5,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 240.0,
+  "pierce": 0,
+  "bounce": 0,
+  "life": 2.0,
+  "behavior": "straight",
+  "color": "#ffd700",
+  "size": [
+   8,
+   4
+  ],
+  "desc": "Надёжный стартовый револьвер: 2 урона, 2 выстрела/сек.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_golden_revolver",
+   "name": "Золотой Револьвер",
+   "item": "golden_bullet",
+   "item_name": "Золотая Пуля",
+   "damage": 5.0,
+   "fire_rate": 3.0,
+   "projectiles": 6,
+   "spread": 60.0,
+   "proj_speed": 320.0,
+   "pierce": 3,
+   "size": [
+    12,
+    6
+   ],
+   "desc": "5 урона, 3.0/сек, 6 пуль веером ±30°, пронзает 3 врагов."
+  }
+ },
+ {
+  "id": "shotgun",
+  "name": "Дробовик",
+  "role": "Оружие",
+  "price": 800,
+  "unlock": "",
+  "damage": 1.5,
+  "fire_rate": 1.0,
+  "mag": 2,
+  "reload": 1.0,
+  "projectiles": 8,
+  "spread": 30.0,
+  "proj_speed": 160.0,
+  "pierce": 0,
+  "bounce": 0,
+  "life": 0.8,
+  "behavior": "shotgun",
+  "color": "#c0c0c0",
+  "size": [
+   4,
+   4
+  ],
+  "desc": "8 дробинок по 1.5 урона в конусе 30°, отдача 32 px.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_hell_shotgun",
+   "name": "Адский Дробовик",
+   "item": "hell_powder",
+   "item_name": "Адский Порох",
+   "damage": 4.0,
+   "fire_rate": 1.5,
+   "projectiles": 16,
+   "spread": 60.0,
+   "proj_speed": 200.0,
+   "pierce": 1,
+   "size": [
+    6,
+    6
+   ],
+   "desc": "4 урона, 16 дробинок в конусе 60°, пронзает 1 врага, поджигает."
+  }
+ },
+ {
+  "id": "crossbow",
+  "name": "Арбалет",
+  "role": "Оружие",
+  "price": 1200,
+  "unlock": "",
+  "damage": 4.0,
+  "fire_rate": 1.2,
+  "mag": 1,
+  "reload": 0.83,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 320.0,
+  "pierce": 2,
+  "bounce": 0,
+  "life": 2.5,
+  "behavior": "straight",
+  "color": "#8b4513",
+  "size": [
+   16,
+   6
+  ],
+  "desc": "4 урона, пронзает 2 врагов, точный болт.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "pierce": 1
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "pierce": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1,
+    "pierce": 1
+   }
+  ],
+  "evolution": {
+   "id": "ev_rapid_crossbow",
+   "name": "Скорострельный Арбалет",
+   "item": "quick_mechanism",
+   "item_name": "Быстрый Механизм",
+   "damage": 8.0,
+   "fire_rate": 2.5,
+   "projectiles": 3,
+   "spread": 30.0,
+   "proj_speed": 400.0,
+   "pierce": 5,
+   "size": [
+    20,
+    8
+   ],
+   "desc": "8 урона, 2.5/сек, 3 болта веером, пронзает 5 врагов."
+  }
+ },
+ {
+  "id": "fire_staff",
+  "name": "Огненный Посох",
+  "role": "Оружие",
+  "price": 1600,
+  "unlock": "",
+  "damage": 3.0,
+  "fire_rate": 1.5,
+  "mag": 8,
+  "reload": 0.67,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 180.0,
+  "pierce": 0,
+  "bounce": 0,
+  "life": 2.0,
+  "behavior": "fireball",
+  "color": "#ff4500",
+  "size": [
+   12,
+   12
+  ],
+  "desc": "3 урона + поджог 3 дпс на 3 сек, огненный шар.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "burn_dps": 1.0
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "burn_dps": 1.0
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_meteor_staff",
+   "name": "Метеорный Посох",
+   "item": "meteor_stone",
+   "item_name": "Метеоритный Камень",
+   "damage": 8.0,
+   "fire_rate": 2.0,
+   "projectiles": 5,
+   "spread": 90.0,
+   "proj_speed": 240.0,
+   "pierce": 2,
+   "size": [
+    20,
+    20
+   ],
+   "burn_dps": 8.0,
+   "burn_dur": 4.0,
+   "desc": "8 урона, 5 метеоритов веером, поджог 8 дпс на 4 сек."
+  }
+ },
+ {
+  "id": "bow",
+  "name": "Лук",
+  "role": "Оружие",
+  "price": 2000,
+  "unlock": "",
+  "damage": 5.0,
+  "fire_rate": 1.0,
+  "mag": 1,
+  "reload": 1.0,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 400.0,
+  "pierce": 3,
+  "bounce": 0,
+  "life": 3.0,
+  "behavior": "straight",
+  "color": "#7cfc00",
+  "size": [
+   20,
+   4
+  ],
+  "desc": "5 урона, пронзает 3 врагов, быстрая стрела.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "pierce": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1,
+    "pierce": 1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1,
+    "pierce": 1
+   }
+  ],
+  "evolution": {
+   "id": "ev_wind_bow",
+   "name": "Лук Ветра",
+   "item": "griffin_feather",
+   "item_name": "Перо Грифона",
+   "damage": 12.0,
+   "fire_rate": 2.0,
+   "projectiles": 5,
+   "spread": 40.0,
+   "proj_speed": 600.0,
+   "pierce": 8,
+   "size": [
+    28,
+    6
+   ],
+   "desc": "12 урона, 5 стрел веером, пронзает 8 врагов."
+  }
+ },
+ {
+  "id": "lightning_staff",
+  "name": "Посох Молний",
+  "role": "Оружие",
+  "price": 2400,
+  "unlock": "",
+  "damage": 2.5,
+  "fire_rate": 1.8,
+  "mag": 6,
+  "reload": 0.56,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 500.0,
+  "pierce": 3,
+  "bounce": 0,
+  "life": 0.5,
+  "behavior": "lightning",
+  "color": "#00bfff",
+  "size": [
+   10,
+   10
+  ],
+  "stun": 0.5,
+  "desc": "2.5 урона + оглушение 0.5 сек, цепная молния на 3 цели.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "pierce": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "pierce": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1,
+    "pierce": 1
+   }
+  ],
+  "evolution": {
+   "id": "ev_storm_staff",
+   "name": "Посох Бури",
+   "item": "storm_crystal",
+   "item_name": "Кристалл Бури",
+   "damage": 6.0,
+   "fire_rate": 3.0,
+   "projectiles": 7,
+   "spread": 120.0,
+   "proj_speed": 700.0,
+   "pierce": 8,
+   "size": [
+    16,
+    16
+   ],
+   "stun": 1.0,
+   "desc": "6 урона, 7 молний, оглушение 1.0 сек, цепь на 8 целей."
+  }
+ },
+ {
+  "id": "magic_books",
+  "name": "Магические Книги",
+  "role": "Оружие",
+  "price": 2800,
+  "unlock": "",
+  "damage": 2.0,
+  "fire_rate": 2.2,
+  "mag": 10,
+  "reload": 0.7,
+  "projectiles": 2,
+  "spread": 20.0,
+  "proj_speed": 220.0,
+  "pierce": 1,
+  "bounce": 1,
+  "life": 2.4,
+  "behavior": "homing",
+  "color": "#9c27b0",
+  "size": [
+   8,
+   8
+  ],
+  "desc": "Самонаводящиеся страницы: 2 урона, 2 снаряда, отскок.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_arcane_tome",
+   "name": "Том Откровений",
+   "item": "arcane_ink",
+   "item_name": "Тайные Чернила",
+   "damage": 5.0,
+   "fire_rate": 3.0,
+   "projectiles": 4,
+   "spread": 40.0,
+   "proj_speed": 260.0,
+   "pierce": 3,
+   "bounce": 2,
+   "size": [
+    12,
+    12
+   ],
+   "desc": "5 урона, 4 самонаводящихся снаряда, 3 пробития, 2 отскока."
+  }
+ },
+ {
+  "id": "fire_ring",
+  "name": "Кольцо Огня",
+  "role": "Оружие",
+  "price": 3000,
+  "unlock": "",
+  "damage": 1.5,
+  "fire_rate": 3.0,
+  "mag": 20,
+  "reload": 0.8,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 200.0,
+  "pierce": 1,
+  "bounce": 0,
+  "life": 1.6,
+  "behavior": "fireball",
+  "color": "#ff6347",
+  "size": [
+   8,
+   8
+  ],
+  "desc": "Быстрые искры: 1.5 урона + поджог, 3 выстрела/сек.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "burn_dps": 1.0
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "burn_dps": 1.0
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_solar_ring",
+   "name": "Солнечное Кольцо",
+   "item": "sun_shard",
+   "item_name": "Осколок Солнца",
+   "damage": 4.0,
+   "fire_rate": 4.0,
+   "projectiles": 2,
+   "spread": 20.0,
+   "proj_speed": 240.0,
+   "pierce": 2,
+   "size": [
+    12,
+    12
+   ],
+   "burn_dps": 6.0,
+   "burn_dur": 3.0,
+   "desc": "4 урона, 4/сек, поджог 6 дпс."
+  }
+ },
+ {
+  "id": "ice_needles",
+  "name": "Ледяные Иглы",
+  "role": "Оружие",
+  "price": 3200,
+  "unlock": "",
+  "damage": 2.5,
+  "fire_rate": 2.0,
+  "mag": 12,
+  "reload": 0.6,
+  "projectiles": 3,
+  "spread": 24.0,
+  "proj_speed": 340.0,
+  "pierce": 1,
+  "bounce": 0,
+  "life": 1.8,
+  "behavior": "straight",
+  "freeze": 2.0,
+  "color": "#a8d8ea",
+  "size": [
+   6,
+   6
+  ],
+  "desc": "3 иглы по 2.5 урона, заморозка на 2 сек.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_blizzard",
+   "name": "Метелица",
+   "item": "frost_core",
+   "item_name": "Морозное Ядро",
+   "damage": 6.0,
+   "fire_rate": 2.5,
+   "projectiles": 6,
+   "spread": 50.0,
+   "proj_speed": 380.0,
+   "pierce": 3,
+   "size": [
+    10,
+    10
+   ],
+   "freeze": 2.5,
+   "desc": "6 урона, 6 игл, заморозка 2.5 сек."
+  }
+ },
+ {
+  "id": "poison_clouds",
+  "name": "Ядовитые Облака",
+  "role": "Оружие",
+  "price": 3400,
+  "unlock": "",
+  "damage": 1.0,
+  "fire_rate": 1.6,
+  "mag": 6,
+  "reload": 1.0,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 150.0,
+  "pierce": 0,
+  "bounce": 0,
+  "life": 2.2,
+  "behavior": "gas",
+  "poison": {
+   "dps": 4.0,
+   "dur": 4.0
+  },
+  "color": "#7fff00",
+  "size": [
+   12,
+   12
+  ],
+  "desc": "Облако яда: 1 урон + 4 дпс яда на 4 сек, площадь.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_plague_cloud",
+   "name": "Чумное Облако",
+   "item": "plague_vial",
+   "item_name": "Чумная Колба",
+   "damage": 3.0,
+   "fire_rate": 2.0,
+   "projectiles": 2,
+   "spread": 30.0,
+   "proj_speed": 170.0,
+   "pierce": 0,
+   "size": [
+    20,
+    20
+   ],
+   "poison": {
+    "dps": 10.0,
+    "dur": 6.0
+   },
+   "desc": "3 урона + 10 дпс яда, 2 облака."
+  }
+ },
+ {
+  "id": "holy_spears",
+  "name": "Святые Копья",
+  "role": "Оружие",
+  "price": 3600,
+  "unlock": "",
+  "damage": 4.0,
+  "fire_rate": 1.2,
+  "mag": 4,
+  "reload": 0.9,
+  "projectiles": 1,
+  "spread": 0.0,
+  "proj_speed": 300.0,
+  "pierce": 2,
+  "bounce": 0,
+  "life": 2.6,
+  "behavior": "straight",
+  "holy": true,
+  "color": "#ffd700",
+  "size": [
+   16,
+   8
+  ],
+  "desc": "4 урона, ×2 по нежити, пронзает 2 врагов.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "pierce": 1
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1,
+    "pierce": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_divine_lance",
+   "name": "Божественное Копьё",
+   "item": "holy_relic",
+   "item_name": "Святая Реликвия",
+   "damage": 10.0,
+   "fire_rate": 1.8,
+   "projectiles": 3,
+   "spread": 30.0,
+   "proj_speed": 360.0,
+   "pierce": 6,
+   "size": [
+    20,
+    10
+   ],
+   "holy": true,
+   "desc": "10 урона, ×2 по нежити, 3 копья, 6 пробитий."
+  }
+ },
+ {
+  "id": "shadow_daggers",
+  "name": "Теневые Кинжалы",
+  "role": "Оружие",
+  "price": 3800,
+  "unlock": "",
+  "damage": 1.5,
+  "fire_rate": 3.2,
+  "mag": 14,
+  "reload": 0.55,
+  "projectiles": 1,
+  "spread": 8.0,
+  "proj_speed": 280.0,
+  "pierce": 1,
+  "bounce": 0,
+  "life": 1.4,
+  "behavior": "dagger",
+  "color": "#4a148c",
+  "size": [
+   10,
+   4
+  ],
+  "desc": "Быстрые кинжалы: 1.5 урона, 3.2 выстрела/сек.",
+  "levels": [
+   {},
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15
+   },
+   {
+    "fire_rate": 0.1
+   },
+   {
+    "proj": 1
+   },
+   {
+    "dmg": 0.15,
+    "fire_rate": 0.1
+   }
+  ],
+  "evolution": {
+   "id": "ev_night_blades",
+   "name": "Клинки Ночи",
+   "item": "night_essence",
+   "item_name": "Эссенция Ночи",
+   "damage": 4.0,
+   "fire_rate": 4.0,
+   "projectiles": 3,
+   "spread": 24.0,
+   "proj_speed": 320.0,
+   "pierce": 3,
+   "size": [
+    14,
+    6
+   ],
+   "desc": "4 урона, 3 кинжала, 3 пробития, 4/сек."
+  }
+ }
+]

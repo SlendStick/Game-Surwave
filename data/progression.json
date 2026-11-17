@@ -1,0 +1,308 @@
+{
+ "version": "1.4.16",
+ "economy": {
+  "miniboss_souls": 25,
+  "boss_souls": 150,
+  "secret_boss_souls": 500,
+  "crystal_no_death": 1,
+  "base_challenge_reward": 100
+ },
+ "director": {
+  "interval": 5.0,
+  "rating_start": 300,
+  "rating_k_first": 32,
+  "rating_k_later": 16,
+  "low_hp": 0.25,
+  "dominant_hp": 0.9,
+  "dominant_nohit": 60.0
+ },
+ "combo": {
+  "timeout": 3.0,
+  "max": 20,
+  "xp_per": 0.015,
+  "gold_per": 0.01,
+  "damage_per": 0.005,
+  "drop_per": 0.0075,
+  "event_per": 0.005
+ },
+ "tree": {
+  "power": {
+   "name": "СИЛА",
+   "max": 10,
+   "costs": [
+    50,
+    75,
+    100,
+    150,
+    200,
+    250,
+    300,
+    400,
+    500,
+    750
+   ]
+  },
+  "fortitude": {
+   "name": "СТОЙКОСТЬ",
+   "max": 10,
+   "costs": [
+    50,
+    75,
+    100,
+    150,
+    200,
+    250,
+    300,
+    400,
+    500,
+    750
+   ]
+  },
+  "speed": {
+   "name": "СКОРОСТЬ",
+   "max": 10,
+   "costs": [
+    50,
+    75,
+    100,
+    150,
+    200,
+    250,
+    300,
+    400,
+    500,
+    750
+   ]
+  },
+  "luck": {
+   "name": "УДАЧА",
+   "max": 10,
+   "costs": [
+    50,
+    75,
+    100,
+    150,
+    200,
+    250,
+    300,
+    400,
+    500,
+    750
+   ]
+  },
+  "mastery": {
+   "name": "МАСТЕРСТВО",
+   "max": 15,
+   "costs": [
+    100,
+    150,
+    200,
+    300,
+    400,
+    500,
+    600,
+    750,
+    900,
+    1000,
+    1200,
+    1500,
+    1800,
+    2500,
+    3000
+   ]
+  }
+ },
+ "map_difficulty": {
+  "sands": 0.9,
+  "tundra": 1.0,
+  "peak": 1.1,
+  "abyss": 1.0,
+  "forest": 1.05,
+  "rift": 1.15,
+  "graveyard": 1.1,
+  "hive": 1.2,
+  "bloodmoon": 1.25,
+  "chaos": 1.3,
+  "temple": 1.15,
+  "throne": 1.5,
+  "void": 1.5
+ },
+ "challenges": {
+  "hell": {
+   "name": "АД",
+   "reward": 2.0,
+   "desc": "Враги +50% HP/урон, +20% скорость; лечение -50%; спавн +30%."
+  },
+  "speedrun": {
+   "name": "СПИДРАН",
+   "reward": 1.5,
+   "desc": "15 минут; враги +20% скорость; XP +50%; спавн ×1.5."
+  },
+  "no_heal": {
+   "name": "БЕЗ ИСЦЕЛЕНИЯ",
+   "reward": 2.0,
+   "desc": "Нет сердец и обычного восстановления HP."
+  },
+  "sniper": {
+   "name": "СНАЙПЕР",
+   "reward": 1.5,
+   "desc": "Только дальнее оружие; враги +10% скорость."
+  },
+  "berserk": {
+   "name": "БЕРСЕРК",
+   "reward": 2.0,
+   "desc": "Ближний стиль; +25% урон, +2 HP; враги +20% HP."
+  },
+  "invisible": {
+   "name": "НЕВИДИМЫЕ",
+   "reward": 1.5,
+   "desc": "Враги видны только ближе 128 px."
+  },
+  "wave": {
+   "name": "ЦУНАМИ",
+   "reward": 1.5,
+   "desc": "Бесконечные растущие волны и 10 секунд передышки."
+  },
+  "one_life": {
+   "name": "ОДНА ЖИЗНЬ",
+   "reward": 3.0,
+   "desc": "1 HP, без лечения/щитов; враги +30% урон."
+  },
+  "chaos": {
+   "name": "ХАОС",
+   "reward": 1.5,
+   "desc": "Случайное правило каждые 60 секунд."
+  }
+ },
+ "daily_pool": [
+  {
+   "id": "kills300",
+   "name": "Охотник",
+   "type": "kills",
+   "goal": 300,
+   "souls": 50,
+   "crystals": 1
+  },
+  {
+   "id": "kills500",
+   "name": "Истребитель",
+   "type": "kills",
+   "goal": 500,
+   "souls": 75,
+   "crystals": 1
+  },
+  {
+   "id": "kills1000",
+   "name": "Сборщик Душ",
+   "type": "kills",
+   "goal": 1000,
+   "souls": 100,
+   "crystals": 2
+  },
+  {
+   "id": "combo8",
+   "name": "Серия",
+   "type": "combo",
+   "goal": 8,
+   "souls": 50,
+   "crystals": 1
+  },
+  {
+   "id": "combo15",
+   "name": "Цепочка",
+   "type": "combo",
+   "goal": 15,
+   "souls": 100,
+   "crystals": 2
+  },
+  {
+   "id": "survive25",
+   "name": "Выживший",
+   "type": "minutes",
+   "goal": 25,
+   "souls": 75,
+   "crystals": 1
+  },
+  {
+   "id": "boss",
+   "name": "Босс-убийца",
+   "type": "boss",
+   "goal": 1,
+   "souls": 150,
+   "crystals": 2
+  }
+ ],
+ "weekly_pool": [
+  {
+   "id": "runs10",
+   "name": "Марафонец",
+   "type": "runs",
+   "goal": 10,
+   "souls": 300,
+   "crystals": 5
+  },
+  {
+   "id": "kills10000",
+   "name": "Ветеран",
+   "type": "kills",
+   "goal": 10000,
+   "souls": 500,
+   "crystals": 10
+  },
+  {
+   "id": "combo20x5",
+   "name": "Мастер комбо",
+   "type": "combo20",
+   "goal": 5,
+   "souls": 300,
+   "crystals": 5
+  },
+  {
+   "id": "wins5",
+   "name": "Без смертей",
+   "type": "wins",
+   "goal": 5,
+   "souls": 500,
+   "crystals": 10
+  }
+ ],
+ "season": {
+  "id": "awakening_darkness",
+  "name": "Пробуждение Тьмы",
+  "days": 90,
+  "tasks": [
+   {
+    "id": "shemhaz10",
+    "name": "Победить Шемхаза 10 раз",
+    "type": "shemhaz",
+    "goal": 10,
+    "souls": 1000,
+    "crystals": 5
+   },
+   {
+    "id": "kills50000",
+    "name": "Убить 50000 врагов",
+    "type": "kills",
+    "goal": 50000,
+    "souls": 1500,
+    "crystals": 10
+   },
+   {
+    "id": "challenges8",
+    "name": "Завершить 8 испытаний",
+    "type": "challenges",
+    "goal": 8,
+    "souls": 1200,
+    "crystals": 8
+   },
+   {
+    "id": "satanail",
+    "name": "Победить САТАНАИЛА",
+    "type": "satanail",
+    "goal": 1,
+    "souls": 2000,
+    "crystals": 15
+   }
+  ]
+ }
+}

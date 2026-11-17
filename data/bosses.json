@@ -1,0 +1,1521 @@
+{
+ "bosses": {
+  "shemhaz": {
+   "id": "boss_shemhaz",
+   "name": "Шемхаз",
+   "hp": 7500,
+   "color": "#8b0000",
+   "color2": "#ff4500",
+   "radius": 48,
+   "sprite": [
+    128,
+    128
+   ],
+   "collide": [
+    96,
+    96
+   ],
+   "damage": 5,
+   "speed": 40,
+   "xp": 500,
+   "reward": "реликвия",
+   "desc": "Корень-демон. Финальный босс забега, 3 фазы.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.4,
+     "speed_mult": 1.5,
+     "regen": 5.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 1.5,
+       "params": {
+        "count": 5,
+        "spread": 90.0,
+        "speed": 280,
+        "damage": 5,
+        "size": 40
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 3.0,
+       "params": {
+        "radius": 192,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 4.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 8.0,
+       "params": {
+        "enemy": "demon",
+        "count": 5
+       }
+      },
+      {
+       "type": "storm_aura",
+       "interval": 12.0,
+       "params": {
+        "radius": 128,
+        "dps": 3.0,
+        "duration": 5.0,
+        "color": "#ff4500"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "satanail": {
+   "id": "boss_satanail",
+   "name": "САТАНАИЛ",
+   "hp": 10000,
+   "color": "#8b0000",
+   "color2": "#ffd700",
+   "radius": 64,
+   "sprite": [
+    192,
+    192
+   ],
+   "collide": [
+    128,
+    128
+   ],
+   "damage": 7,
+   "speed": 50,
+   "xp": 2000,
+   "reward": "5 реликвий + Крыло САТАНАИЛА",
+   "desc": "Секретный босс Пустоты, 3 фазы + мегафаза САТАН.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "holy_light",
+       "interval": 4.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 240,
+        "damage": 7,
+        "size": 48
+       }
+      },
+      {
+       "type": "dark_chains",
+       "interval": 6.0,
+       "params": {
+        "radius": 192,
+        "damage": 7,
+        "root": 1.5
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.8,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "holy_light",
+       "interval": 3.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 280,
+        "damage": 7,
+        "size": 48
+       }
+      },
+      {
+       "type": "dark_chains",
+       "interval": 5.0,
+       "params": {
+        "radius": 224,
+        "damage": 7,
+        "root": 2.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 12.0,
+       "params": {
+        "enemy": "fallen_angel",
+        "count": 5
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.5,
+     "speed_mult": 1.5,
+     "regen": 10.0,
+     "patterns": [
+      {
+       "type": "holy_light",
+       "interval": 2.0,
+       "params": {
+        "count": 5,
+        "spread": 90.0,
+        "speed": 320,
+        "damage": 7,
+        "size": 56
+       }
+      },
+      {
+       "type": "dark_chains",
+       "interval": 4.0,
+       "params": {
+        "radius": 256,
+        "damage": 7,
+        "root": 2.5
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "fallen_angel",
+        "count": 7
+       }
+      },
+      {
+       "type": "storm_aura",
+       "interval": 15.0,
+       "params": {
+        "radius": 192,
+        "dps": 5.0,
+        "duration": 6.0,
+        "color": "#000000"
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.2,
+     "speed_mult": 2.0,
+     "regen": 20.0,
+     "mega": true,
+     "patterns": [
+      {
+       "type": "holy_light",
+       "interval": 1.5,
+       "params": {
+        "count": 7,
+        "spread": 120.0,
+        "speed": 360,
+        "damage": 10,
+        "size": 64
+       }
+      },
+      {
+       "type": "dark_chains",
+       "interval": 3.0,
+       "params": {
+        "radius": 320,
+        "damage": 10,
+        "root": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 8.0,
+       "params": {
+        "enemy": "fallen_angel",
+        "count": 10
+       }
+      },
+      {
+       "type": "storm_aura",
+       "interval": 12.0,
+       "params": {
+        "radius": 256,
+        "dps": 8.0,
+        "duration": 8.0,
+        "color": "#000000"
+       }
+      },
+      {
+       "type": "apocalypse",
+       "interval": 20.0,
+       "params": {
+        "damage": 15,
+        "warn": 3.0,
+        "balls": 100
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "sands": {
+   "id": "champ_sands",
+   "name": "Песчаный Владыка",
+   "hp": 1600,
+   "color": "#c4a55a",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "tundra": {
+   "id": "champ_tundra",
+   "name": "Ледяной Ужас",
+   "hp": 1800,
+   "color": "#a8d8ea",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "peak": {
+   "id": "champ_peak",
+   "name": "Пик Огня",
+   "hp": 2000,
+   "color": "#ff4500",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "abyss": {
+   "id": "champ_abyss",
+   "name": "Эхо Бездны",
+   "hp": 2200,
+   "color": "#9370db",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "forest": {
+   "id": "champ_forest",
+   "name": "Древень-Патриарх",
+   "hp": 2400,
+   "color": "#2d5a2d",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "rift": {
+   "id": "champ_rift",
+   "name": "Разлом Безумия",
+   "hp": 2600,
+   "color": "#7fff00",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "graveyard": {
+   "id": "champ_graveyard",
+   "name": "Владыка Погоста",
+   "hp": 2800,
+   "color": "#808080",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "hive": {
+   "id": "champ_hive",
+   "name": "Матка Улья",
+   "hp": 3000,
+   "color": "#6b8e23",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "bloodmoon": {
+   "id": "champ_bloodmoon",
+   "name": "Кровавый Лунарх",
+   "hp": 3200,
+   "color": "#8b0000",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "chaos": {
+   "id": "champ_chaos",
+   "name": "Искажение",
+   "hp": 3400,
+   "color": "#9400d3",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "temple": {
+   "id": "champ_temple",
+   "name": "Хранитель Храма",
+   "hp": 3600,
+   "color": "#ffd700",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "throne": {
+   "id": "champ_throne",
+   "name": "Шелтик",
+   "hp": 4000,
+   "color": "#b8860b",
+   "color2": "#ff4500",
+   "radius": 40,
+   "sprite": [
+    96,
+    96
+   ],
+   "collide": [
+    72,
+    72
+   ],
+   "damage": 4,
+   "speed": 45,
+   "xp": 300,
+   "reward": "реликвия",
+   "desc": "Чемпион карты. Появляется на 15:00.",
+   "phases": [
+    {
+     "at": 1.0,
+     "speed_mult": 1.0,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 3.0,
+       "params": {
+        "count": 1,
+        "spread": 0.0,
+        "speed": 200,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 5.0,
+       "params": {
+        "radius": 128,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "at": 0.7,
+     "speed_mult": 1.25,
+     "patterns": [
+      {
+       "type": "fireball",
+       "interval": 2.0,
+       "params": {
+        "count": 3,
+        "spread": 60.0,
+        "speed": 240,
+        "damage": 5,
+        "size": 32
+       }
+      },
+      {
+       "type": "chain_slam",
+       "interval": 4.0,
+       "params": {
+        "radius": 160,
+        "damage": 5,
+        "slow": 0.5,
+        "slow_dur": 3.0
+       }
+      },
+      {
+       "type": "summon",
+       "interval": 10.0,
+       "params": {
+        "enemy": "demon",
+        "count": 3
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "sathan": {
+  "id": "boss_satanail",
+  "name": "САТАНАИЛ",
+  "hp": 10000,
+  "color": "#8b0000",
+  "color2": "#ffd700",
+  "radius": 64,
+  "sprite": [
+   192,
+   192
+  ],
+  "collide": [
+   128,
+   128
+  ],
+  "damage": 7,
+  "speed": 50,
+  "xp": 2000,
+  "reward": "5 реликвий + Крыло САТАНАИЛА",
+  "desc": "Секретный босс Пустоты, 3 фазы + мегафаза САТАН.",
+  "phases": [
+   {
+    "at": 1.0,
+    "speed_mult": 1.0,
+    "patterns": [
+     {
+      "type": "holy_light",
+      "interval": 4.0,
+      "params": {
+       "count": 1,
+       "spread": 0.0,
+       "speed": 240,
+       "damage": 7,
+       "size": 48
+      }
+     },
+     {
+      "type": "dark_chains",
+      "interval": 6.0,
+      "params": {
+       "radius": 192,
+       "damage": 7,
+       "root": 1.5
+      }
+     }
+    ]
+   },
+   {
+    "at": 0.8,
+    "speed_mult": 1.25,
+    "patterns": [
+     {
+      "type": "holy_light",
+      "interval": 3.0,
+      "params": {
+       "count": 3,
+       "spread": 60.0,
+       "speed": 280,
+       "damage": 7,
+       "size": 48
+      }
+     },
+     {
+      "type": "dark_chains",
+      "interval": 5.0,
+      "params": {
+       "radius": 224,
+       "damage": 7,
+       "root": 2.0
+      }
+     },
+     {
+      "type": "summon",
+      "interval": 12.0,
+      "params": {
+       "enemy": "fallen_angel",
+       "count": 5
+      }
+     }
+    ]
+   },
+   {
+    "at": 0.5,
+    "speed_mult": 1.5,
+    "regen": 10.0,
+    "patterns": [
+     {
+      "type": "holy_light",
+      "interval": 2.0,
+      "params": {
+       "count": 5,
+       "spread": 90.0,
+       "speed": 320,
+       "damage": 7,
+       "size": 56
+      }
+     },
+     {
+      "type": "dark_chains",
+      "interval": 4.0,
+      "params": {
+       "radius": 256,
+       "damage": 7,
+       "root": 2.5
+      }
+     },
+     {
+      "type": "summon",
+      "interval": 10.0,
+      "params": {
+       "enemy": "fallen_angel",
+       "count": 7
+      }
+     },
+     {
+      "type": "storm_aura",
+      "interval": 15.0,
+      "params": {
+       "radius": 192,
+       "dps": 5.0,
+       "duration": 6.0,
+       "color": "#000000"
+      }
+     }
+    ]
+   },
+   {
+    "at": 0.2,
+    "speed_mult": 2.0,
+    "regen": 20.0,
+    "mega": true,
+    "patterns": [
+     {
+      "type": "holy_light",
+      "interval": 1.5,
+      "params": {
+       "count": 7,
+       "spread": 120.0,
+       "speed": 360,
+       "damage": 10,
+       "size": 64
+      }
+     },
+     {
+      "type": "dark_chains",
+      "interval": 3.0,
+      "params": {
+       "radius": 320,
+       "damage": 10,
+       "root": 3.0
+      }
+     },
+     {
+      "type": "summon",
+      "interval": 8.0,
+      "params": {
+       "enemy": "fallen_angel",
+       "count": 10
+      }
+     },
+     {
+      "type": "storm_aura",
+      "interval": 12.0,
+      "params": {
+       "radius": 256,
+       "dps": 8.0,
+       "duration": 8.0,
+       "color": "#000000"
+      }
+     },
+     {
+      "type": "apocalypse",
+      "interval": 20.0,
+      "params": {
+       "damage": 15,
+       "warn": 3.0,
+       "balls": 100
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

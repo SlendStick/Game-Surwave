@@ -1,0 +1,1982 @@
+{
+ "trees": [
+  {
+   "id": "fast_arrows",
+   "name": "Быстрые Стрелы",
+   "nodes": [
+    "fast_arrows_t1",
+    "fast_arrows_t2a",
+    "fast_arrows_t2b",
+    "fast_arrows_t3"
+   ]
+  },
+  {
+   "id": "damage",
+   "name": "Урон",
+   "nodes": [
+    "damage_t1",
+    "damage_t2a",
+    "damage_t2b",
+    "damage_t3"
+   ]
+  },
+  {
+   "id": "fire_rate",
+   "name": "Скорострельность",
+   "nodes": [
+    "fire_rate_t1",
+    "fire_rate_t2a",
+    "fire_rate_t2b",
+    "fire_rate_t3"
+   ]
+  },
+  {
+   "id": "multishot",
+   "name": "Шквальный Огонь",
+   "nodes": [
+    "multishot_t1",
+    "multishot_t2a",
+    "multishot_t2b",
+    "multishot_t3"
+   ]
+  },
+  {
+   "id": "reload",
+   "name": "Быстрая Перезарядка",
+   "nodes": [
+    "reload_t1",
+    "reload_t2a",
+    "reload_t2b",
+    "reload_t3"
+   ]
+  },
+  {
+   "id": "proj_speed",
+   "name": "Скорость Пуль",
+   "nodes": [
+    "proj_speed_t1",
+    "proj_speed_t2a",
+    "proj_speed_t2b",
+    "proj_speed_t3"
+   ]
+  },
+  {
+   "id": "pierce",
+   "name": "Пробитие",
+   "nodes": [
+    "pierce_t1",
+    "pierce_t2a",
+    "pierce_t2b",
+    "pierce_t3"
+   ]
+  },
+  {
+   "id": "thunder",
+   "name": "Гром",
+   "nodes": [
+    "thunder_t1",
+    "thunder_t2a",
+    "thunder_t2b",
+    "thunder_t3"
+   ]
+  },
+  {
+   "id": "flame",
+   "name": "Пламя",
+   "nodes": [
+    "flame_t1",
+    "flame_t2a",
+    "flame_t2b",
+    "flame_t3"
+   ]
+  },
+  {
+   "id": "frost",
+   "name": "Мороз",
+   "nodes": [
+    "frost_t1",
+    "frost_t2a",
+    "frost_t2b",
+    "frost_t3"
+   ]
+  },
+  {
+   "id": "dark",
+   "name": "Тёмная Магия",
+   "nodes": [
+    "dark_t1",
+    "dark_t2a",
+    "dark_t2b",
+    "dark_t3"
+   ]
+  },
+  {
+   "id": "light",
+   "name": "Светлая Магия",
+   "nodes": [
+    "light_t1",
+    "light_t2a",
+    "light_t2b",
+    "light_t3"
+   ]
+  },
+  {
+   "id": "health",
+   "name": "Здоровье",
+   "nodes": [
+    "health_t1",
+    "health_t2a",
+    "health_t2b",
+    "health_t3"
+   ]
+  },
+  {
+   "id": "shield",
+   "name": "Щит",
+   "nodes": [
+    "shield_t1",
+    "shield_t2a",
+    "shield_t2b",
+    "shield_t3"
+   ]
+  },
+  {
+   "id": "dodge",
+   "name": "Уворот",
+   "nodes": [
+    "dodge_t1",
+    "dodge_t2a",
+    "dodge_t2b",
+    "dodge_t3"
+   ]
+  },
+  {
+   "id": "soul",
+   "name": "Душа",
+   "nodes": [
+    "soul_t1",
+    "soul_t2a",
+    "soul_t2b",
+    "soul_t3"
+   ]
+  },
+  {
+   "id": "pickup",
+   "name": "Притяжение",
+   "nodes": [
+    "pickup_t1",
+    "pickup_t2a",
+    "pickup_t2b",
+    "pickup_t3"
+   ]
+  },
+  {
+   "id": "move",
+   "name": "Скорость",
+   "nodes": [
+    "move_t1",
+    "move_t2a",
+    "move_t2b",
+    "move_t3"
+   ]
+  },
+  {
+   "id": "vision",
+   "name": "Зрение",
+   "nodes": [
+    "vision_t1",
+    "vision_t2a",
+    "vision_t2b",
+    "vision_t3"
+   ]
+  },
+  {
+   "id": "wind",
+   "name": "Власть Ветра",
+   "nodes": [
+    "wind_t1",
+    "wind_t2a",
+    "wind_t2b",
+    "wind_t3"
+   ]
+  },
+  {
+   "id": "summon",
+   "name": "Призыв",
+   "nodes": [
+    "summon_t1",
+    "summon_t2a",
+    "summon_t2b",
+    "summon_t3"
+   ]
+  },
+  {
+   "id": "dragon",
+   "name": "Дракон",
+   "nodes": [
+    "dragon_t1",
+    "dragon_t2a",
+    "dragon_t2b",
+    "dragon_t3"
+   ]
+  },
+  {
+   "id": "scythe",
+   "name": "Призрачный Серп",
+   "nodes": [
+    "scythe_t1",
+    "scythe_t2a",
+    "scythe_t2b",
+    "scythe_t3"
+   ]
+  },
+  {
+   "id": "spear",
+   "name": "Святое Копьё",
+   "nodes": [
+    "spear_t1",
+    "spear_t2a",
+    "spear_t2b",
+    "spear_t3"
+   ]
+  },
+  {
+   "id": "beast",
+   "name": "Укротитель",
+   "nodes": [
+    "beast_t1",
+    "beast_t2a",
+    "beast_t2b",
+    "beast_t3"
+   ]
+  }
+ ],
+ "perks": [
+  {
+   "id": "fast_arrows_t1",
+   "name": "Точный Прицел",
+   "tree": "fast_arrows",
+   "tier": 1,
+   "branch": "",
+   "desc": "Скорость пуль +30%, разброс −15.",
+   "mods": {
+    "proj_speed": 0.3,
+    "spread": -15.0
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fast_arrows_t2a",
+   "name": "Пробивная Сила",
+   "tree": "fast_arrows",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Скорость пуль +15%, пробитие +1.",
+   "mods": {
+    "proj_speed": 0.15,
+    "pierce": 1
+   },
+   "flags": {},
+   "req": [
+    "fast_arrows_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fast_arrows_t2b",
+   "name": "Снайпер",
+   "tree": "fast_arrows",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Скорость пуль +25%, урон +15%.",
+   "mods": {
+    "proj_speed": 0.25,
+    "dmg": 0.15
+   },
+   "flags": {},
+   "req": [
+    "fast_arrows_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fast_arrows_t3",
+   "name": "Убийца",
+   "tree": "fast_arrows",
+   "tier": 3,
+   "branch": "",
+   "desc": "Добивает врагов с HP ниже 20% от максимума.",
+   "mods": {},
+   "flags": {
+    "exec_threshold": 0.2
+   },
+   "req": [],
+   "req_any": [
+    "fast_arrows_t2a",
+    "fast_arrows_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "damage_t1",
+   "name": "Мощный Выстрел",
+   "tree": "damage",
+   "tier": 1,
+   "branch": "",
+   "desc": "Урон +40%, отбрасывание +20%.",
+   "mods": {
+    "dmg": 0.4,
+    "knockback": 0.2
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "damage_t2a",
+   "name": "Крупный Калибр",
+   "tree": "damage",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон +45%, размер пуль +40%.",
+   "mods": {
+    "dmg": 0.45,
+    "size": 0.4
+   },
+   "flags": {},
+   "req": [
+    "damage_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "damage_t2b",
+   "name": "Осколочная Пуля",
+   "tree": "damage",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Убитый враг выпускает 3 пули по 10% урона.",
+   "mods": {},
+   "flags": {
+    "split_on_kill": 3,
+    "split_dmg": 0.1
+   },
+   "req": [
+    "damage_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "damage_t3",
+   "name": "Пули Жнеца",
+   "tree": "damage",
+   "tier": 3,
+   "branch": "",
+   "desc": "Урон +20%, пули пробивают всех врагов.",
+   "mods": {
+    "dmg": 0.2,
+    "pierce": 999
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "damage_t2a",
+    "damage_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "fire_rate_t1",
+   "name": "Скорострел",
+   "tree": "fire_rate",
+   "tier": 1,
+   "branch": "",
+   "desc": "Скорострельность +25%.",
+   "mods": {
+    "fire_rate": 0.25
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fire_rate_t2a",
+   "name": "Облегчённые Пули",
+   "tree": "fire_rate",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Скорострельность +15%, магазин +1, скорость пуль +15%.",
+   "mods": {
+    "fire_rate": 0.15,
+    "mag": 1,
+    "proj_speed": 0.15
+   },
+   "flags": {},
+   "req": [
+    "fire_rate_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fire_rate_t2b",
+   "name": "Рикошетные Пули",
+   "tree": "fire_rate",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Отскок +1, скорострельность +10%.",
+   "mods": {
+    "bounce": 1,
+    "fire_rate": 0.1
+   },
+   "flags": {},
+   "req": [
+    "fire_rate_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "fire_rate_t3",
+   "name": "Осадный Режим",
+   "tree": "fire_rate",
+   "tier": 3,
+   "branch": "",
+   "desc": "Стоя на месте: 40% шанс не потратить патрон.",
+   "mods": {},
+   "flags": {
+    "siege_save": 0.4
+   },
+   "req": [],
+   "req_any": [
+    "fire_rate_t2a",
+    "fire_rate_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "multishot_t1",
+   "name": "Двойной Выстрел",
+   "tree": "multishot",
+   "tier": 1,
+   "branch": "",
+   "desc": "+1 снаряд за выстрел.",
+   "mods": {
+    "proj": 1
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "multishot_t2a",
+   "name": "Залп",
+   "tree": "multishot",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+3 снаряда, урон −15%.",
+   "mods": {
+    "proj": 3,
+    "dmg": -0.15
+   },
+   "flags": {},
+   "req": [
+    "multishot_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "multishot_t2b",
+   "name": "Веерный Огонь",
+   "tree": "multishot",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Последний патрон: 10 пуль по кругу (15% урона).",
+   "mods": {},
+   "flags": {
+    "last_shot_fan": 10
+   },
+   "req": [
+    "multishot_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "multishot_t3",
+   "name": "Шквал",
+   "tree": "multishot",
+   "tier": 3,
+   "branch": "",
+   "desc": "+2 снаряда, скорострельность +25%.",
+   "mods": {
+    "proj": 2,
+    "fire_rate": 0.25
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "multishot_t2a",
+    "multishot_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "reload_t1",
+   "name": "Ловкие Руки",
+   "tree": "reload",
+   "tier": 1,
+   "branch": "",
+   "desc": "Перезарядка +20%, скорострельность +5%.",
+   "mods": {
+    "reload": 0.2,
+    "fire_rate": 0.05
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "reload_t2a",
+   "name": "Вооружён и Готов",
+   "tree": "reload",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Перезарядка +10%, магазин +2.",
+   "mods": {
+    "reload": 0.1,
+    "mag": 2
+   },
+   "flags": {},
+   "req": [
+    "reload_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "reload_t2b",
+   "name": "Свежий Магазин",
+   "tree": "reload",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Перезарядка +5%, +50% урона на 1 сек после перезарядки.",
+   "mods": {
+    "reload": 0.05
+   },
+   "flags": {
+    "fresh_mag": 0.5
+   },
+   "req": [
+    "reload_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "reload_t3",
+   "name": "Кровавый Магазин",
+   "tree": "reload",
+   "tier": 3,
+   "branch": "",
+   "desc": "+5% скорости перезарядки за убийство (сброс после перезарядки).",
+   "mods": {
+    "reload": 0.05
+   },
+   "flags": {
+    "blood_mag": 0.05
+   },
+   "req": [],
+   "req_any": [
+    "reload_t2a",
+    "reload_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "proj_speed_t1",
+   "name": "Скорость Пуль",
+   "tree": "proj_speed",
+   "tier": 1,
+   "branch": "",
+   "desc": "Скорость пуль +30%.",
+   "mods": {
+    "proj_speed": 0.3
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "proj_speed_t2a",
+   "name": "Точный Прицел",
+   "tree": "proj_speed",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Скорость пуль +15%, урон +15%.",
+   "mods": {
+    "proj_speed": 0.15,
+    "dmg": 0.15
+   },
+   "flags": {},
+   "req": [
+    "proj_speed_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "proj_speed_t2b",
+   "name": "Охотник",
+   "tree": "proj_speed",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Скорость пуль +25%, добивание < 20% HP.",
+   "mods": {
+    "proj_speed": 0.25
+   },
+   "flags": {
+    "exec_threshold": 0.2
+   },
+   "req": [
+    "proj_speed_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "proj_speed_t3",
+   "name": "Снайперский Глаз",
+   "tree": "proj_speed",
+   "tier": 3,
+   "branch": "",
+   "desc": "Скорость пуль +30%, крит. шанс +10%.",
+   "mods": {
+    "proj_speed": 0.3,
+    "crit": 0.1
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "proj_speed_t2a",
+    "proj_speed_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "pierce_t1",
+   "name": "Пробитие",
+   "tree": "pierce",
+   "tier": 1,
+   "branch": "",
+   "desc": "Пробитие +1.",
+   "mods": {
+    "pierce": 1
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pierce_t2a",
+   "name": "Рикошет",
+   "tree": "pierce",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Отскок +1.",
+   "mods": {
+    "bounce": 1
+   },
+   "flags": {},
+   "req": [
+    "pierce_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pierce_t2b",
+   "name": "Мастер Пробития",
+   "tree": "pierce",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Пробитие +2.",
+   "mods": {
+    "pierce": 2
+   },
+   "flags": {},
+   "req": [
+    "pierce_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pierce_t3",
+   "name": "Бронебойщик",
+   "tree": "pierce",
+   "tier": 3,
+   "branch": "",
+   "desc": "Игнорирует 50% брони врагов, пробитие +1.",
+   "mods": {
+    "pierce": 1,
+    "armor_pierce": 0.5
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "pierce_t2a",
+    "pierce_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "thunder_t1",
+   "name": "Гром",
+   "tree": "thunder",
+   "tier": 1,
+   "branch": "",
+   "desc": "Каждый 2-й выстрел вызывает молнию (22 урона).",
+   "mods": {},
+   "flags": {
+    "lightning_every": 2,
+    "lightning_damage": 22.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "thunder_t2a",
+   "name": "Громовой Жук",
+   "tree": "thunder",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Призывает громового жука, бьющего молниями.",
+   "mods": {},
+   "flags": {
+    "summon": "thunder_beetle"
+   },
+   "req": [
+    "thunder_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "thunder_t2b",
+   "name": "Заряженный",
+   "tree": "thunder",
+   "tier": 2,
+   "branch": "b",
+   "desc": "20% шанс восполнить 3 патрона при ударе молнии.",
+   "mods": {},
+   "flags": {
+    "charged_refill": 0.2
+   },
+   "req": [
+    "thunder_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "thunder_t3",
+   "name": "Власть Молний",
+   "tree": "thunder",
+   "tier": 3,
+   "branch": "",
+   "desc": "Урон молнии +12, радиус +75%.",
+   "mods": {
+    "shock_dmg": 12.0,
+    "shock_radius": 0.75
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "thunder_t2a",
+    "thunder_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "flame_t1",
+   "name": "Пламя",
+   "tree": "flame",
+   "tier": 1,
+   "branch": "",
+   "desc": "Каждый 5-й выстрел — огненный шар (поджог 3 дпс).",
+   "mods": {},
+   "flags": {
+    "fireball_every": 5,
+    "fireball_damage": 5.0,
+    "fireball_burn": 3.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "flame_t2a",
+   "name": "Заклинатель Огня",
+   "tree": "flame",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон поджога +50%.",
+   "mods": {
+    "burn_mult": 0.5
+   },
+   "flags": {},
+   "req": [
+    "flame_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "flame_t2b",
+   "name": "Поджигатель",
+   "tree": "flame",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Длительность поджога +30%.",
+   "mods": {
+    "burn_dur": 0.3
+   },
+   "flags": {},
+   "req": [
+    "flame_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "flame_t3",
+   "name": "Инферно",
+   "tree": "flame",
+   "tier": 3,
+   "branch": "",
+   "desc": "Поджоги взрываются (8 урона по области).",
+   "mods": {},
+   "flags": {
+    "burn_explode": 8.0
+   },
+   "req": [],
+   "req_any": [
+    "flame_t2a",
+    "flame_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "frost_t1",
+   "name": "Мороз",
+   "tree": "frost",
+   "tier": 1,
+   "branch": "",
+   "desc": "Каждый 6-й выстрел — ледяной осколок (заморозка).",
+   "mods": {},
+   "flags": {
+    "ice_every": 6,
+    "ice_damage": 6.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "frost_t2a",
+   "name": "Морозный Чародей",
+   "tree": "frost",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Шанс заморозки пулями +35%.",
+   "mods": {
+    "freeze_chance": 0.35
+   },
+   "flags": {},
+   "req": [
+    "frost_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "frost_t2b",
+   "name": "Ледяной Вихрь",
+   "tree": "frost",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Замороженные враги взрываются (10 урона).",
+   "mods": {},
+   "flags": {
+    "frozen_explode": 10.0
+   },
+   "req": [
+    "frost_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "frost_t3",
+   "name": "Раскол",
+   "tree": "frost",
+   "tier": 3,
+   "branch": "",
+   "desc": "Замороженные враги получают +100% урона.",
+   "mods": {},
+   "flags": {
+    "frozen_vuln": 1.0
+   },
+   "req": [],
+   "req_any": [
+    "frost_t2a",
+    "frost_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "dark_t1",
+   "name": "Тёмная Магия",
+   "tree": "dark",
+   "tier": 1,
+   "branch": "",
+   "desc": "Пули накладывают проклятие (35% шанс).",
+   "mods": {
+    "curse_chance": 0.35
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dark_t2a",
+   "name": "Ритуал Крови",
+   "tree": "dark",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+1% урона за каждые 10 убийств проклятием.",
+   "mods": {},
+   "flags": {
+    "blood_ritual": 0.01
+   },
+   "req": [
+    "dark_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dark_t2b",
+   "name": "Тёмный Призыв",
+   "tree": "dark",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Проклятые враги при смерти призывают духа.",
+   "mods": {},
+   "flags": {
+    "curse_soul": true
+   },
+   "req": [
+    "dark_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dark_t3",
+   "name": "Моровая Чума",
+   "tree": "dark",
+   "tier": 3,
+   "branch": "",
+   "desc": "Проклятье распространяется на врагов рядом.",
+   "mods": {},
+   "flags": {
+    "plague": true
+   },
+   "req": [],
+   "req_any": [
+    "dark_t2a",
+    "dark_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "light_t1",
+   "name": "Светлая Магия",
+   "tree": "light",
+   "tier": 1,
+   "branch": "",
+   "desc": "Выстрел последним патроном вызывает кару (20 урона).",
+   "mods": {},
+   "flags": {
+    "last_shot_retribution": 20.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "light_t2a",
+   "name": "Священная Мощь",
+   "tree": "light",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+10 урона кары за каждое текущее HP.",
+   "mods": {},
+   "flags": {
+    "retribution_per_hp": 10.0
+   },
+   "req": [
+    "light_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "light_t2b",
+   "name": "Правосудие",
+   "tree": "light",
+   "tier": 2,
+   "branch": "b",
+   "desc": "+1 макс. HP за 500 убийств карой.",
+   "mods": {},
+   "flags": {
+    "justice": true
+   },
+   "req": [
+    "light_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "light_t3",
+   "name": "Небесное Благословение",
+   "tree": "light",
+   "tier": 3,
+   "branch": "",
+   "desc": "Каждые 500 убийств карой лечат на 1 HP.",
+   "mods": {},
+   "flags": {
+    "heaven_bless": true
+   },
+   "req": [],
+   "req_any": [
+    "light_t2a",
+    "light_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "health_t1",
+   "name": "Здоровье",
+   "tree": "health",
+   "tier": 1,
+   "branch": "",
+   "desc": "Максимальное HP +1.",
+   "mods": {
+    "hp": 1
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "health_t2a",
+   "name": "Точка Ярости",
+   "tree": "health",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+75% урона и скорострельности на 30 сек при получении урона.",
+   "mods": {},
+   "flags": {
+    "rage_point": 0.75
+   },
+   "req": [
+    "health_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "health_t2b",
+   "name": "Исполин",
+   "tree": "health",
+   "tier": 2,
+   "branch": "b",
+   "desc": "+2 HP, размер +25%.",
+   "mods": {
+    "hp": 2,
+    "size": 0.25
+   },
+   "flags": {},
+   "req": [
+    "health_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "health_t3",
+   "name": "Восстановление",
+   "tree": "health",
+   "tier": 3,
+   "branch": "",
+   "desc": "Восстановление 1 HP каждые 90 сек.",
+   "mods": {},
+   "flags": {
+    "regen": 90.0
+   },
+   "req": [],
+   "req_any": [
+    "health_t2a",
+    "health_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "shield_t1",
+   "name": "Небесный Щит",
+   "tree": "shield",
+   "tier": 1,
+   "branch": "",
+   "desc": "Блокирует одну атаку, восстанавливается 120 сек.",
+   "mods": {},
+   "flags": {
+    "shield": true,
+    "shield_recharge": 120.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "shield_t2a",
+   "name": "Божественное Благословение",
+   "tree": "shield",
+   "tier": 2,
+   "branch": "a",
+   "desc": "При активном щите: перезарядка и скорость +25%.",
+   "mods": {},
+   "flags": {
+    "shield_blessing": 0.25
+   },
+   "req": [
+    "shield_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "shield_t2b",
+   "name": "Несгибаемая Воля",
+   "tree": "shield",
+   "tier": 2,
+   "branch": "b",
+   "desc": "При HP ≤ 50%: +2 пробития, +25% отбрасывания.",
+   "mods": {},
+   "flags": {
+    "unbending": true
+   },
+   "req": [
+    "shield_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "shield_t3",
+   "name": "Меч и Щит",
+   "tree": "shield",
+   "tier": 3,
+   "branch": "",
+   "desc": "Убийства карой снижают восстановление щита на 1 сек.",
+   "mods": {},
+   "flags": {
+    "sword_and_shield": true
+   },
+   "req": [],
+   "req_any": [
+    "shield_t2a",
+    "shield_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "dodge_t1",
+   "name": "Уворот",
+   "tree": "dodge",
+   "tier": 1,
+   "branch": "",
+   "desc": "Уворот +10%.",
+   "mods": {
+    "dodge": 0.1
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dodge_t2a",
+   "name": "Уклонение",
+   "tree": "dodge",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Уворот +15%.",
+   "mods": {
+    "dodge": 0.15
+   },
+   "flags": {},
+   "req": [
+    "dodge_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dodge_t2b",
+   "name": "Попутный Ветер",
+   "tree": "dodge",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Каждые 10 сек: +30% скорости и урона (макс. +120%).",
+   "mods": {},
+   "flags": {
+    "wind_runner": 0.3
+   },
+   "req": [
+    "dodge_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dodge_t3",
+   "name": "Тень Ветра",
+   "tree": "dodge",
+   "tier": 3,
+   "branch": "",
+   "desc": "Каждые 10 сек: +10% скорострельности и +1 пробитие.",
+   "mods": {},
+   "flags": {
+    "wind_shadow": true
+   },
+   "req": [],
+   "req_any": [
+    "dodge_t2a",
+    "dodge_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "soul_t1",
+   "name": "Душа",
+   "tree": "soul",
+   "tier": 1,
+   "branch": "",
+   "desc": "Редкие враги роняют души: +1 HP перманентно.",
+   "mods": {},
+   "flags": {
+    "soul_drop": 0.03
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "soul_t2a",
+   "name": "Сбор Душ",
+   "tree": "soul",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+25% шанс дропа души.",
+   "mods": {},
+   "flags": {
+    "soul_drop_bonus": 0.25
+   },
+   "req": [
+    "soul_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "soul_t2b",
+   "name": "Конвертация Душ",
+   "tree": "soul",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Через 60 сек душа превращается в +1 макс. HP.",
+   "mods": {},
+   "flags": {
+    "soul_convert": 60.0
+   },
+   "req": [
+    "soul_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "soul_t3",
+   "name": "Душа-Рыцарь",
+   "tree": "soul",
+   "tier": 3,
+   "branch": "",
+   "desc": "+15 урона призывов за каждую собранную душу. Требует перк дерева «Призыв».",
+   "mods": {
+    "summon_dmg": 0.0
+   },
+   "flags": {
+    "soul_knight": 15.0
+   },
+   "req": [],
+   "req_any": [
+    "soul_t2a",
+    "soul_t2b"
+   ],
+   "max_stacks": 1,
+   "req_tree_any": [
+    "summon"
+   ]
+  },
+  {
+   "id": "pickup_t1",
+   "name": "Притяжение",
+   "tree": "pickup",
+   "tier": 1,
+   "branch": "",
+   "desc": "Радиус сбора +50%.",
+   "mods": {
+    "pickup": 0.5
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pickup_t2a",
+   "name": "Подзарядка",
+   "tree": "pickup",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Радиус +20%, 10% шанс пополнить патрон при сборе XP.",
+   "mods": {
+    "pickup": 0.2
+   },
+   "flags": {
+    "recharge_ammo": 0.1
+   },
+   "req": [
+    "pickup_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pickup_t2b",
+   "name": "Наблюдательность",
+   "tree": "pickup",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Радиус +30%, радиус видимости +25%.",
+   "mods": {
+    "pickup": 0.3,
+    "vision": 0.25
+   },
+   "flags": {},
+   "req": [
+    "pickup_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "pickup_t3",
+   "name": "Азарт",
+   "tree": "pickup",
+   "tier": 3,
+   "branch": "",
+   "desc": "Радиус +30%, +50% скорострельности на 1 сек после XP.",
+   "mods": {
+    "pickup": 0.3
+   },
+   "flags": {
+    "xp_rush": 0.5
+   },
+   "req": [],
+   "req_any": [
+    "pickup_t2a",
+    "pickup_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "move_t1",
+   "name": "Скорость",
+   "tree": "move",
+   "tier": 1,
+   "branch": "",
+   "desc": "Скорость движения +15%.",
+   "mods": {
+    "move_speed": 0.15
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "move_t2a",
+   "name": "Спринт",
+   "tree": "move",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Скорость движения +20%.",
+   "mods": {
+    "move_speed": 0.2
+   },
+   "flags": {},
+   "req": [
+    "move_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "move_t2b",
+   "name": "Стремительность",
+   "tree": "move",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Скорость +25%, урон +10%.",
+   "mods": {
+    "move_speed": 0.25,
+    "dmg": 0.1
+   },
+   "flags": {},
+   "req": [
+    "move_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "move_t3",
+   "name": "Неистовый Бег",
+   "tree": "move",
+   "tier": 3,
+   "branch": "",
+   "desc": "Скорость +30%, поджиг 3 стака при касании врагов.",
+   "mods": {
+    "move_speed": 0.3
+   },
+   "flags": {
+    "run_burn": 3
+   },
+   "req": [],
+   "req_any": [
+    "move_t2a",
+    "move_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "vision_t1",
+   "name": "Зрение",
+   "tree": "vision",
+   "tier": 1,
+   "branch": "",
+   "desc": "Радиус видимости +25%.",
+   "mods": {
+    "vision": 0.25
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "vision_t2a",
+   "name": "Зоркость",
+   "tree": "vision",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Радиус видимости +25%.",
+   "mods": {
+    "vision": 0.25
+   },
+   "flags": {},
+   "req": [
+    "vision_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "vision_t2b",
+   "name": "Пронзительный Взгляд",
+   "tree": "vision",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Враги в радиусе видимости получают 5 дпс.",
+   "mods": {},
+   "flags": {
+    "gaze_dps": 5.0
+   },
+   "req": [
+    "vision_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "vision_t3",
+   "name": "Испепеляющий Взгляд",
+   "tree": "vision",
+   "tier": 3,
+   "branch": "",
+   "desc": "Радиус +75%, урон взгляда x4.",
+   "mods": {
+    "vision": 0.75
+   },
+   "flags": {
+    "gaze_mult": 4.0
+   },
+   "req": [],
+   "req_any": [
+    "vision_t2a",
+    "vision_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "wind_t1",
+   "name": "Власть Ветра",
+   "tree": "wind",
+   "tier": 1,
+   "branch": "",
+   "desc": "Каждые 2 сек порыв ветра по ближайшему врагу (8 урона).",
+   "mods": {},
+   "flags": {
+    "gust_every": 2.0,
+    "gust_damage": 8.0
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "wind_t2a",
+   "name": "Покоритель Ветра",
+   "tree": "wind",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон порыва +45.",
+   "mods": {},
+   "flags": {
+    "gust_damage_add": 45.0
+   },
+   "req": [
+    "wind_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "wind_t2b",
+   "name": "Власть Ветра",
+   "tree": "wind",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Радиус порыва +100%.",
+   "mods": {},
+   "flags": {
+    "gust_radius": 1.0
+   },
+   "req": [
+    "wind_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "wind_t3",
+   "name": "Око Грозы",
+   "tree": "wind",
+   "tier": 3,
+   "branch": "",
+   "desc": "Порыв бьёт x2 урона трижды.",
+   "mods": {},
+   "flags": {
+    "gust_echo": 3,
+    "gust_mult": 2.0
+   },
+   "req": [],
+   "req_any": [
+    "wind_t2a",
+    "wind_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "summon_t1",
+   "name": "Призыв",
+   "tree": "summon",
+   "tier": 1,
+   "branch": "",
+   "desc": "Урон призывов +25%.",
+   "mods": {
+    "summon_dmg": 0.25
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "summon_t2a",
+   "name": "Двойное Владение",
+   "tree": "summon",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+3 призыва, урон призывов +40%.",
+   "mods": {
+    "summon_count": 3,
+    "summon_dmg": 0.4
+   },
+   "flags": {},
+   "req": [
+    "summon_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "summon_t2b",
+   "name": "Приз Возмездия",
+   "tree": "summon",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Урон призывов +30%.",
+   "mods": {
+    "summon_dmg": 0.3
+   },
+   "flags": {},
+   "req": [
+    "summon_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "summon_t3",
+   "name": "Власть Призыва",
+   "tree": "summon",
+   "tier": 3,
+   "branch": "",
+   "desc": "+35% урона и скорости призывов, -35% урона пуль.",
+   "mods": {
+    "summon_dmg": 0.35,
+    "summon_speed": 0.35,
+    "dmg": -0.35
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "summon_t2a",
+    "summon_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "dragon_t1",
+   "name": "Яйцо Дракона",
+   "tree": "dragon",
+   "tier": 1,
+   "branch": "",
+   "desc": "Призывает дракончика, атакующего врагов.",
+   "mods": {},
+   "flags": {
+    "summon": "dragonling"
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dragon_t2a",
+   "name": "Драконья Связь",
+   "tree": "dragon",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон дракона растёт каждые 60 сек.",
+   "mods": {},
+   "flags": {
+    "dragon_growth": 1.0
+   },
+   "req": [
+    "dragon_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dragon_t2b",
+   "name": "Древний Дракон",
+   "tree": "dragon",
+   "tier": 2,
+   "branch": "b",
+   "desc": "+45 базового урона дракона за минуту.",
+   "mods": {},
+   "flags": {
+    "dragon_flat": 45.0
+   },
+   "req": [
+    "dragon_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "dragon_t3",
+   "name": "Драконье Пламя",
+   "tree": "dragon",
+   "tier": 3,
+   "branch": "",
+   "desc": "Дракон дышит огнём по области.",
+   "mods": {},
+   "flags": {
+    "dragon_breath": true
+   },
+   "req": [],
+   "req_any": [
+    "dragon_t2a",
+    "dragon_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "scythe_t1",
+   "name": "Призрачный Серп",
+   "tree": "scythe",
+   "tier": 1,
+   "branch": "",
+   "desc": "Орбитальный серп вращается вокруг игрока.",
+   "mods": {},
+   "flags": {
+    "summon": "scythe"
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "scythe_t2a",
+   "name": "Власть Серпа",
+   "tree": "scythe",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон серпа +50%.",
+   "mods": {
+    "summon_dmg": 0.5
+   },
+   "flags": {},
+   "req": [
+    "scythe_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "scythe_t2b",
+   "name": "Вихрь",
+   "tree": "scythe",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Скорость серпа +100%.",
+   "mods": {
+    "summon_speed": 1.0
+   },
+   "flags": {},
+   "req": [
+    "scythe_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "scythe_t3",
+   "name": "Жатва Душ",
+   "tree": "scythe",
+   "tier": 3,
+   "branch": "",
+   "desc": "Убийства серпом призывают духа.",
+   "mods": {},
+   "flags": {
+    "scythe_soul": true
+   },
+   "req": [],
+   "req_any": [
+    "scythe_t2a",
+    "scythe_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "spear_t1",
+   "name": "Святое Копьё",
+   "tree": "spear",
+   "tier": 1,
+   "branch": "",
+   "desc": "Призывает святое копьё, преследующее врагов.",
+   "mods": {},
+   "flags": {
+    "summon": "holy_spear"
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "spear_t2a",
+   "name": "Рыцарь Копья",
+   "tree": "spear",
+   "tier": 2,
+   "branch": "a",
+   "desc": "+15 урона копья за каждую душу. Требует перк «Душа».",
+   "mods": {},
+   "flags": {
+    "spear_soul": 15.0
+   },
+   "req": [
+    "spear_t1",
+    "soul_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "spear_t2b",
+   "name": "Мастер Копья",
+   "tree": "spear",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Урон копья +40%.",
+   "mods": {
+    "summon_dmg": 0.4
+   },
+   "flags": {},
+   "req": [
+    "spear_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "spear_t3",
+   "name": "Святые Копья",
+   "tree": "spear",
+   "tier": 3,
+   "branch": "",
+   "desc": "+3 копья.",
+   "mods": {
+    "summon_count": 3
+   },
+   "flags": {},
+   "req": [],
+   "req_any": [
+    "spear_t2a",
+    "spear_t2b"
+   ],
+   "max_stacks": 1
+  },
+  {
+   "id": "beast_t1",
+   "name": "Укротитель",
+   "tree": "beast",
+   "tier": 1,
+   "branch": "",
+   "desc": "Призывы +10% урона за каждые 15 убийств.",
+   "mods": {},
+   "flags": {
+    "beast_kill_stack": 15
+   },
+   "req": [],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "beast_t2a",
+   "name": "Звериный Инстинкт",
+   "tree": "beast",
+   "tier": 2,
+   "branch": "a",
+   "desc": "Урон призывов +30%.",
+   "mods": {
+    "summon_dmg": 0.3
+   },
+   "flags": {},
+   "req": [
+    "beast_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "beast_t2b",
+   "name": "Неистовство",
+   "tree": "beast",
+   "tier": 2,
+   "branch": "b",
+   "desc": "Скорость атаки призывов +20%.",
+   "mods": {
+    "summon_speed": 0.2
+   },
+   "flags": {},
+   "req": [
+    "beast_t1"
+   ],
+   "req_any": [],
+   "max_stacks": 1
+  },
+  {
+   "id": "beast_t3",
+   "name": "Неистовство Стаи",
+   "tree": "beast",
+   "tier": 3,
+   "branch": "",
+   "desc": "+50% урона, если есть призыв.",
+   "mods": {},
+   "flags": {
+    "beast_alone": 0.5
+   },
+   "req": [],
+   "req_any": [
+    "beast_t2a",
+    "beast_t2b"
+   ],
+   "max_stacks": 1
+  }
+ ]
+}

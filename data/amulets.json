@@ -1,0 +1,139 @@
+{
+ "amulets": [
+  {
+   "id": "amu_echo",
+   "name": "Отголосок",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "Последний патрон: урон всем врагам рядом (+20% урона пули за ранг).",
+   "per_rank": 0.2
+  },
+  {
+   "id": "amu_bodiless",
+   "name": "Бестелесный",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "Каждые 50 убийств оружие не тратит патроны (+2 сек за ранг).",
+   "per_rank": 2.0
+  },
+  {
+   "id": "amu_rhythm",
+   "name": "Ритм Стрелка",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+1 пробитие за ранг в первые 60 сек раунда.",
+   "per_rank": 1
+  },
+  {
+   "id": "amu_courage",
+   "name": "Отвага",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+2 магазина за ранг.",
+   "per_rank": 2
+  },
+  {
+   "id": "amu_fortress",
+   "name": "Крепость",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+10% урона за ранг при HP > 75%.",
+   "per_rank": 0.1
+  },
+  {
+   "id": "amu_fragility",
+   "name": "Хрупкость",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+25% урона за ранг, -1 HP за ранг.",
+   "per_rank": 0.25
+  },
+  {
+   "id": "amu_spark",
+   "name": "Искра",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+5% шанс молнии за ранг при попадании.",
+   "per_rank": 0.05
+  },
+  {
+   "id": "amu_frost",
+   "name": "Стужа",
+   "type": "attack",
+   "max_rank": 5,
+   "desc": "+5% шанс заморозки за ранг.",
+   "per_rank": 0.05
+  },
+  {
+   "id": "amu_agility",
+   "name": "Проворство",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "+10% уворота за ранг (кап 75%).",
+   "per_rank": 0.1
+  },
+  {
+   "id": "amu_foresight",
+   "name": "Предвидение",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "+25% радиуса видимости за ранг.",
+   "per_rank": 0.25
+  },
+  {
+   "id": "amu_growth",
+   "name": "Рост",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "Лечение 1 HP за каждые 5 уровней.",
+   "per_rank": 1
+  },
+  {
+   "id": "amu_endurance",
+   "name": "Стойкость",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "+1 макс. HP за ранг.",
+   "per_rank": 1
+  },
+  {
+   "id": "amu_recovery",
+   "name": "Восстановление",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "Старт раунда с +1 HP за ранг (запас лечения).",
+   "per_rank": 1
+  },
+  {
+   "id": "amu_soulbond",
+   "name": "Связь Душ",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "Воскрешение с 1 HP (1 раз за раунд за ранг).",
+   "per_rank": 1
+  },
+  {
+   "id": "amu_bulwark",
+   "name": "Оплот",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "-5% получаемого урона за ранг.",
+   "per_rank": 0.05
+  },
+  {
+   "id": "amu_secondwind",
+   "name": "Второе Дыхание",
+   "type": "defense",
+   "max_rank": 5,
+   "desc": "+10% скорости за ранг при HP < 50%.",
+   "per_rank": 0.1
+  }
+ ],
+ "costs": [
+  500,
+  1415,
+  2598,
+  4000,
+  5590
+ ]
+}

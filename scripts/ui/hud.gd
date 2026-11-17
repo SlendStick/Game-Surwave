@@ -1,0 +1,830 @@
+extends CanvasLayer
+## HUD забега + оверлеи: выбор улучшения, пауза, конец раунда, список синергий.
+
+signal choice_made(card: Dictionary)
+
+var game: Node = null
+var _last_hp := -1
+var _last_max_hp := -1
+var root: Control
+var hp_lbl: Label
+var timer_lbl: Label
+var level_lbl: Label
+var xp_fill: ColorRect
+var xp_back: ColorRect
+var name_lbl: Label
+var ammo_lbl: Label
+var skill_lbl: Label
+var fps_lbl: Label
+var perks_lbl: Label
+var xp_lbl: Label
+var hearts: Control
+var ammo_icon: Control
+var skill_icon: Control
+var combo_lbl: Label
+var weather_lbl: Label
+var boss_box: Control
+var boss_fill: ColorRect
+var boss_name: Label
+var toast_box: VBoxContainer
+var choice_layer: Control
+var choice_title: Label
+var choice_hint: Label
+var choice_box: HBoxContainer
+var pause_layer: Control
+var pause_perk_list: VBoxContainer
+var pause_perks_count: Label
+var pause_stats: VBoxContainer
+var end_layer: Control
+var syn_layer: Control
+var syn_list: VBoxContainer
+var current_cards: Array = []
+var cheat_console: Node = null
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	layer = 10
+	_build()
+
+## Чит-консоль живёт внутри HUD: `~` открывает строку, «wuss menu» — меню.
+func _setup_cheat_console() -> void:
+	if game == null or cheat_console != null:
+		return
+	cheat_console = load("res://scripts/ui/cheat_console.gd").new()
+	cheat_console.set("game", game)
+	add_child(cheat_console)
+
+func _build() -> void:
+	root = Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+
+	# --- шкала опыта во всю ширину, поверх неё по центру уровень
+	xp_back = ColorRect.new()
+	xp_back.color = Color("#0b0c10")
+	xp_back.position = Vector2(0, 0)
+	xp_back.size = Vector2(640, 8)
+	xp_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(xp_back)
+	var xp_frame := ColorRect.new()
+	xp_frame.color = Color(0.30, 0.31, 0.34, 0.9)
+	xp_frame.position = Vector2(0, 8)
+	xp_frame.size = Vector2(640, 1)
+	xp_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(xp_frame)
+	xp_fill = ColorRect.new()
+	xp_fill.color = Color("#8f8158")
+	xp_fill.position = Vector2(0, 0)
+	xp_fill.size = Vector2(0, 8)
+	xp_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(xp_fill)
+	level_lbl = UI.label(root, "УРОВЕНЬ 1", 13, UI.TEXT, Vector2(0, 12))
+	level_lbl.size = Vector2(640, 15)
+	level_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for side in [-1, 1]:
+		var seg := ColorRect.new()
+		seg.color = Color(0.40, 0.40, 0.44, 0.85)
+		seg.size = Vector2(56, 1)
+		seg.position = Vector2(320 + (74.0 if side > 0 else -130.0), 19)
+		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(seg)
+
+	# --- слева сверху: сердца здоровья
+	hearts = Control.new()
+	hearts.position = Vector2(6, 24)
+	hearts.size = Vector2(178, 18)
+	hearts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hearts)
+	hearts.draw.connect(_draw_hearts)
+	hp_lbl = UI.label(root, "", 9, UI.TEXT, Vector2(188, 26))
+
+	# --- слева под сердцами: патроны в магазине и размер магазина
+	ammo_icon = Control.new()
+	ammo_icon.position = Vector2(6, 42)
+	ammo_icon.size = Vector2(12, 16)
+	ammo_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(ammo_icon)
+	ammo_icon.draw.connect(_draw_ammo_icon)
+	ammo_lbl = UI.label(root, "0/0", 13, UI.GOLD, Vector2(22, 43))
+	skill_icon = Control.new()
+	skill_icon.position = Vector2(86, 41)
+	skill_icon.size = Vector2(18, 18)
+	skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(skill_icon)
+	skill_icon.draw.connect(_draw_skill_icon)
+
+	# --- справа сверху: оставшееся время и подпись режима
+	timer_lbl = UI.label(root, "30:00", 20, UI.TEXT, Vector2(462, 12))
+	timer_lbl.size = Vector2(172, 22)
+	timer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	# --- золото и души теперь только в меню паузы, на поле их нет
+	weather_lbl = UI.label(root, "", 8, UI.ACCENT, Vector2(320, 27))
+	weather_lbl.size = Vector2(220, 11)
+	weather_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	weather_lbl.visible = false
+	combo_lbl = UI.label(root, "", 12, Color("#cbc6ba"), Vector2(564, 40))
+	combo_lbl.size = Vector2(70, 16)
+	combo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	combo_lbl.visible = false
+
+	# --- босс
+	boss_box = Control.new()
+	boss_box.position = Vector2(170, 92)
+	boss_box.size = Vector2(300, 20)
+	boss_box.visible = false
+	boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(boss_box)
+	boss_name = UI.label(boss_box, "", 9, Color("#c0a49a"), Vector2(0, 0))
+	boss_name.size = Vector2(300, 10)
+	boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var boss_back := ColorRect.new()
+	boss_back.color = Color("#150e0d")
+	boss_back.position = Vector2(0, 11)
+	boss_back.size = Vector2(300, 6)
+	boss_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_box.add_child(boss_back)
+	boss_fill = ColorRect.new()
+	boss_fill.color = Color("#8f2f28")
+	boss_fill.position = Vector2(0, 11)
+	boss_fill.size = Vector2(300, 6)
+	boss_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_box.add_child(boss_fill)
+
+	# --- низ: только FPS и мелкие служебные надписи
+	fps_lbl = UI.label(root, "", 7, UI.DIM, Vector2(586, 350))
+	fps_lbl.size = Vector2(48, 10)
+	fps_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	# --- тосты по центру сверху
+	toast_box = VBoxContainer.new()
+	toast_box.position = Vector2(170, 112)
+	toast_box.size = Vector2(300, 60)
+	toast_box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(toast_box)
+
+	_apply_outlines(root)
+	_build_choice_layer()
+	_build_pause_layer()
+	_build_end_layer()
+	_build_syn_layer()
+	EventBus.notify.connect(_on_notify)
+	EventBus.boss_spawned.connect(_on_boss_spawned)
+	EventBus.boss_defeated.connect(_on_boss_defeated)
+	EventBus.chest_opened.connect(_on_chest)
+	EventBus.boss_damaged.connect(update_boss_bar)
+	EventBus.upgrade_picked.connect(_on_upgrade_picked)
+
+func setup(g: Node) -> void:
+	game = g
+	_setup_cheat_console()
+
+# ------------------------------------------------------------------ ОВЕРЛЕИ
+func _dim(parent: Control) -> ColorRect:
+	var d := ColorRect.new()
+	d.color = Color(0, 0, 0, 0.72)
+	d.set_anchors_preset(Control.PRESET_FULL_RECT)
+	d.mouse_filter = Control.MOUSE_FILTER_STOP
+	parent.add_child(d)
+	return d
+
+func _build_choice_layer() -> void:
+	choice_layer = Control.new()
+	choice_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	choice_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	choice_layer.visible = false
+	root.add_child(choice_layer)
+	_dim(choice_layer)
+	choice_title = UI.label(choice_layer, "", 15, UI.GOLD, Vector2(0, 22))
+	choice_title.size = Vector2(640, 20)
+	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	choice_hint = UI.label(choice_layer, "ЛКМ — выбрать · игра на паузе", 8, UI.MUTED, Vector2(0, 44))
+	choice_hint.size = Vector2(640, 12)
+	choice_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	choice_box = HBoxContainer.new()
+	choice_box.position = Vector2(20, 64)
+	choice_box.size = Vector2(600, 210)
+	choice_box.add_theme_constant_override("separation", 8)
+	choice_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	choice_layer.add_child(choice_box)
+
+## Меню паузы: слева хронология взятых перков, справа сводка по забегу.
+func _build_pause_layer() -> void:
+	pause_layer = Control.new()
+	pause_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_layer.visible = false
+	root.add_child(pause_layer)
+	_dim(pause_layer)
+
+	var title := UI.label(pause_layer, Loc.t("paused"), 16, UI.GOLD, Vector2(0, 10))
+	title.size = Vector2(640, 20)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var hint := UI.label(pause_layer, "Esc — продолжить · Tab — список взятого", 8, UI.DIM, Vector2(0, 30))
+	hint.size = Vector2(640, 10)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# --- левая колонка: перки по порядку получения
+	var left := UI.panel(pause_layer, Rect2(10, 44, 350, 258))
+	UI.label(left, "ВЗЯТЫЕ ПЕРКИ ПО ПОРЯДКУ", 9, UI.GOLD, Vector2(8, 6))
+	pause_perks_count = UI.label(left, "", 8, UI.DIM, Vector2(200, 6))
+	pause_perks_count.size = Vector2(140, 10)
+	pause_perks_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(6, 22)
+	scroll.size = Vector2(338, 228)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left.add_child(scroll)
+	pause_perk_list = VBoxContainer.new()
+	pause_perk_list.custom_minimum_size = Vector2(330, 0)
+	pause_perk_list.add_theme_constant_override("separation", 1)
+	scroll.add_child(pause_perk_list)
+
+	# --- правая колонка: сводка забега
+	var right := UI.panel(pause_layer, Rect2(368, 44, 262, 176))
+	UI.label(right, "ЗАБЕГ", 9, UI.GOLD, Vector2(8, 6))
+	pause_stats = VBoxContainer.new()
+	pause_stats.position = Vector2(8, 22)
+	pause_stats.size = Vector2(246, 148)
+	pause_stats.add_theme_constant_override("separation", 1)
+	right.add_child(pause_stats)
+
+	# --- кнопки
+	var buttons := UI.vbox(pause_layer, 6)
+	buttons.position = Vector2(368, 228)
+	buttons.size = Vector2(262, 74)
+	var resume := UI.button(buttons, Loc.t("resume"), 10, Vector2(262, 22))
+	resume.pressed.connect(toggle_pause)
+	var to_menu := UI.button(buttons, Loc.t("main_menu"), 10, Vector2(262, 22))
+	to_menu.pressed.connect(_pause_to_menu)
+	var quit := UI.button(buttons, Loc.t("quit"), 10, Vector2(262, 22))
+	quit.pressed.connect(func() -> void: get_tree().quit())
+
+	# --- подсказка внизу
+	var foot := UI.label(pause_layer, "Пробел — автоприцел · R — перезарядка · ЛКМ — огонь", 7, UI.DIM, Vector2(0, 312))
+	foot.size = Vector2(640, 10)
+	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+func _build_end_layer() -> void:
+	end_layer = Control.new()
+	end_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	end_layer.visible = false
+	root.add_child(end_layer)
+	_dim(end_layer)
+	var panel := UI.panel(end_layer, Rect2(150, 60, 340, 240))
+	var v := UI.vbox(panel, 4)
+	v.position = Vector2(16, 12)
+	v.size = Vector2(308, 210)
+
+func _build_syn_layer() -> void:
+	syn_layer = Control.new()
+	syn_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	syn_layer.visible = false
+	root.add_child(syn_layer)
+	_dim(syn_layer)
+	var panel := UI.panel(syn_layer, Rect2(140, 40, 360, 280))
+	UI.label(panel, Loc.t("synergies_list"), 12, UI.GOLD, Vector2(12, 8))
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(10, 30)
+	scroll.size = Vector2(340, 210)
+	panel.add_child(scroll)
+	syn_list = VBoxContainer.new()
+	syn_list.custom_minimum_size = Vector2(330, 0)
+	syn_list.add_theme_constant_override("separation", 2)
+	scroll.add_child(syn_list)
+	var close := UI.button(panel, Loc.t("close"), 9, Vector2(80, 20))
+	close.position = Vector2(268, 248)
+	close.pressed.connect(func() -> void: syn_layer.visible = false)
+
+# ------------------------------------------------------------------ ВЫБОР
+func open_choice(cards: Array, title: String, _kind: String) -> void:
+	current_cards = cards
+	UI.clear(choice_box)
+	choice_title.text = title
+	var card_w := 112.0
+	if cards.size() <= 3:
+		card_w = 140.0
+	for i in cards.size():
+		var card: Dictionary = cards[i]
+		var kind := String(card.get("kind", "perk"))
+		var data: Dictionary = card.get("data", {})
+		var accent := UI.kind_color(kind)
+		var b := UI.card(choice_box, Vector2(card_w, 198), accent)
+		# цветная полоса сверху — сразу видно вид награды
+		var stripe := ColorRect.new()
+		stripe.color = accent
+		stripe.position = Vector2(2, 2)
+		stripe.size = Vector2(card_w - 4, 2)
+		stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(stripe)
+		var v := UI.vbox(b, 2)
+		v.set_anchors_preset(Control.PRESET_FULL_RECT)
+		v.offset_left = 7
+		v.offset_top = 7
+		v.offset_right = -7
+		v.offset_bottom = -6
+		# номер для выбора с клавиатуры
+		var num := UI.label(v, "%d" % (i + 1), 8, accent)
+		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var badge := UI.label(v, UI.kind_name(kind).to_upper(), 7, accent)
+		badge.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var title_lbl := UI.label(v, String(data.get("name", card.get("id", ""))), 10, UI.TEXT)
+		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var meta_txt := _card_meta(card)
+		if meta_txt != "":
+			var meta_lbl := UI.label(v, meta_txt, 7, UI.GOLD)
+			meta_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var desc_lbl := UI.label(v, String(data.get("desc", "")), 8, UI.DIM)
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.custom_minimum_size = Vector2(card_w - 18, 84)
+		var req_txt := _card_requires(data)
+		if req_txt != "":
+			var req_lbl := UI.label(v, req_txt, 7, UI.ACCENT)
+			req_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			req_lbl.custom_minimum_size = Vector2(card_w - 18, 20)
+		b.pressed.connect(_on_card_pressed.bind(card))
+	choice_hint.text = "ЛКМ или клавиши 1–%d · игра на паузе" % cards.size()
+	choice_layer.visible = true
+
+## Выбор карточки с клавиатуры (1–5).
+func _input_choice_hotkey(event: InputEvent) -> bool:
+	if not choice_layer.visible:
+		return false
+	for i in mini(current_cards.size(), 5):
+		var key := KEY_1 + i
+		if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).physical_keycode == key:
+			_on_card_pressed(current_cards[i])
+			return true
+	return false
+
+## Подпись карточки: дерево, тир и число уже взятых стаков.
+func _card_meta(card: Dictionary) -> String:
+	var kind := String(card.get("kind", "perk"))
+	var data: Dictionary = card.get("data", {})
+	var upg: UpgradeSystem = game.player.upg if (game != null and game.player != null) else null
+	match kind:
+		"perk":
+			var tree_id := String(data.get("tree", ""))
+			var tree_name := String(DB.tree_by_id.get(tree_id, {}).get("name", tree_id))
+			var tier := int(data.get("tier", 1))
+			var stack := int(upg.taken.get(String(card.get("id", "")), 0)) if upg != null else 0
+			var out := "%s · T%d" % [tree_name, tier]
+			if stack > 0:
+				out += " · взят ×%d" % stack
+			return out
+		"synergy":
+			return "Синергия · все условия выполнены"
+		"char_upgrade":
+			return "Уникальный апгрейд персонажа"
+		"seal":
+			return "Древняя печать"
+		"specialization":
+			if upg != null and upg.specialization_pending > 0:
+				return "Специализация · ×%d следующему перку" % int(upg.spec_mult)
+			return "Специализация"
+		"evolution":
+			return "Эволюция оружия"
+	return ""
+
+## Строка требований: для синергии — какие перки уже собраны.
+func _card_requires(data: Dictionary) -> String:
+	var reqs: Array = data.get("requires", [])
+	if reqs.is_empty():
+		return ""
+	var names: Array = []
+	for rid in reqs:
+		var perk := DB.perk(String(rid))
+		names.append(String(perk.get("name", rid)))
+	if names.is_empty():
+		return ""
+	return "Нужно: " + ", ".join(names)
+
+func _on_card_pressed(card: Dictionary) -> void:
+	choice_layer.visible = false
+	AudioManager.play_sfx("ui", 1.2)
+	choice_made.emit(card)
+
+func _process(delta: float) -> void:
+	if game == null or game.player == null:
+		return
+	_refresh(delta)
+
+func _refresh(delta: float) -> void:
+	var p: Player = game.player
+	if weather_lbl != null:
+		var w: Dictionary = game.weather if game != null else {}
+		if w.is_empty():
+			weather_lbl.visible = false
+		else:
+			weather_lbl.visible = true
+			weather_lbl.text = "%s · %d с" % [String(w.get("title", "")), int(ceilf(float(w.get("left", 0.0))))]
+			weather_lbl.add_theme_color_override("font_color", UI.ACCENT if float(w.get("left", 0.0)) > 3.0 else UI.DANGER)
+	var corner := String(GameManager.setting("hud_vitals", "corner")) == "corner"
+	# в режиме «над игроком» верхние сердца и патроны скрыты
+	if hearts != null:
+		hearts.visible = corner
+	if ammo_icon != null:
+		ammo_icon.visible = corner
+	hp_lbl.visible = corner
+	ammo_lbl.visible = corner
+	if int(_last_hp) != p.hp or int(_last_max_hp) != p.max_hp:
+		_last_hp = p.hp
+		_last_max_hp = p.max_hp
+		if hearts != null:
+			hearts.queue_redraw()
+	hp_lbl.text = "%d/%d" % [maxi(p.hp, 0), p.max_hp]
+	if p.shield_charges > 0:
+		hp_lbl.text += " ★"
+	# патроны: при перезарядке счётчик и иконка становятся белыми
+	ammo_lbl.text = "%d/%d" % [p.mag, int(p.S.mag)]
+	ammo_lbl.add_theme_color_override("font_color", Color("#ffffff") if p.reloading else UI.GOLD)
+	if ammo_icon != null:
+		ammo_icon.queue_redraw()
+	if skill_icon != null:
+		skill_icon.queue_redraw()
+	level_lbl.text = "УРОВЕНЬ %d" % game.level
+	var xp_frac := clampf(float(game.xp) / maxf(1.0, float(game.xp_need)), 0.0, 1.0)
+	xp_fill.size = Vector2(640.0 * xp_frac, 8)
+	if game.mode == "endless":
+		timer_lbl.text = UI.fmt_time(game.elapsed)
+	else:
+		timer_lbl.text = UI.fmt_time(maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed)))
+	fps_lbl.text = "%s %d" % [Loc.t("fps"), Engine.get_frames_per_second()]
+
+## Кольцо готовности способности: заполняется по мере восстановления, без текста.
+func _draw_skill_icon() -> void:
+	if skill_icon == null or game == null or game.player == null:
+		return
+	var p: Player = game.player
+	var cd_total := maxf(0.1, float(p.skill_data.get("cd", 10.0)))
+	var frac := clampf(1.0 - p.skill_cd_left / cd_total, 0.0, 1.0)
+	var c := Vector2(9, 9)
+	var pulse := 0.55 + 0.45 * sin(float(Time.get_ticks_msec()) * 0.004)
+	skill_icon.draw_circle(c, 8.4, Color(0.04, 0.05, 0.09, 0.9))
+	skill_icon.draw_arc(c, 8.0, 0.0, TAU, 28, Color(0.35, 0.38, 0.5, 0.85), 1.0)
+	if frac >= 1.0:
+		# способность готова: тёплое свечение и ромб внутри
+		skill_icon.draw_circle(c, 7.4, Color(0.50, 0.82, 1.0, 0.20 + 0.18 * pulse))
+		skill_icon.draw_arc(c, 7.0, 0.0, TAU, 28, Color(0.55, 0.85, 1.0, 0.95), 1.6)
+		skill_icon.draw_colored_polygon(PackedVector2Array([
+			c + Vector2(0, -3.4), c + Vector2(3.0, 0), c + Vector2(0, 3.4), c + Vector2(-3.0, 0)]),
+			Color(0.85, 0.95, 1.0))
+	else:
+		skill_icon.draw_arc(c, 6.6, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 2.0)
+
+## Иконка патрона: гильза с пулей.
+func _draw_ammo_icon() -> void:
+	if ammo_icon == null:
+		return
+	var gold := Color("#ffffff") if (game != null and game.player != null and game.player.reloading) else Color("#cbbc95")
+	ammo_icon.draw_rect(Rect2(2, 3, 5, 9), gold)
+	ammo_icon.draw_colored_polygon(PackedVector2Array([
+		Vector2(2, 3), Vector2(7, 3), Vector2(4.5, 0)]), gold)
+
+## Сердца здоровья: заполненные — текущее HP, тёмные — потерянные.
+func _draw_hearts() -> void:
+	if hearts == null or game == null or game.player == null:
+		return
+	var pl: Player = game.player
+	var total: int = clampi(pl.max_hp, 1, 20)
+	var step := minf(18.0, 176.0 / float(total))
+	var r := minf(4.4, step * 0.30)
+	for i in total:
+		var c := Vector2(step * 0.5 + step * float(i), 8.0)
+		var col := Color("#8f2f28") if i < pl.hp else Color("#2c2c31")
+		if i < pl.hp and pl.hp <= 2:
+			col = Color("#b06a4e")
+		hearts.draw_circle(c + Vector2(-r, -r * 0.6), r, col)
+		hearts.draw_circle(c + Vector2(r, -r * 0.6), r, col)
+		hearts.draw_colored_polygon(PackedVector2Array([
+			c + Vector2(-r * 1.9, -r * 0.2),
+			c + Vector2(r * 1.9, -r * 0.2),
+			c + Vector2(0.0, r * 2.2)]), col)
+		if i < pl.hp:
+			hearts.draw_circle(c + Vector2(-r * 0.7, -r * 0.9), r * 0.28, Color(1, 1, 1, 0.35))
+	if pl.shield_charges > 0:
+		hearts.draw_arc(Vector2(176.0, 8.0), 4.5, 0.0, TAU, 16, Color(1.0, 0.9, 0.4), 1.5)
+
+# ------------------------------------------------------------------ ПАУЗА / КОНЕЦ
+func toggle_pause() -> void:
+	if end_layer.visible:
+		return
+	var now := not pause_layer.visible
+	pause_layer.visible = now
+	get_tree().paused = now
+	if now:
+		_refresh_pause_menu()
+		AudioManager.play_sfx("ui", 0.9)
+
+## Заполняет меню паузы: хронология перков и сводка по забегу.
+func _refresh_pause_menu() -> void:
+	if game == null or game.player == null:
+		return
+	UI.clear(pause_perk_list)
+	var log: Array = game.player.upg.log
+	var idx := 0
+	for entry in log:
+		idx += 1
+		var kind := String(entry.get("kind", ""))
+		var id := String(entry.get("id", ""))
+		var data: Dictionary = _find_entry_data(kind, id)
+		var nm := String(data.get("name", id))
+		var mult := float(entry.get("mult", 1.0))
+		var suffix := ""
+		if mult > 1.0:
+			suffix = " ×%d" % int(mult)
+		var row := UI.label(pause_perk_list, "%2d. [%s] %s%s" % [idx, UI.kind_name(kind), nm, suffix], 8, UI.kind_color(kind))
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.custom_minimum_size = Vector2(326, 0)
+	if log.is_empty():
+		UI.label(pause_perk_list, "Пока ничего не выбрано", 9, UI.DIM)
+	var upg: UpgradeSystem = game.player.upg
+	pause_perks_count.text = "всего %d" % log.size()
+
+	UI.clear(pause_stats)
+	var map_name := String(game.map_data.get("name", ""))
+	var char_name := String(game.player.char_data.get("name", ""))
+	var weapon_name := String(game.player.weapon.get("name", ""))
+	var mode_names := {"standard": "Стандартный 30 мин", "quick": "Быстрый 10 мин", "endless": "Бесконечный", "coop": "Кооператив"}
+	var mode_name := String(mode_names.get(String(game.mode), String(game.mode)))
+	var total_time := float(game.elapsed)
+	if game.mode != "endless":
+		total_time = maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed))
+	var rows := [
+		["Карта", map_name],
+		["Персонаж", char_name],
+		["Оружие", "%s · ур. %d" % [weapon_name, game.player.weapon_level]],
+		["Режим", mode_name],
+		["Осталось", UI.fmt_time(total_time) if game.mode != "endless" else UI.fmt_time(float(game.elapsed))],
+		["Уровень", str(game.level)],
+		["Убийства", str(game.kills)],
+		["Урон нанесён", str(int(game.damage_dealt))],
+		["Урон получен", str(int(game.damage_taken))],
+		["Золото", str(game.gold)],
+		["Души", str(int(game.souls))],
+		["Осколки", str(int(SaveManager.data.get("crystals", 0)))],
+		["Перки", "%d · синергий %d" % [upg.taken.size(), upg.taken_synergies.size()]],
+		["Тьма", str(int(GameManager.run_config.get("darkness", 1)))],
+	]
+	for pair in rows:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 4)
+		row.custom_minimum_size = Vector2(246, 9)
+		var a := UI.label(row, String(pair[0]), 8, UI.DIM)
+		a.custom_minimum_size = Vector2(96, 0)
+		var b := UI.label(row, String(pair[1]), 8, UI.TEXT)
+		b.custom_minimum_size = Vector2(140, 0)
+		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		pause_stats.add_child(row)
+
+## Ищет данные карточки по виду и id (для названия в списке паузы).
+func _find_entry_data(kind: String, id: String) -> Dictionary:
+	match kind:
+		"perk":
+			return DB.perk(id)
+		"synergy":
+			for syn in DB.synergies:
+				if String(syn.get("id", "")) == id:
+					return syn
+		"seal":
+			return DB.seal_by_id.get(id, {})
+		"specialization":
+			return DB.spec_by_id.get(id, {})
+		"evolution":
+			if game != null and game.player != null:
+				var ev: Dictionary = game.player.upg.weapon_evolution
+				if String(ev.get("id", "")) == id:
+					return ev
+		"char_upgrade":
+			if game != null and game.player != null:
+				for up in DB.character(String(game.player.char_data.get("id", ""))).get("upgrades", []):
+					if String(up.get("id", "")) == id:
+						return up
+	return {}
+
+## Выход из забега через паузу: сначала снимаем паузу.
+func _pause_to_menu() -> void:
+	get_tree().paused = false
+	pause_layer.visible = false
+	GameManager.goto_menu()
+
+func show_end(results: Dictionary, win: bool, secret_win: bool) -> void:
+	pause_layer.visible = false
+	choice_layer.visible = false
+	syn_layer.visible = false
+	get_tree().paused = false
+	end_layer.visible = true
+	var panel: Panel = end_layer.get_child(1)
+	UI.clear(panel)
+	var title_txt := Loc.t("victory") if win else Loc.t("defeat")
+	var accent := UI.GOLD if win else UI.DANGER
+	if secret_win:
+		title_txt = "СЕКРЕТНАЯ ПОБЕДА"
+	# цветная полоса сверху панели
+	var stripe := ColorRect.new()
+	stripe.color = Color(accent.r, accent.g, accent.b, 0.85)
+	stripe.position = Vector2(1, 1)
+	stripe.size = Vector2(panel.size.x - 2, 2)
+	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(stripe)
+	var title := UI.label(panel, title_txt, 20, accent, Vector2(18, 12))
+	title.size = Vector2(panel.size.x - 36, 22)
+	UI.label(panel, "итоги забега", 8, UI.MUTED, Vector2(19, 34))
+	var lines := [
+		[Loc.t("time"), UI.fmt_time(float(results.get("time", 0.0)))],
+		[Loc.t("kills"), str(int(results.get("kills", 0)))],
+		[Loc.t("damage_dealt"), str(int(results.get("damage_dealt", 0)))],
+		[Loc.t("damage_taken"), str(int(results.get("damage_taken", 0)))],
+		[Loc.t("level"), str(int(results.get("level", 1)))],
+		[Loc.t("gold"), str(int(results.get("gold", 0)))],
+		[Loc.t("souls"), str(int(results.get("souls", 0)))],
+	]
+	var y := 52
+	for pair in lines:
+		var row := HBoxContainer.new()
+		row.position = Vector2(18, y)
+		row.size = Vector2(panel.size.x - 36, 10)
+		var a := UI.label(row, String(pair[0]), 9, UI.DIM)
+		a.custom_minimum_size = Vector2(170, 0)
+		var b := UI.label(row, String(pair[1]), 9, UI.TEXT)
+		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		b.custom_minimum_size = Vector2(130, 0)
+		panel.add_child(row)
+		y += 14
+	var buttons := UI.vbox(panel, 5)
+	buttons.position = Vector2(18, y + 8)
+	buttons.size = Vector2(panel.size.x - 36, 80)
+	var retry := UI.primary_button(buttons, Loc.t("restart"), 10, Vector2(panel.size.x - 36, 24))
+	retry.pressed.connect(func() -> void: GameManager.start_run(GameManager.run_config.duplicate()))
+	var menu := UI.button(buttons, Loc.t("main_menu"), 10, Vector2(panel.size.x - 36, 22))
+	menu.pressed.connect(func() -> void: GameManager.goto_menu())
+	if GameManager.is_endless_unlocked() and not win:
+		var endless := UI.button(buttons, Loc.t("continue_endless"), 9, Vector2(panel.size.x - 36, 22))
+		endless.pressed.connect(_continue_endless)
+
+func _continue_endless() -> void:
+	var cfg: Dictionary = GameManager.run_config.duplicate()
+	cfg["mode"] = "endless"
+	GameManager.start_run(cfg)
+
+func _toggle_synergies() -> void:
+	if syn_layer.visible:
+		syn_layer.visible = false
+		return
+	UI.clear(syn_list)
+	if game == null or game.player == null:
+		return
+	var upg: UpgradeSystem = game.player.upg
+	var shown := 0
+	for entry in upg.log:
+		var kind := String(entry.get("kind", ""))
+		var id := String(entry.get("id", ""))
+		var data: Dictionary = {}
+		match kind:
+			"perk": data = DB.perk(id)
+			"char_upgrade":
+				for up in DB.character(String(game.player.char_data.get("id", ""))).get("upgrades", []):
+					if String(up["id"]) == id:
+						data = up
+			"seal": data = DB.seal_by_id.get(id, {})
+			"specialization": data = DB.spec_by_id.get(id, {})
+			"synergy":
+				for syn in DB.synergies:
+					if String(syn["id"]) == id:
+						data = syn
+		if data.is_empty():
+			continue
+		var row := UI.label(syn_list, "› [%s] %s — %s" % [UI.kind_name(kind), String(data.get("name", id)), String(data.get("desc", ""))], 8, UI.kind_color(kind))
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.custom_minimum_size = Vector2(330, 0)
+		shown += 1
+	if shown == 0:
+		UI.label(syn_list, Loc.t("no_synergies"), 9, UI.DIM)
+	syn_layer.visible = true
+
+# ------------------------------------------------------------------ СОБЫТИЯ
+## Подтверждения о полученных перках не выводятся: по просьбе игрока
+## всплывающие надписи поверх игры убраны. Список взятого — по клавише Tab.
+func _on_upgrade_picked(_id: String, _kind: String) -> void:
+	pass
+
+func _on_notify(text: String) -> void:
+	if text == "":
+		return
+	var l := UI.label(toast_box, text, 9, UI.TEXT)
+	l.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.06, 1.0))
+	l.add_theme_constant_override("outline_size", 4)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(280, 0)
+	# Таймер — дочерний узел HUD: умирает вместе с ним, поэтому лямбда
+	# не может «выстрелить» в уже удалённую надпись после смены сцены.
+	var timer := Timer.new()
+	timer.one_shot = true
+	timer.wait_time = 3.0
+	timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(timer)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(l):
+			l.queue_free())
+	timer.timeout.connect(timer.queue_free)
+	timer.start()
+
+func _on_boss_spawned(boss_name_txt: String, hp: float, is_final: bool) -> void:
+	boss_box.visible = true
+	boss_name.text = ("ФИНАЛЬНЫЙ БОСС: " if is_final else "БОСС: ") + boss_name_txt
+	boss_fill.size = Vector2(280, 6)
+
+func _on_boss_defeated(_boss_name_txt: String) -> void:
+	boss_box.visible = false
+
+func _on_chest(kind: String) -> void:
+	_on_notify("%s %s" % [Loc.t("chest"), kind])
+
+func _unhandled_input(_event: InputEvent) -> void:
+	pass
+
+func _input(event: InputEvent) -> void:
+	if GameManager.cheat_open:
+		return
+	if _input_choice_hotkey(event):
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("pause"):
+		# Esc ставит бой на паузу в любой момент, кроме экранов выбора и конца забега
+		if not end_layer.visible and not choice_layer.visible:
+			toggle_pause()
+			get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("synergies"):
+		# список взятого доступен и на паузе, но не поверх экрана выбора
+		if not end_layer.visible and not choice_layer.visible:
+			_toggle_synergies()
+			get_viewport().set_input_as_handled()
+
+func update_combo(value: int) -> void:
+	if combo_lbl == null: return
+	combo_lbl.visible = value >= 2
+	combo_lbl.text = "×%d" % value if value >= 2 else ""
+	if value >= 20: combo_lbl.add_theme_color_override("font_color", Color("#8f3524"))
+	elif value >= 15: combo_lbl.add_theme_color_override("font_color", Color("#8f4a24"))
+	elif value >= 10: combo_lbl.add_theme_color_override("font_color", Color("#95805a"))
+	elif value >= 5: combo_lbl.add_theme_color_override("font_color", Color("#b8ac8b"))
+	else: combo_lbl.add_theme_color_override("font_color", Color("#928d80"))
+
+func update_boss_bar(hp: float, hp_max: float) -> void:
+	if boss_box == null:
+		return
+	boss_box.visible = hp > 0.0
+	var frac := clampf(hp / maxf(1.0, hp_max), 0.0, 1.0)
+	boss_fill.size = Vector2(280.0 * frac, 6)
+
+## Служебная проверка раскладки: возвращает прямоугольники всех подписей HUD
+## с учётом реальной ширины текста. Используется тестом SURW_HUD_TEST.
+func layout_report() -> Array:
+	var out: Array = []
+	if root == null:
+		return out
+	var font: Font = ThemeDB.fallback_font
+	for node in _all_children(root):
+		if node is Label:
+			var l: Label = node
+			if l.text.strip_edges() == "":
+				continue
+			var fs := l.get_theme_font_size("font_size")
+			var w := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var box: Vector2 = l.size
+			var pos: Vector2 = l.global_position
+			# учитываем выравнивание: проверяем реальные границы текста, а не весь Label
+			match l.horizontal_alignment:
+				HORIZONTAL_ALIGNMENT_RIGHT:
+					pos.x += maxf(0.0, box.x - w)
+				HORIZONTAL_ALIGNMENT_CENTER:
+					pos.x += maxf(0.0, (box.x - w) * 0.5)
+			out.append({"name": l.name + ":" + l.text.substr(0, 24), "rect": Rect2(pos, Vector2(w, float(fs) + 2.0))})
+		elif node is Panel:
+			var pn: Panel = node
+			out.append({"name": pn.name + ":panel", "rect": Rect2(pn.global_position, pn.size)})
+	return out
+
+func _all_children(node: Node) -> Array:
+	var out: Array = []
+	for child in node.get_children():
+		if child is Control and not (child as Control).visible:
+			continue
+		out.append(child)
+		out.append_array(_all_children(child))
+	return out
+
+## Контур текста: HUD больше не использует панели, поэтому надписи должны
+## читаться и на светлой земле, и на тёмных областях карты.
+func _apply_outlines(node: Node) -> void:
+	for child in node.get_children():
+		if child is Label:
+			var l: Label = child
+			l.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.06, 1.0))
+			l.add_theme_constant_override("outline_size", 4)
+		elif child is Panel:
+			continue
+		else:
+			_apply_outlines(child)

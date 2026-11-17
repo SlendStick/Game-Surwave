@@ -1,0 +1,248 @@
+{
+ "version": "1.4.16",
+ "note": "Манифест точек подключения. В 1.4.16 весь игровой визуал остаётся процедурным: узнаваемые силуэты, контуры, затенение и детали создаются из фигур. Будущие PNG можно положить по указанным путям без изменения игровой логики.",
+ "render": {
+  "base_resolution": [
+   640,
+   360
+  ],
+  "window": [
+   1280,
+   720
+  ],
+  "pixel_snap": true,
+  "texture_filter": "nearest"
+ },
+ "sprites": {
+  "size_px": 32,
+  "anims": [
+   "idle",
+   "walk",
+   "attack",
+   "hurt",
+   "death"
+  ],
+  "player_characters": [
+   {
+    "id": "aldar",
+    "file": "aldar.png",
+    "shape": "square",
+    "note": "маг тайн, фиолетовый"
+   },
+   {
+    "id": "gavan",
+    "file": "gavan.png",
+    "shape": "cross",
+    "note": "паладин, золотой"
+   },
+   {
+    "id": "morkana",
+    "file": "morkana.png",
+    "shape": "pentagon",
+    "note": "некромант, тёмно-зелёный"
+   },
+   {
+    "id": "korgash",
+    "file": "korgash.png",
+    "shape": "hex",
+    "note": "орк, красно-коричневый"
+   },
+   {
+    "id": "liel",
+    "file": "liel.png",
+    "shape": "triangle",
+    "note": "эльфийка, зелёный"
+   },
+   {
+    "id": "ten",
+    "file": "ten.png",
+    "shape": "diamond",
+    "note": "тень, чёрно-серый"
+   },
+   {
+    "id": "voltra",
+    "file": "voltra.png",
+    "shape": "rect",
+    "note": "изобретатель, жёлтый"
+   },
+   {
+    "id": "rain",
+    "file": "rain.png",
+    "shape": "rect",
+    "note": "снайпер, светло-оливковый"
+   },
+   {
+    "id": "ignis",
+    "file": "ignis.png",
+    "shape": "circle",
+    "note": "пиромант, оранжевый"
+   }
+  ],
+  "enemies": [
+   {
+    "id": "slime",
+    "file": "slime.png",
+    "shape": "blob"
+   },
+   {
+    "id": "slime_small",
+    "file": "slime_small.png",
+    "shape": "blob"
+   },
+   {
+    "id": "goblin_archer",
+    "file": "goblin_archer.png",
+    "shape": "triangle"
+   },
+   {
+    "id": "frozen_zombie",
+    "file": "frozen_zombie.png",
+    "shape": "rect"
+   },
+   {
+    "id": "bat",
+    "file": "bat.png",
+    "shape": "diamond"
+   },
+   {
+    "id": "skeleton_warrior",
+    "file": "skeleton_warrior.png",
+    "shape": "cross"
+   },
+   {
+    "id": "dark_mage",
+    "file": "dark_mage.png",
+    "shape": "pentagon"
+   },
+   {
+    "id": "werewolf",
+    "file": "werewolf.png",
+    "shape": "hex"
+   },
+   {
+    "id": "demon",
+    "file": "demon.png",
+    "shape": "inv_triangle"
+   },
+   {
+    "id": "fallen_angel",
+    "file": "fallen_angel.png",
+    "shape": "star"
+   },
+   {
+    "id": "miniboss",
+    "file": "mb.png",
+    "shape": "ring_hex"
+   },
+   {
+    "id": "boss_shemhaz",
+    "file": "boss_shemhaz.png",
+    "shape": "boss"
+   },
+   {
+    "id": "boss_satanail",
+    "file": "boss_satanail.png",
+    "shape": "boss"
+   },
+   {
+    "id": "elite_marker",
+    "file": "elite.png",
+    "shape": "ring",
+    "note": "оверлей поверх элиты"
+   }
+  ],
+  "projectiles": [
+   "bullet.png",
+   "pellet.png",
+   "arrow.png",
+   "orb.png",
+   "fireball.png",
+   "gas.png",
+   "enemy_bullet.png",
+   "boss_orb.png"
+  ],
+  "pickups": [
+   "xp_small.png",
+   "xp_big.png",
+   "gold.png",
+   "soul.png",
+   "heart.png",
+   "chest.png",
+   "item.png"
+  ],
+  "ui": [
+   "hud_ammo.png",
+   "hud_skill.png",
+   "card_frame.png",
+   "map_node.png",
+   "pentagram.png"
+  ],
+  "allies": [
+   "spirit.png",
+   "skeleton.png",
+   "holy_spear.png",
+   "dragonling.png",
+   "scythe.png",
+   "phoenix.png"
+  ],
+  "hazards": [
+   "fire_zone.png",
+   "poison_zone.png",
+   "ice_zone.png",
+   "void_zone.png"
+  ]
+ },
+ "audio": {
+  "note": "Звук в этой версии не создаётся. Игра уже обращается к AudioManager.play_sfx(id)/play_music(mood); файлы кладутся в assets/audio/<id>.ogg",
+  "sfx": [
+   "shot",
+   "shot_magic",
+   "shot_heavy",
+   "reload",
+   "hit",
+   "enemy_die",
+   "levelup",
+   "boss",
+   "sathan",
+   "pickup",
+   "hurt",
+   "dodge",
+   "skill",
+   "evolution",
+   "shemhaz_roar",
+   "shemhaz_explosion",
+   "satanail_megaphase_explosion",
+   "satanail_roar",
+   "critical_hit",
+   "ultimate_attack",
+   "boss_fall",
+   "boss_dissolve",
+   "boss_explosion",
+   "dodge_success",
+   "dodge_fail",
+   "counter_attack",
+   "final_blow",
+   "photo_shutter"
+  ],
+  "music_layers": {
+   "calm": "базовая тема",
+   "tense": "волны 2-3",
+   "boss": "босс",
+   "final": "САТАНАИЛ"
+  },
+  "music_stems": [
+   "base.ogg",
+   "drums.ogg",
+   "lead.ogg",
+   "boss.ogg"
+  ],
+  "boss_music_layers": {
+   "shemhaz_base_theme": "120 BPM, D minor",
+   "shemhaz_timpani_layer": "фаза 2+",
+   "shemhaz_choir_layer": "фаза 2+",
+   "shemhaz_guitar_layer": "фаза 3",
+   "shemhaz_bass_layer": "фаза 3",
+   "satanail_megaphase_theme": "180 BPM"
+  }
+ }
+}
