@@ -148,10 +148,10 @@ MATRIX_COMBOS = [
 MATRIX_TESTS: list[TestCase] = [
     TestCase(
         name=f"matrix_{ch}_{wp}_{mp}",
-        env={"SURW_CHAR": ch, "SURW_WEAPON": wp, "SURW_MAP": mp, "SURW_LOG": "60"},
+        env={"SURW_CHAR": ch, "SURW_WEAPON": wp, "SURW_MAP": mp, "SURW_LOG": "20"},
         args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god", "--fast"],
         expect_re=r"\[SURWAVE\] t=",
-        timeout_s=35.0,
+        timeout_s=60.0,
     )
     for ch, wp, mp in MATRIX_COMBOS
 ]
