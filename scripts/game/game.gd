@@ -2432,7 +2432,7 @@ func boss_phase_transition(boss_node: Node2D, new_phase: int, mega: bool) -> voi
 	print("[SURWAVE] boss_phase id=%s phase=%d mega=%s t=%.1f" % [String(boss_node.boss_def.get("id","")),new_phase,str(mega),elapsed])
 	if player != null:
 		player.iframes = maxf(player.iframes, 1.2)
-	for b in enemy_bullets:
+	for b in ebullets:
 		if b != null and b.active and b.global_position.distance_to(boss_node.global_position) < 160.0:
 			b.deactivate()
 	if not GameManager.setting("boss_fx", true): return
