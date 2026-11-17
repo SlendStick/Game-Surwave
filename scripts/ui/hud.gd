@@ -509,7 +509,7 @@ func _draw_skill_icon() -> void:
 func _draw_ammo_icon() -> void:
 	if ammo_icon == null:
 		return
-	var reloading := (game != null and game.player != null and game.player.reloading)
+	var reloading: bool = (game != null and game.player != null and bool(game.player.reloading))
 	var atex := Assets.icon("ui_ammo")
 	if atex != null:
 		ammo_icon.draw_texture_rect(atex, Rect2(0, 0, 10, 13), false, Color(1.5, 1.5, 1.5) if reloading else Color.WHITE)
