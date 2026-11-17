@@ -247,10 +247,12 @@ func _unlock_char(char_id: String) -> void:
 
 # ------------------------------------------------------------------ ПРОВЕРКИ ДОСТУПА
 func is_char_unlocked(id: String) -> bool:
+	if (meta.get("unlocked_chars", []) as Array).has(id):
+		return true
 	if id == "nox": return Progression.tree_level("mastery") >= 14 and bool(meta.get("sathan_defeated",false))
 	var req := {"ten":1,"voltra":4,"rain":8,"ignis":11}
 	if req.has(id): return Progression.tree_level("mastery") >= int(req[id])
-	return (meta.get("unlocked_chars", []) as Array).has(id)
+	return false
 
 func is_weapon_unlocked(id: String) -> bool:
 	return (meta.get("unlocked_weapons", []) as Array).has(id)
@@ -258,21 +260,25 @@ func is_weapon_unlocked(id: String) -> bool:
 func is_map_unlocked(id: String) -> bool:
 	if id == "void":
 		return false   # секретная карта не показывается в меню
+	if (meta.get("unlocked_maps", []) as Array).has(id):
+		return true
 	var req := {"rift":2,"bloodmoon":5,"chaos":6,"temple":9}
 	if req.has(id): return Progression.tree_level("mastery") >= int(req[id])
 	if id == "throne": return bool(meta.get("throne_unlocked",false))
-	return (meta.get("unlocked_maps", []) as Array).has(id)
+	return false
 
 func is_endless_unlocked() -> bool:
 	return Progression.tree_level("mastery") >= 12 or bool(meta.get("endless_unlocked", false))
 
-# ------------------------------------------------------------------ МАГАЗИНЫ
+# ------------------------------------------------------------------ ПОКУПКИ В МЕНЮ ВЫБОРА
 func buy_character(id: String) -> bool:
 	var ch := DB.character(id)
 	if ch.is_empty() or is_char_unlocked(id):
 		return false
+	if String(ch.get("unlock", "")) != "":
+		return false
 	var price := int(ch.get("price", 0))
-	if int(meta["souls"]) < price:
+	if price <= 0 or int(meta["souls"]) < price:
 		return false
 	meta["souls"] = int(meta["souls"]) - price
 	_unlock_char(id)
@@ -286,10 +292,24 @@ func buy_weapon(id: String) -> bool:
 	if String(w.get("unlock", "")) != "":
 		return false      # открывается особым условием
 	var price := int(w.get("price", 0))
-	if int(meta["souls"]) < price:
+	if price <= 0 or int(meta["souls"]) < price:
 		return false
 	meta["souls"] = int(meta["souls"]) - price
 	_unlock_weapon(id)
+	SaveManager.save_game()
+	return true
+
+func buy_map(id: String) -> bool:
+	var m := DB.map(id)
+	if m.is_empty() or is_map_unlocked(id):
+		return false
+	if String(m.get("unlock", "")) == "secret" or bool(m.get("secret", false)):
+		return false
+	var price := int(m.get("price", 0))
+	if price <= 0 or int(meta["souls"]) < price:
+		return false
+	meta["souls"] = int(meta["souls"]) - price
+	_unlock_map(id)
 	SaveManager.save_game()
 	return true
 

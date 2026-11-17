@@ -26,8 +26,10 @@ const SHADOW := Color(0, 0, 0, 0.78)
 
 const RADIUS := 0
 const FONT_NAMES := ["Georgia", "Times New Roman", "DejaVu Serif", "Liberation Serif", "Noto Serif", "serif"]
+const SANS_NAMES := ["DejaVu Sans", "Liberation Sans", "Noto Sans", "Segoe UI", "Arial", "sans-serif"]
 
 static var _serif: Font = null
+static var _sans: Font = null
 
 ## Засечный шрифт (Georgia / Times / DejaVu Serif) с откатом на шрифт движка.
 static func font() -> Font:
@@ -37,6 +39,15 @@ static func font() -> Font:
 		f.allow_system_fallback = true
 		_serif = f
 	return _serif
+
+## Чёткий рубленый шрифт без засечек — для мелких карточек и дерева улучшений.
+static func crisp_font() -> Font:
+	if _sans == null:
+		var f := SystemFont.new()
+		f.font_names = PackedStringArray(SANS_NAMES)
+		f.allow_system_fallback = true
+		_sans = f
+	return _sans
 
 static func _apply_font(c: Control, size: int) -> void:
 	if font() != null:
@@ -103,6 +114,21 @@ static func label(parent: Node, text: String, size: int = 10, color: Color = TEX
 	l.add_theme_constant_override("shadow_offset_y", 1)
 	l.add_theme_constant_override("outline_size", 2)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
+	l.position = pos
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(l)
+	return l
+
+## Чёткая подпись без размытого контура для компактных карточек и дерева перков.
+static func crisp_label(parent: Node, text: String, size: int = 8, color: Color = TEXT, pos: Vector2 = Vector2.ZERO) -> Label:
+	var l := Label.new()
+	l.text = text
+	if crisp_font() != null:
+		l.add_theme_font_override("font", crisp_font())
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_constant_override("outline_size", 1)
+	l.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.04, 0.9))
 	l.position = pos
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(l)

@@ -57,7 +57,7 @@ func tick(delta: float) -> void:
 	var range_pickup := float(game.player.S.pickup) * (2.5 if kind == "soul" else 1.0)
 	if dist < range_pickup:
 		magnet = true
-	elif kind == "xp" and dist < range_pickup * 2.4:
+	elif kind == "xp" and dist < range_pickup * 1.45:
 		# Мягкое дальнее притяжение: опыт не остаётся лежать на карте,
 		# поэтому даже при спокойном темпе старта прокачка идёт ровно.
 		global_position += to_player.normalized() * 62.0 * delta

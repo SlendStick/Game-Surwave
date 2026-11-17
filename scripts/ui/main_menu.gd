@@ -82,9 +82,8 @@ func _build() -> void:
 	play.pressed.connect(func() -> void:
 		AudioManager.play_sfx("ui")
 		GameManager.goto_select())
-	var y := 40
+	var y := 44
 	for item in [
-		[Loc.t("shops"), "shops"],
 		[Loc.t("album"), "album"],
 		["ДРЕВО ПРОГРЕССИИ", "progression"],
 		["ЗАДАНИЯ И СЕЗОН", "quests"],
@@ -96,9 +95,9 @@ func _build() -> void:
 		btn.position = Vector2(0, y)
 		var key := String(item[1])
 		btn.pressed.connect(func() -> void: _open_overlay(key))
-		y += 24
+		y += 27
 	var quit := UI.button(menu, Loc.t("quit"), 10, Vector2(252, 24))
-	quit.position = Vector2(0, y + 2)
+	quit.position = Vector2(0, y + 4)
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
 	# --- нижняя панель со статистикой

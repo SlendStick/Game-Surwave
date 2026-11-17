@@ -102,7 +102,8 @@
    "scale": "hijaz",
    "tempo": 88,
    "wave": "oud"
-  }
+  },
+  "price": 0
  },
  {
   "id": "tundra",
@@ -200,7 +201,8 @@
    "scale": "minor",
    "tempo": 82,
    "wave": "ice"
-  }
+  },
+  "price": 600
  },
  {
   "id": "peak",
@@ -303,7 +305,8 @@
    "scale": "phrygian",
    "tempo": 96,
    "wave": "lava"
-  }
+  },
+  "price": 900
  },
  {
   "id": "abyss",
@@ -406,7 +409,8 @@
    "scale": "dorian",
    "tempo": 78,
    "wave": "crystal"
-  }
+  },
+  "price": 1200
  },
  {
   "id": "forest",
@@ -516,7 +520,8 @@
    "scale": "dorian",
    "tempo": 90,
    "wave": "flute"
-  }
+  },
+  "price": 1500
  },
  {
   "id": "rift",
@@ -626,7 +631,8 @@
    "scale": "locrian",
    "tempo": 100,
    "wave": "noise"
-  }
+  },
+  "price": 1800
  },
  {
   "id": "graveyard",
@@ -727,7 +733,8 @@
    "scale": "minor",
    "tempo": 76,
    "wave": "organ"
-  }
+  },
+  "price": 2200
  },
  {
   "id": "hive",
@@ -838,7 +845,8 @@
    "scale": "phrygian",
    "tempo": 84,
    "wave": "swarm"
-  }
+  },
+  "price": 2600
  },
  {
   "id": "bloodmoon",
@@ -951,7 +959,8 @@
    "scale": "phrygian",
    "tempo": 108,
    "wave": "choir"
-  }
+  },
+  "price": 3000
  },
  {
   "id": "chaos",
@@ -1045,7 +1054,8 @@
    "scale": "whole_tone",
    "tempo": 112,
    "wave": "glitch"
-  }
+  },
+  "price": 3500
  },
  {
   "id": "temple",
@@ -1147,7 +1157,8 @@
    "scale": "major",
    "tempo": 80,
    "wave": "organ"
-  }
+  },
+  "price": 4200
  },
  {
   "id": "throne",
@@ -1243,7 +1254,8 @@
    "scale": "harmonic",
    "tempo": 120,
    "wave": "brass"
-  }
+  },
+  "price": 5500
  },
  {
   "id": "void",
@@ -1336,6 +1348,7 @@
    "scale": "locrian",
    "tempo": 130,
    "wave": "dissonant"
-  }
+  },
+  "price": 0
  }
 ]

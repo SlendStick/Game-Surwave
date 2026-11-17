@@ -93,17 +93,17 @@ func _build() -> void:
 		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(seg)
 
-	# --- слева сверху: сердца здоровья (TextureRect-слоты без draw_texture_rect)
+	# --- слева сверху: сердца здоровья (увеличенные рубиновые сердца)
 	hearts = Control.new()
-	hearts.position = Vector2(6, 24)
-	hearts.size = Vector2(178, 18)
+	hearts.position = Vector2(6, 22)
+	hearts.size = Vector2(216, 22)
 	hearts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hearts)
-	hp_lbl = UI.label(root, "", 9, UI.TEXT, Vector2(188, 26))
+	hp_lbl = UI.label(root, "", 10, UI.TEXT, Vector2(226, 26))
 
 	# --- слева под сердцами: патроны в магазине и иконка скилла
 	ammo_icon = TextureRect.new()
-	ammo_icon.position = Vector2(6, 42)
+	ammo_icon.position = Vector2(6, 47)
 	ammo_icon.size = Vector2(12, 16)
 	ammo_icon.texture = Assets.icon("ui_ammo")
 	ammo_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -111,10 +111,10 @@ func _build() -> void:
 	ammo_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ammo_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ammo_icon)
-	ammo_lbl = UI.label(root, "0/0", 13, UI.GOLD, Vector2(22, 43))
+	ammo_lbl = UI.label(root, "0/0", 13, UI.GOLD, Vector2(22, 48))
 
 	skill_icon = Control.new()
-	skill_icon.position = Vector2(86, 41)
+	skill_icon.position = Vector2(86, 46)
 	skill_icon.size = Vector2(18, 18)
 	skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(skill_icon)
@@ -149,26 +149,26 @@ func _build() -> void:
 	combo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	combo_lbl.visible = false
 
-	# --- босс
+	# --- босс (строго по центру сверху, не перекрывает арену и спрайт босса)
 	boss_box = Control.new()
-	boss_box.position = Vector2(170, 92)
+	boss_box.position = Vector2(170, 34)
 	boss_box.size = Vector2(300, 20)
 	boss_box.visible = false
 	boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(boss_box)
-	boss_name = UI.label(boss_box, "", 9, Color("#c0a49a"), Vector2(0, 0))
-	boss_name.size = Vector2(300, 10)
+	boss_name = UI.label(boss_box, "", 9, Color("#e4c9bd"), Vector2(0, 0))
+	boss_name.size = Vector2(300, 11)
 	boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var boss_back := ColorRect.new()
 	boss_back.color = Color("#150e0d")
-	boss_back.position = Vector2(0, 11)
-	boss_back.size = Vector2(300, 6)
+	boss_back.position = Vector2(0, 12)
+	boss_back.size = Vector2(300, 7)
 	boss_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	boss_box.add_child(boss_back)
 	boss_fill = ColorRect.new()
-	boss_fill.color = Color("#8f2f28")
-	boss_fill.position = Vector2(0, 11)
-	boss_fill.size = Vector2(300, 6)
+	boss_fill.color = Color("#9f312a")
+	boss_fill.position = Vector2(0, 12)
+	boss_fill.size = Vector2(300, 7)
 	boss_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	boss_box.add_child(boss_fill)
 
@@ -179,7 +179,7 @@ func _build() -> void:
 
 	# --- тосты по центру сверху
 	toast_box = VBoxContainer.new()
-	toast_box.position = Vector2(170, 112)
+	toast_box.position = Vector2(170, 58)
 	toast_box.size = Vector2(300, 60)
 	toast_box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -353,7 +353,7 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 
 		# --- верх карточки: иллюстрация + #N + тип + название
 		var illus_tex := _card_illustration(card)
-		var illus_h := 54.0 if cards.size() <= 4 else 48.0
+		var illus_h := 48.0 if cards.size() <= 4 else 42.0
 		var illus_frame := UI.panel(v, Rect2(0, 0, card_w - 12, illus_h), Color("#0d0e13"), Color(accent.r, accent.g, accent.b, 0.75))
 		illus_frame.custom_minimum_size = Vector2(card_w - 12, illus_h)
 		illus_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -374,30 +374,32 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 		var hdr := UI.hbox(v, 4)
 		hdr.custom_minimum_size = Vector2(card_w - 12, 13)
 		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var num := UI.label(hdr, "#%d %s" % [i + 1, UI.kind_name(kind).to_upper()], 7, accent)
+		var num := UI.crisp_label(hdr, "#%d %s" % [i + 1, UI.kind_name(kind).to_upper()], 8, accent)
 		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		num.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var meta_short := _card_tier_badge(card)
 		if meta_short != "":
-			var mbadge := UI.label(hdr, meta_short, 7, UI.GOLD)
+			var mbadge := UI.crisp_label(hdr, meta_short, 8, UI.GOLD_BRIGHT)
 			mbadge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			mbadge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-		var title_lbl := UI.label(v, String(data.get("name", cid)), 10, UI.TEXT)
+		var title_lbl := UI.crisp_label(v, String(data.get("name", cid)), 10, Color("#f2ece0"))
 		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		title_lbl.custom_minimum_size = Vector2(card_w - 12, 24)
+		title_lbl.custom_minimum_size = Vector2(card_w - 12, 22)
 		title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 		var div1 := ColorRect.new()
-		div1.color = Color(accent.r, accent.g, accent.b, 0.35)
+		div1.color = Color(accent.r, accent.g, accent.b, 0.45)
 		div1.custom_minimum_size = Vector2(card_w - 12, 1)
 		div1.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(div1)
 
-		# --- низ карточки: описание + ветвь улучшений
-		var desc_lbl := UI.label(v, String(data.get("desc", "")), 8, UI.DIM)
+		# --- низ карточки: чёткое описание + ветвь улучшений
+		var desc_lbl := UI.crisp_label(v, String(data.get("desc", "")), 8, Color("#cfc9bc"))
 		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc_lbl.custom_minimum_size = Vector2(card_w - 12, 54)
+		desc_lbl.custom_minimum_size = Vector2(card_w - 12, 34)
+		desc_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		desc_lbl.clip_text = true
 		desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 		_build_card_branch(v, card, card_w - 12, accent)
@@ -431,10 +433,10 @@ func _card_tier_badge(card: Dictionary) -> String:
 		return "×%d" % int(upg.spec_mult)
 	return ""
 
-## Визуальная ветвь улучшений в нижней половине карточки (T1 -> T2a / T2b -> T3).
+## Читаемая визуальная ветвь улучшений в нижней половине карточки (T1 -> T2a / T2b -> T3).
 func _build_card_branch(parent: Control, card: Dictionary, width: float, accent: Color) -> void:
-	var wrap := UI.panel(parent, Rect2(0, 0, width, 118), Color("#0c0d12"), Color(0.28, 0.29, 0.34, 0.75))
-	wrap.custom_minimum_size = Vector2(width, 118)
+	var wrap := UI.panel(parent, Rect2(0, 0, width, 134), Color("#0b0c11"), Color(0.32, 0.34, 0.40, 0.85))
+	wrap.custom_minimum_size = Vector2(width, 134)
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var kind := String(card.get("kind", "perk"))
 	var data: Dictionary = card.get("data", {})
@@ -446,70 +448,66 @@ func _build_card_branch(parent: Control, card: Dictionary, width: float, accent:
 		var tree: Dictionary = DB.tree_by_id.get(tree_id, {})
 		var nodes: Array = tree.get("nodes", [])
 		var tname := String(tree.get("name", tree_id))
-		var hdr := UI.label(wrap, "ВЕТВЬ: " + tname.to_upper(), 7, UI.GOLD, Vector2(5, 4))
-		hdr.size = Vector2(width - 10, 10)
+		var hdr := UI.crisp_label(wrap, "ВЕТВЬ: " + tname.to_upper(), 8, UI.GOLD_BRIGHT, Vector2(5, 4))
+		hdr.size = Vector2(width - 10, 12)
 		hdr.clip_text = true
 		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if nodes.size() >= 4:
-			var n0 := String(nodes[0])
-			var n1 := String(nodes[1])
-			var n2 := String(nodes[2])
-			var n3 := String(nodes[3])
 			var graph := Control.new()
-			graph.position = Vector2(4, 16)
-			graph.size = Vector2(width - 8, 98)
+			graph.position = Vector2(4, 18)
+			graph.size = Vector2(width - 8, 112)
 			graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			wrap.add_child(graph)
 			var gw := width - 8.0
-			var box_w := clampf(gw * 0.46, 48.0, 78.0)
-			var box_h := 22.0
-			var p0 := Vector2((gw - box_w) * 0.5, 2.0)
-			var p1 := Vector2(2.0, 38.0)
-			var p2 := Vector2(gw - box_w - 2.0, 38.0)
-			var p3 := Vector2((gw - box_w) * 0.5, 74.0)
+			var box_h := 23.0
+			var rows := [
+				{"id": String(nodes[0]), "tier": "T1", "x": 2.0, "y": 2.0, "w": gw - 4.0},
+				{"id": String(nodes[1]), "tier": "T2", "x": 12.0, "y": 29.0, "w": gw - 14.0},
+				{"id": String(nodes[2]), "tier": "T2", "x": 12.0, "y": 56.0, "w": gw - 14.0},
+				{"id": String(nodes[3]), "tier": "T3", "x": 22.0, "y": 83.0, "w": gw - 24.0},
+			]
 			graph.draw.connect(func() -> void:
-				var line_col := Color(accent.r, accent.g, accent.b, 0.55)
-				var c0 := p0 + Vector2(box_w * 0.5, box_h)
-				var c1 := p1 + Vector2(box_w * 0.5, 0.0)
-				var c2 := p2 + Vector2(box_w * 0.5, 0.0)
-				var b1 := p1 + Vector2(box_w * 0.5, box_h)
-				var b2 := p2 + Vector2(box_w * 0.5, box_h)
-				var c3 := p3 + Vector2(box_w * 0.5, 0.0)
-				graph.draw_line(c0, c1, line_col, 1.5)
-				graph.draw_line(c0, c2, line_col, 1.5)
-				graph.draw_line(b1, c3, line_col, 1.5)
-				graph.draw_line(b2, c3, line_col, 1.5))
-			var pairs := [[n0, p0], [n1, p1], [n2, p2], [n3, p3]]
-			for pr in pairs:
-				var nid := String(pr[0])
-				var npos: Vector2 = pr[1]
+				var line_col := Color(accent.r, accent.g, accent.b, 0.72)
+				# Вертикальная ветка от T1 к T2a/T2b и далее к T3
+				graph.draw_line(Vector2(6.0, 25.0), Vector2(6.0, 67.5), line_col, 1.5)
+				graph.draw_line(Vector2(6.0, 40.5), Vector2(12.0, 40.5), line_col, 1.5)
+				graph.draw_line(Vector2(6.0, 67.5), Vector2(12.0, 67.5), line_col, 1.5)
+				graph.draw_line(Vector2(16.0, 79.0), Vector2(16.0, 94.5), line_col, 1.5)
+				graph.draw_line(Vector2(16.0, 94.5), Vector2(22.0, 94.5), line_col, 1.5))
+			for row_d in rows:
+				var nid := String(row_d["id"])
+				var rx := float(row_d["x"])
+				var ry := float(row_d["y"])
+				var rw := float(row_d["w"])
 				var pdata: Dictionary = DB.perk(nid)
 				var taken_cnt := int(upg.taken.get(nid, 0)) if upg != null else 0
 				var is_cur := nid == cid
-				var bg := Color("#1f1b10") if is_cur else (Color("#121f16") if taken_cnt > 0 else Color("#121319"))
-				var bd := UI.GOLD if is_cur else (UI.GREEN if taken_cnt > 0 else Color(0.28, 0.30, 0.36))
-				var nb := UI.panel(graph, Rect2(npos, Vector2(box_w, box_h)), bg, bd)
+				var bg := Color("#2b2312") if is_cur else (Color("#132619") if taken_cnt > 0 else Color("#12141b"))
+				var bd := UI.GOLD_BRIGHT if is_cur else (Color("#79b86c") if taken_cnt > 0 else Color("#3b3f4c"))
+				var nb := Panel.new()
+				nb.position = Vector2(rx, ry)
+				nb.size = Vector2(rw, box_h)
 				nb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				nb.add_theme_stylebox_override("panel", UI.style(bg, bd, 1, 0))
+				graph.add_child(nb)
 				var short_name := String(pdata.get("name", nid))
-				var tc := UI.GOLD if is_cur else (UI.GREEN if taken_cnt > 0 else UI.DIM)
-				var nl := UI.label(nb, short_name, 6, tc, Vector2(3, 2))
-				nl.size = Vector2(box_w - 6, box_h - 4)
-				nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				var tc := Color("#ffe599") if is_cur else (Color("#9ae08c") if taken_cnt > 0 else Color("#dcd7cb"))
+				var nl := UI.crisp_label(nb, "%s · %s" % [String(row_d["tier"]), short_name], 8, tc, Vector2(4, 3))
+				nl.size = Vector2(rw - 8, box_h - 6)
 				nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-				nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				nl.clip_text = true
 				nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return
 
 	# Для синергий, печатей, эволюций, спецов и апгрейдов
-	var hdr2 := UI.label(wrap, "ЭФФЕКТ И УСЛОВИЯ", 7, UI.GOLD, Vector2(6, 5))
+	var hdr2 := UI.crisp_label(wrap, "ЭФФЕКТ И УСЛОВИЯ", 8, UI.GOLD_BRIGHT, Vector2(6, 5))
 	hdr2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body_txt := _card_meta(card)
 	var req_txt := _card_requires(data)
 	if req_txt != "":
 		body_txt += "\n\n" + req_txt
-	var blbl := UI.label(wrap, body_txt, 7, UI.TEXT, Vector2(6, 20))
-	blbl.size = Vector2(width - 12, 92)
+	var blbl := UI.crisp_label(wrap, body_txt, 8, Color("#e4dfd3"), Vector2(6, 22))
+	blbl.size = Vector2(width - 12, 106)
 	blbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	blbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -640,6 +638,16 @@ func _refresh(delta: float) -> void:
 	else:
 		timer_lbl.text = UI.fmt_time(maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed)))
 	fps_lbl.text = "%s %d" % [Loc.t("fps"), Engine.get_frames_per_second()]
+	if boss_box != null:
+		var has_live_boss := game.boss_enemy != null and is_instance_valid(game.boss_enemy) and game.boss_enemy.active and not game.boss_enemy.dead and game.boss_enemy.hp > 0.0
+		boss_box.visible = has_live_boss
+		if has_live_boss:
+			var b: Enemy = game.boss_enemy
+			var bname := String(b.boss_def.get("name", "БОСС"))
+			var ph_lbl := " · САТАН" if game.megaphase else (" · ФАЗА %d" % (b.phase + 1))
+			boss_name.text = ("ФИНАЛЬНЫЙ БОСС: " if b.is_final else "БОСС: ") + bname + ph_lbl
+			var bfrac := clampf(b.hp / maxf(1.0, b.max_hp), 0.0, 1.0)
+			boss_fill.size = Vector2(300.0 * bfrac, 7)
 
 ## Дуга восстановления способности поверх пиксель-арт иконки.
 func _draw_skill_ring() -> void:
@@ -655,13 +663,13 @@ func _draw_skill_ring() -> void:
 	else:
 		skill_ring.draw_arc(c, 7.6, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 1.8)
 
-## Сердца здоровья: пиксель-арт рубиновые сердца через TextureRect.
+## Сердца здоровья: крупные пиксель-арт рубиновые сердца через TextureRect.
 func _sync_hearts(pl: Player) -> void:
 	if hearts == null or pl == null:
 		return
 	var total: int = clampi(pl.max_hp, 1, 20)
-	var step := minf(16.0, 176.0 / float(total))
-	var sz := minf(14.0, step - 1.0)
+	var sz := clampf(minf(20.0, 208.0 / float(total) - 1.5), 11.0, 20.0)
+	var step := sz + 2.0
 	var full_t := Assets.icon("ui_heart_full")
 	var empty_t := Assets.icon("ui_heart_empty")
 	while _heart_slots.size() < total:
@@ -909,9 +917,12 @@ func _on_notify(text: String) -> void:
 	timer.start()
 
 func _on_boss_spawned(boss_name_txt: String, hp: float, is_final: bool) -> void:
-	boss_box.visible = true
-	boss_name.text = ("ФИНАЛЬНЫЙ БОСС: " if is_final else "БОСС: ") + boss_name_txt
-	boss_fill.size = Vector2(280, 6)
+	if game == null or game.boss_enemy == null or not is_instance_valid(game.boss_enemy) or not game.boss_enemy.active or game.boss_enemy.dead:
+		boss_box.visible = false
+		return
+	boss_box.visible = hp > 0.0
+	boss_name.text = ("ФИНАЛЬНЫЙ БОСС: " if is_final else "БОСС: ") + boss_name_txt + " · ФАЗА 1"
+	boss_fill.size = Vector2(300, 7)
 
 func _on_boss_defeated(_boss_name_txt: String) -> void:
 	boss_box.visible = false
@@ -952,9 +963,12 @@ func update_combo(value: int) -> void:
 func update_boss_bar(hp: float, hp_max: float) -> void:
 	if boss_box == null:
 		return
-	boss_box.visible = hp > 0.0
+	var has_live_boss := game != null and game.boss_enemy != null and is_instance_valid(game.boss_enemy) and game.boss_enemy.active and not game.boss_enemy.dead
+	boss_box.visible = has_live_boss and hp > 0.0
+	if not boss_box.visible:
+		return
 	var frac := clampf(hp / maxf(1.0, hp_max), 0.0, 1.0)
-	boss_fill.size = Vector2(280.0 * frac, 6)
+	boss_fill.size = Vector2(300.0 * frac, 7)
 
 ## Служебная проверка раскладки: возвращает прямоугольники всех подписей HUD
 ## с учётом реальной ширины текста. Используется тестом SURW_HUD_TEST.

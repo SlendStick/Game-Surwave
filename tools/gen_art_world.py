@@ -297,17 +297,20 @@ def generate_ui_and_fx() -> int:
     cv.save(OUT / "fx_ring.png")
     count += 1
 
-    # ui_heart_full.png & ui_heart_empty.png (16x16)
+    # ui_heart_full.png & ui_heart_empty.png (18x18 bold ruby hearts)
     for full in (True, False):
-        cv = Canvas(16, 16)
+        cv = Canvas(18, 18)
         col = c("crimson") if full else c("slate_vd")
+        shade = c("blood_dk") if full else mul(c("slate_vd"), 0.72)
         hi = c("scarlet") if full else c("slate_dk")
-        cv.ellipse(5.5, 6, 3.3, 3.0, col)
-        cv.ellipse(10.5, 6, 3.3, 3.0, col)
-        cv.poly([(3, 7), (13, 7), (8, 13)], col)
-        cv.px(5, 5, hi)
+        cv.ellipse(5.5, 6.2, 4.1, 3.8, col)
+        cv.ellipse(12.5, 6.2, 4.1, 3.8, col)
+        cv.poly([(2, 7.5), (16, 7.5), (9, 15.5)], col)
+        cv.poly([(11, 6.5), (15.5, 8.0), (9, 15.0), (10, 10.5)], shade)
+        cv.ellipse(5.2, 5.2, 1.5, 1.2, hi)
         if full:
-            cv.px(4, 5, c("cream"))
+            cv.px(4, 4, c("cream"))
+            cv.px(5, 4, c("cream"))
         cv.outline(c("black"))
         cv.save(OUT / ("ui_heart_full.png" if full else "ui_heart_empty.png"))
         count += 1

@@ -316,9 +316,20 @@ func _update_vitals() -> void:
 	if not above:
 		return
 	var total_hp := clampi(max_hp, 1, 12)
+	var h_full := Assets.icon("ui_heart_full")
+	var h_empty := Assets.icon("ui_heart_empty")
 	while hp_marks.size() < total_hp:
-		var mark: Sprite2D = Gfx.square(self, Vector2(3.0, 3.0), Color("#e0524a"))
+		var mark := Sprite2D.new()
+		mark.centered = true
+		mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		mark.z_index = 3
+		if h_full != null:
+			mark.texture = h_full
+			mark.scale = Vector2(0.5, 0.5)
+		else:
+			mark.texture = Gfx.white()
+			mark.scale = Vector2(3.0, 3.0)
+		add_child(mark)
 		hp_marks.append(mark)
 	var hp_now := clampi(hp, 0, total_hp)
 	for i in hp_marks.size():
@@ -326,8 +337,12 @@ func _update_vitals() -> void:
 		mark.visible = i < total_hp
 		if i >= total_hp:
 			continue
-		mark.position = Vector2((float(i) - (float(total_hp) - 1.0) * 0.5) * 4.2, -24.0)
-		mark.modulate = Color("#e0524a") if i < hp_now else Color("#3a3a46")
+		mark.position = Vector2((float(i) - (float(total_hp) - 1.0) * 0.5) * 9.5, -26.0)
+		if h_full != null and h_empty != null:
+			mark.texture = h_full if i < hp_now else h_empty
+			mark.modulate = Color.WHITE
+		else:
+			mark.modulate = Color("#e0524a") if i < hp_now else Color("#3a3a46")
 	var total := clampi(int(S.mag), 0, 16)
 	while ammo_pips.size() < total:
 		var pip: Sprite2D = Gfx.square(self, Vector2(2.0, 3.0), Color(1.0, 0.86, 0.32))

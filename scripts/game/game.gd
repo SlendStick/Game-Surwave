@@ -1900,7 +1900,6 @@ func spawn_miniboss(tier: int) -> void:
 	var hp := float(mb.get("hp", 300)) * (1.0 + 0.15 * minf(float(tier), 3.0)) * (1.0 + float(diff_mods.get("boss_hp", 0.0)) * 0.5)
 	var enemy := spawn_enemy(String(mb.get("id", "")), _spawn_position(), {"hp_mult": hp / maxf(1.0, float(mb.get("hp", 1))), "dmg_mult": 1.0 + float(diff_mods.get("boss_dmg", 0.0))})
 	if enemy != null:
-		EventBus.boss_spawned.emit(String(mb.get("name", "Мини-босс")), enemy.max_hp, false)
 		notify("%s: %s" % [Loc.t("miniboss"), String(mb.get("name", ""))])
 		print("[SURWAVE] miniboss id=%s hp=%.0f t=%.0f" % [String(mb.get("id", "")), hp, elapsed])
 		AudioManager.play_sfx("boss", 1.3)
@@ -2431,6 +2430,11 @@ func shake(amount: float) -> void:
 
 func boss_phase_transition(boss_node: Node2D, new_phase: int, mega: bool) -> void:
 	print("[SURWAVE] boss_phase id=%s phase=%d mega=%s t=%.1f" % [String(boss_node.boss_def.get("id","")),new_phase,str(mega),elapsed])
+	if player != null:
+		player.iframes = maxf(player.iframes, 1.2)
+	for b in enemy_bullets:
+		if b != null and b.active and b.global_position.distance_to(boss_node.global_position) < 160.0:
+			b.deactivate()
 	if not GameManager.setting("boss_fx", true): return
 	boss_focus = 3.0
 	camera_zoom_target = 1.65 if mega else (1.45 if new_phase == 2 else 1.6)
