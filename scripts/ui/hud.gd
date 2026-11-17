@@ -19,8 +19,11 @@ var fps_lbl: Label
 var perks_lbl: Label
 var xp_lbl: Label
 var hearts: Control
-var ammo_icon: Control
+var _heart_slots: Array = []
+var ammo_icon: TextureRect
 var skill_icon: Control
+var skill_tex: TextureRect
+var skill_ring: Control
 var combo_lbl: Label
 var weather_lbl: Label
 var boss_box: Control
@@ -90,29 +93,46 @@ func _build() -> void:
 		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(seg)
 
-	# --- слева сверху: сердца здоровья
+	# --- слева сверху: сердца здоровья (TextureRect-слоты без draw_texture_rect)
 	hearts = Control.new()
 	hearts.position = Vector2(6, 24)
 	hearts.size = Vector2(178, 18)
 	hearts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hearts)
-	hearts.draw.connect(_draw_hearts)
 	hp_lbl = UI.label(root, "", 9, UI.TEXT, Vector2(188, 26))
 
-	# --- слева под сердцами: патроны в магазине и размер магазина
-	ammo_icon = Control.new()
+	# --- слева под сердцами: патроны в магазине и иконка скилла
+	ammo_icon = TextureRect.new()
 	ammo_icon.position = Vector2(6, 42)
 	ammo_icon.size = Vector2(12, 16)
+	ammo_icon.texture = Assets.icon("ui_ammo")
+	ammo_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	ammo_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ammo_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	ammo_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ammo_icon)
-	ammo_icon.draw.connect(_draw_ammo_icon)
 	ammo_lbl = UI.label(root, "0/0", 13, UI.GOLD, Vector2(22, 43))
+
 	skill_icon = Control.new()
 	skill_icon.position = Vector2(86, 41)
 	skill_icon.size = Vector2(18, 18)
 	skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(skill_icon)
-	skill_icon.draw.connect(_draw_skill_icon)
+	skill_tex = TextureRect.new()
+	skill_tex.position = Vector2(1, 1)
+	skill_tex.size = Vector2(16, 16)
+	skill_tex.texture = Assets.icon("ui_skill_ready")
+	skill_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	skill_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	skill_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	skill_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skill_icon.add_child(skill_tex)
+	skill_ring = Control.new()
+	skill_ring.position = Vector2.ZERO
+	skill_ring.size = Vector2(18, 18)
+	skill_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skill_icon.add_child(skill_ring)
+	skill_ring.draw.connect(_draw_skill_ring)
 
 	# --- справа сверху: оставшееся время и подпись режима
 	timer_lbl = UI.label(root, "30:00", 20, UI.TEXT, Vector2(462, 12))
@@ -262,7 +282,7 @@ func _build_pause_layer() -> void:
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
 	# --- подсказка внизу
-	var foot := UI.label(pause_layer, "Пробел — автоприцел · R — перезарядка · ЛКМ — огонь", 7, UI.DIM, Vector2(0, 312))
+	var foot := UI.label(pause_layer, "Пробел — автоприцел · R — перезарядка · ЛКМ — огонь · F12 / P — фоторежим", 7, UI.DIM, Vector2(0, 312))
 	foot.size = Vector2(640, 10)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -326,6 +346,7 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 		v.offset_bottom = -6
 		# номер + иконка предмета/перка
 		var hdr := UI.hbox(v, 4)
+		hdr.custom_minimum_size = Vector2(card_w - 14, 18)
 		hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var ctex := _card_icon(card)
 		if ctex != null:
@@ -338,11 +359,16 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 			ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hdr.add_child(ico)
 		var hdr_txt := UI.vbox(hdr, 0)
+		hdr_txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hdr_txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var num := UI.label(hdr_txt, "%d" % (i + 1), 8, accent)
+		var num := UI.label(hdr_txt, "#%d" % (i + 1), 8, accent)
 		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var badge := UI.label(hdr_txt, UI.kind_name(kind).to_upper(), 7, accent)
-		badge.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var kind_txt := UI.kind_name(kind).to_upper()
+		var badge_fs := 6 if kind_txt.length() > 10 else 7
+		var badge := UI.label(hdr_txt, kind_txt, badge_fs, accent)
+		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var title_lbl := UI.label(v, String(data.get("name", card.get("id", ""))), 10, UI.TEXT)
 		title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var meta_txt := _card_meta(card)
@@ -465,8 +491,7 @@ func _refresh(delta: float) -> void:
 	if int(_last_hp) != p.hp or int(_last_max_hp) != p.max_hp:
 		_last_hp = p.hp
 		_last_max_hp = p.max_hp
-		if hearts != null:
-			hearts.queue_redraw()
+		_sync_hearts(p)
 	hp_lbl.text = "%d/%d" % [maxi(p.hp, 0), p.max_hp]
 	if p.shield_charges > 0:
 		hp_lbl.text += " ★"
@@ -474,9 +499,13 @@ func _refresh(delta: float) -> void:
 	ammo_lbl.text = "%d/%d" % [p.mag, int(p.S.mag)]
 	ammo_lbl.add_theme_color_override("font_color", Color("#ffffff") if p.reloading else UI.GOLD)
 	if ammo_icon != null:
-		ammo_icon.queue_redraw()
-	if skill_icon != null:
-		skill_icon.queue_redraw()
+		ammo_icon.modulate = Color(1.4, 1.4, 1.4, 1.0) if p.reloading else Color.WHITE
+	if skill_tex != null:
+		var cd_total := maxf(0.1, float(p.skill_data.get("cd", 10.0)))
+		var frac := clampf(1.0 - p.skill_cd_left / cd_total, 0.0, 1.0)
+		skill_tex.modulate = Color(1, 1, 1, 1.0 if frac >= 1.0 else 0.40)
+	if skill_ring != null:
+		skill_ring.queue_redraw()
 	level_lbl.text = "УРОВЕНЬ %d" % game.level
 	var xp_frac := clampf(float(game.xp) / maxf(1.0, float(game.xp_need)), 0.0, 1.0)
 	xp_fill.size = Vector2(640.0 * xp_frac, 8)
@@ -486,71 +515,47 @@ func _refresh(delta: float) -> void:
 		timer_lbl.text = UI.fmt_time(maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed)))
 	fps_lbl.text = "%s %d" % [Loc.t("fps"), Engine.get_frames_per_second()]
 
-## Кольцо готовности способности: пиксель-арт кристалл + дуга восстановления.
-func _draw_skill_icon() -> void:
-	if skill_icon == null or game == null or game.player == null:
+## Дуга восстановления способности поверх пиксель-арт иконки.
+func _draw_skill_ring() -> void:
+	if skill_ring == null or game == null or game.player == null:
 		return
 	var p: Player = game.player
 	var cd_total := maxf(0.1, float(p.skill_data.get("cd", 10.0)))
 	var frac := clampf(1.0 - p.skill_cd_left / cd_total, 0.0, 1.0)
 	var c := Vector2(9, 9)
 	var pulse := 0.55 + 0.45 * sin(float(Time.get_ticks_msec()) * 0.004)
-	var stex := Assets.icon("ui_skill_ready")
-	if stex != null:
-		skill_icon.draw_texture_rect(stex, Rect2(1, 1, 16, 16), false, Color(1, 1, 1, 1.0 if frac >= 1.0 else 0.35))
-	else:
-		skill_icon.draw_circle(c, 8.4, Color(0.04, 0.05, 0.09, 0.9))
 	if frac >= 1.0:
-		skill_icon.draw_arc(c, 8.2, 0.0, TAU, 28, Color(0.65, 0.88, 1.0, 0.55 + 0.35 * pulse), 1.4)
+		skill_ring.draw_arc(c, 8.2, 0.0, TAU, 28, Color(0.65, 0.88, 1.0, 0.55 + 0.35 * pulse), 1.4)
 	else:
-		skill_icon.draw_arc(c, 7.4, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 2.0)
+		skill_ring.draw_arc(c, 7.6, -PI * 0.5, -PI * 0.5 + TAU * frac, 28, Color(0.50, 0.82, 1.0, 0.9), 1.8)
 
-## Иконка патрона: пиксель-арт гильза с пулей.
-func _draw_ammo_icon() -> void:
-	if ammo_icon == null:
+## Сердца здоровья: пиксель-арт рубиновые сердца через TextureRect.
+func _sync_hearts(pl: Player) -> void:
+	if hearts == null or pl == null:
 		return
-	var reloading: bool = (game != null and game.player != null and bool(game.player.reloading))
-	var atex := Assets.icon("ui_ammo")
-	if atex != null:
-		ammo_icon.draw_texture_rect(atex, Rect2(0, 0, 10, 13), false, Color(1.5, 1.5, 1.5) if reloading else Color.WHITE)
-		return
-	var gold := Color("#ffffff") if reloading else Color("#cbbc95")
-	ammo_icon.draw_rect(Rect2(2, 3, 5, 9), gold)
-	ammo_icon.draw_colored_polygon(PackedVector2Array([
-		Vector2(2, 3), Vector2(7, 3), Vector2(4.5, 0)]), gold)
-
-## Сердца здоровья: пиксель-арт рубиновые сердца.
-func _draw_hearts() -> void:
-	if hearts == null or game == null or game.player == null:
-		return
-	var pl: Player = game.player
 	var total: int = clampi(pl.max_hp, 1, 20)
 	var step := minf(16.0, 176.0 / float(total))
+	var sz := minf(14.0, step - 1.0)
 	var full_t := Assets.icon("ui_heart_full")
 	var empty_t := Assets.icon("ui_heart_empty")
-	if full_t != null and empty_t != null:
-		var sz := minf(14.0, step - 1.0)
-		for i in total:
-			var t := full_t if i < pl.hp else empty_t
-			var mod := Color(1.25, 0.95, 0.85) if (i < pl.hp and pl.hp <= 2) else Color.WHITE
-			hearts.draw_texture_rect(t, Rect2(step * float(i), 1.0, sz, sz), false, mod)
-		return
-	var r := minf(4.4, step * 0.30)
-	for i in total:
-		var c := Vector2(step * 0.5 + step * float(i), 8.0)
-		var col := Color("#8f2f28") if i < pl.hp else Color("#2c2c31")
-		if i < pl.hp and pl.hp <= 2:
-			col = Color("#b06a4e")
-		hearts.draw_circle(c + Vector2(-r, -r * 0.6), r, col)
-		hearts.draw_circle(c + Vector2(r, -r * 0.6), r, col)
-		hearts.draw_colored_polygon(PackedVector2Array([
-			c + Vector2(-r * 1.9, -r * 0.2),
-			c + Vector2(r * 1.9, -r * 0.2),
-			c + Vector2(0.0, r * 2.2)]), col)
-		if i < pl.hp:
-			hearts.draw_circle(c + Vector2(-r * 0.7, -r * 0.9), r * 0.28, Color(1, 1, 1, 0.35))
-	if pl.shield_charges > 0:
-		hearts.draw_arc(Vector2(176.0, 8.0), 4.5, 0.0, TAU, 16, Color(1.0, 0.9, 0.4), 1.5)
+	while _heart_slots.size() < total:
+		var tr := TextureRect.new()
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hearts.add_child(tr)
+		_heart_slots.append(tr)
+	for i in _heart_slots.size():
+		var tr: TextureRect = _heart_slots[i]
+		if i >= total:
+			tr.visible = false
+			continue
+		tr.visible = true
+		tr.position = Vector2(step * float(i), 1.0)
+		tr.size = Vector2(sz, sz)
+		tr.texture = full_t if i < pl.hp else empty_t
+		tr.modulate = Color(1.15, 0.85, 0.85) if (i < pl.hp and pl.hp <= 2) else Color.WHITE
 
 # ------------------------------------------------------------------ ПАУЗА / КОНЕЦ
 func toggle_pause() -> void:

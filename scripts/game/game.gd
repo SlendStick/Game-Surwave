@@ -107,10 +107,13 @@ var recent_damage := 0.0
 var combo := 0
 var combo_peak := 0
 var combo_left := 0.0
+const BASE_CAMERA_ZOOM := 1.28
+
 var combo20_hits := 0
 var boss_focus := 0.0
-var camera_zoom_target := 1.0
+var camera_zoom_target := BASE_CAMERA_ZOOM
 var photo_mode := false
+var _photo_was_paused := false
 var qte_target: Enemy = null
 var final_qte := false
 var qte_presses := 0
@@ -305,6 +308,7 @@ func _setup_camera() -> void:
 	camera.limit_top = 0
 	camera.limit_right = int(map_rect.size.x)
 	camera.limit_bottom = int(map_rect.size.y)
+	camera.zoom = Vector2(BASE_CAMERA_ZOOM, BASE_CAMERA_ZOOM)
 	add_child(camera)
 	camera.make_current()
 
@@ -676,6 +680,25 @@ func _run_perk_effect_test() -> void:
 		checked += 1
 	# 25 T1 + 25 T2a + 25 T2b + 25 T3 деревьев
 	assert(checked == DB.perks.size(), "Проверены не все перки")
+	# Проверка реального призыва перков (Серп, Святое Копьё)
+	if player != null:
+		var saved_flags := player.upg.flags.duplicate(true)
+		player.upg.apply_flags({"summon": "scythe"})
+		player.upg.apply_flags({"summon": "holy_spear"})
+		player._tick_perk_summons()
+		var has_scythe := false
+		var has_spear := false
+		for a in allies:
+			if a.active and a.kind == "scythe":
+				has_scythe = true
+			elif a.active and a.kind == "holy_spear":
+				has_spear = true
+		assert(has_scythe, "Перк Призрачный Серп не призвал серп")
+		assert(has_spear, "Перк Святое Копьё не призвал копьё")
+		for a in allies:
+			if a.perk_summon:
+				a.deactivate()
+		player.upg.flags = saved_flags
 	print("[SURWAVE] perk_effects OK: %d perks, %d mod keys, %d flag keys" % [checked, mod_keys.size(), flag_keys.size()])
 
 ## Проверка времени жизни отложенных вызовов: события ставят таймеры,
@@ -1592,7 +1615,7 @@ func _start_final_qte(enemy: Enemy) -> void:
 	qte_left = 2.2
 	enemy.transition_left = 2.2
 	notify("ФИНАЛЬНЫЙ УДАР! Нажмите E три раза")
-	camera_zoom_target = 1.5
+	camera_zoom_target = 1.6
 	shake(8.0)
 
 func start_dodge_qte(amount: int, source: Vector2, boss: Enemy) -> bool:
@@ -1671,10 +1694,10 @@ func _tick_camera(delta: float) -> void:
 		boss_focus += delta
 		# 60% фокус на боссе, но игрок остаётся читаемым в кадре
 		target = player.global_position.lerp(boss_enemy.global_position, 0.38)
-		camera_zoom_target = 1.15 if boss_enemy.hp/boss_enemy.max_hp < 0.3 else 1.0
+		camera_zoom_target = BASE_CAMERA_ZOOM + (0.15 if boss_enemy.hp / boss_enemy.max_hp < 0.3 else 0.0)
 	else:
 		boss_focus = 0.0
-		camera_zoom_target = 1.1 if player.hp <= 1 else 1.0
+		camera_zoom_target = BASE_CAMERA_ZOOM + (0.1 if player.hp <= 1 else 0.0)
 	camera.global_position = camera.global_position.lerp(target, clampf((6.0 if boss_enemy != null else 9.0) * delta, 0.0, 1.0))
 	var z := lerpf(camera.zoom.x, camera_zoom_target, clampf(3.0*delta,0.0,1.0))
 	camera.zoom = Vector2(z,z)
@@ -2002,7 +2025,7 @@ func spawn_ally(kind: String, opts: Dictionary) -> void:
 	allies.append(a)
 	EventBus.summon_count_changed.emit(allies.size())
 	# доп. призывы за перки
-	if int(player.S.summon_count) > 0 and kind in ["spirit", "skeleton", "holy_spear", "dragonling", "scythe"]:
+	if not bool(opts.get("no_extra", false)) and int(player.S.summon_count) > 0 and kind in ["spirit", "skeleton", "holy_spear", "dragonling", "scythe"]:
 		for i in int(player.S.summon_count):
 			var extra: Ally
 			if ally_pool.is_empty():
@@ -2045,7 +2068,7 @@ func spawn_delayed_aoe(pos: Vector2, radius: float, dmg: float, delay: float, co
 		h.setup(self)
 	else:
 		h = hazard_pool.pop_back()
-	h.init_hazard(self, pos, radius, dmg, dot, delay, maxf(0.4, delay + 0.4), color, {"hits_player": true, "hits_enemies": false})
+	h.init_hazard(self, pos, radius, dmg, dot, delay, 2.2 if dot > 0.0 else 0.35, color, {"hits_player": true, "hits_enemies": false})
 	hazards.append(h)
 
 func spawn_beam(pos: Vector2, dir: Vector2, length: float, dmg: int) -> void:
@@ -2385,7 +2408,7 @@ func boss_phase_transition(boss_node: Node2D, new_phase: int, mega: bool) -> voi
 	print("[SURWAVE] boss_phase id=%s phase=%d mega=%s t=%.1f" % [String(boss_node.boss_def.get("id","")),new_phase,str(mega),elapsed])
 	if not GameManager.setting("boss_fx", true): return
 	boss_focus = 3.0
-	camera_zoom_target = 1.5 if mega else (1.3 if new_phase == 2 else 1.5)
+	camera_zoom_target = 1.65 if mega else (1.45 if new_phase == 2 else 1.6)
 	var boss_name_txt := String(boss_node.boss_def.get("name","БОСС"))
 	var text := "МЕГАФАЗА: САТАН ПРОБУЖДАЕТСЯ" if mega else ("АБСОЛЮТНАЯ ЯРОСТЬ" if new_phase >= 3 else "ЯРОСТЬ ПРОБУЖДАЕТСЯ")
 	notify(boss_name_txt + " — " + text)
@@ -2397,7 +2420,7 @@ func boss_phase_transition(boss_node: Node2D, new_phase: int, mega: bool) -> voi
 	if new_phase >= 3:
 		for i in (4 if not mega else 8):
 			var p := clamp_to_map(boss_node.global_position + Vector2.RIGHT.rotated(TAU*float(i)/(4.0 if not mega else 8.0))*randf_range(100.0,260.0))
-			spawn_hazard_zone(p, 3.0 if not mega else 5.0, 8.0, 28.0 if not mega else 40.0, Color(1,0.2,0.05,0.5))
+			spawn_hazard_zone(p, 3.0 if not mega else 5.0, 5.0, 28.0 if not mega else 40.0, Color(1,0.2,0.05,0.5))
 
 func _phase_sequence(boss_node: Node2D, phase_no: int, mega: bool) -> void:
 	# Примитивная, но полная временная постановка: остановка → накопление → взрыв → возврат.
@@ -2407,10 +2430,10 @@ func _phase_sequence(boss_node: Node2D, phase_no: int, mega: bool) -> void:
 		if not is_instance_valid(boss_node) or ended:return
 		match step:
 			0: spawn_fx(boss_node.global_position,Color(0.1,0.0,0.15,0.8) if mega else Color(0.5,0.1,0.0,0.7),96.0,0.8)
-			1: shake(8.0 if not mega else 16.0); spawn_fx(boss_node.global_position,Color("#ff1493") if mega else Color("#ff4500"),160.0,1.0)
-			2: camera_zoom_target=1.5; flash_screen(Color(1,1,1)); shake(20.0 if not mega else 32.0)
+			1: shake(8.0 if mega else 16.0); spawn_fx(boss_node.global_position,Color("#ff1493") if mega else Color("#ff4500"),160.0,1.0)
+			2: camera_zoom_target=1.65; flash_screen(Color(1,1,1)); shake(20.0 if not mega else 32.0)
 			3: spawn_fx(boss_node.global_position,Color("#ffd700"),384.0 if mega else 256.0,1.0)
-			4: camera_zoom_target=1.2 if mega else 1.15; notify("БОЙ ПРОДОЛЖАЕТСЯ")
+			4: camera_zoom_target=BASE_CAMERA_ZOOM + (0.12 if mega else 0.05); notify("БОЙ ПРОДОЛЖАЕТСЯ")
 
 func _setup_flash_layer() -> void:
 	var layer := CanvasLayer.new()
@@ -2838,7 +2861,7 @@ func run_map_event(ev: Dictionary) -> void:
 		"cursed_ground":
 			for i in int(p.get("count", 2)):
 				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_hazard_zone(pos, float(p.get("dot", 3.0)), float(p.get("duration", 10.0)), float(p.get("radius", 48.0)), Color(0.4, 0.2, 0.5), {"slow": float(p.get("slow", 0.0))})
+				spawn_hazard_zone(pos, float(p.get("dot", 3.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 48.0)), Color(0.4, 0.2, 0.5), {"slow": float(p.get("slow", 0.0))})
 		"obstacle_toggle":
 			notify("Обвал!")
 			_collapse_obstacles(int(p.get("count", 4)), float(p.get("duration", 15.0)))
@@ -2907,12 +2930,12 @@ func run_map_event(ev: Dictionary) -> void:
 		"quicksand":
 			for i in int(p.get("count", 5)):
 				var pos := player.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160))
-				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), float(p.get("duration", 10.0)), float(p.get("radius", 44.0)),
+				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 44.0)),
 					Color(0.72, 0.62, 0.36), {"slow": float(p.get("slow", 0.65)), "telegraph": 0.6, "pattern": "swirl"})
 		"pull_zone":
 			for i in int(p.get("count", 4)):
 				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
-				spawn_pull_zone(pos, float(p.get("radius", 52.0)), float(p.get("force", 40.0)), float(p.get("duration", 8.0)),
+				spawn_pull_zone(pos, float(p.get("radius", 52.0)), float(p.get("force", 40.0)), minf(float(p.get("duration", 5.0)), 5.5),
 					float(p.get("dps", 1.5)), Color(0.30, 0.24, 0.16))
 			notify("Трясина!")
 		"ice_spikes":
@@ -2950,7 +2973,7 @@ func run_map_event(ev: Dictionary) -> void:
 			spawn_delayed_aoe(center, float(p.get("radius", 150.0)), float(p.get("damage", 3)), float(p.get("telegraph", 3.0)), Color(1, 0.4, 0.1), float(p.get("dot", 2.0)))
 			for i in int(p.get("pools", 5)):
 				var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(40, float(p.get("radius", 150.0)))
-				spawn_hazard_zone(pos, float(p.get("dot", 2.0)), 8.0, 26.0, Color(1, 0.35, 0.1))
+				spawn_hazard_zone(pos, float(p.get("dot", 2.0)), 5.0, 26.0, Color(1, 0.35, 0.1))
 		"cave_in":
 			notify("Обвал!")
 			shake(12.0)
@@ -2985,7 +3008,7 @@ func run_map_event(ev: Dictionary) -> void:
 		"ghost_hands":
 			for i in int(p.get("count", 6)):
 				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_hazard_zone(pos, 0.0, 5.0, float(p.get("radius", 22.0)), Color(0.75, 0.78, 0.8), {"telegraph": 1.0, "root": 1.2, "hits_enemies": false})
+				spawn_hazard_zone(pos, 0.0, 3.5, float(p.get("radius", 22.0)), Color(0.75, 0.78, 0.8), {"telegraph": 1.0, "root": 1.2, "hits_enemies": false})
 		"necro_fog":
 			start_weather("Некромантский туман", "fog", Color(0.35, 0.75, 0.35), float(p.get("duration", 20.0)),
 				{"vision": 0.35, "dps": 0.4, "amount": 90, "flash": true})
@@ -2997,7 +3020,7 @@ func run_map_event(ev: Dictionary) -> void:
 		"curse":
 			for i in int(p.get("count", 3)):
 				var pos := player.global_position + Vector2(randf_range(-130, 130), randf_range(-130, 130))
-				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), float(p.get("duration", 8.0)), float(p.get("radius", 46.0)),
+				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), minf(float(p.get("duration", 5.0)), 5.5), float(p.get("radius", 46.0)),
 					Color(0.45, 0.1, 0.15), {"slow": float(p.get("slow", 0.4)), "telegraph": 0.8, "pattern": "rune"})
 			player.add_status("curse", float(p.get("curse", 4.0)))
 		"hell_flame":
@@ -3189,9 +3212,9 @@ func save_current_state() -> void:
 	pass
 
 func _setup_photo_ui() -> void:
-	photo_layer=CanvasLayer.new(); photo_layer.layer=60; photo_layer.visible=false; add_child(photo_layer)
+	photo_layer=CanvasLayer.new(); photo_layer.layer=60; photo_layer.visible=false; photo_layer.process_mode=Node.PROCESS_MODE_ALWAYS; add_child(photo_layer)
 	photo_tint=ColorRect.new(); photo_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); photo_tint.mouse_filter=Control.MOUSE_FILTER_IGNORE; photo_layer.add_child(photo_tint)
-	photo_info=Label.new(); photo_info.position=Vector2(8,332); photo_info.text="F12 выход · SPACE снимок · H фильтр · R рамка · F враги · J формат · K размер"; photo_info.add_theme_font_size_override("font_size",8); photo_layer.add_child(photo_info)
+	photo_info=Label.new(); photo_info.position=Vector2(8,338); photo_info.text="F12/P выход · SPACE/F5 снимок · H фильтр · R рамка · F враги · J формат · K размер"; photo_info.add_theme_font_size_override("font_size",8); photo_info.add_theme_color_override("font_outline_color",Color(0,0,0,1)); photo_info.add_theme_constant_override("outline_size",3); photo_layer.add_child(photo_info)
 
 func _apply_photo_style() -> void:
 	if photo_tint==null:return
@@ -3205,11 +3228,16 @@ func _apply_photo_style() -> void:
 		for spec in [[Vector2(0,0),Vector2(640,thick)],[Vector2(0,360-thick),Vector2(640,thick)],[Vector2(0,0),Vector2(thick,360)],[Vector2(640-thick,0),Vector2(thick,360)]]:
 			var bar:=ColorRect.new(); bar.name="FrameBar"; bar.position=spec[0]; bar.size=spec[1]; bar.color=Color.WHITE if photo_frame==1 else Color.BLACK; bar.mouse_filter=Control.MOUSE_FILTER_IGNORE; photo_layer.add_child(bar); photo_layer.move_child(bar,1)
 	var names=["НОРМА","СЕПИЯ","ХОЛОДНЫЙ","НУАР","РЕТРО"]
-	photo_info.text="%s · рамка %d · %s ×%d · F12 выход · SPACE снимок · H/R/F/J/K" % [names[photo_filter%names.size()],photo_frame,photo_format.to_upper(),photo_scale]
+	photo_info.text="%s · рамка %d · %s ×%d · F12/P выход · SPACE/F5 снимок · H/R/F/J/K" % [names[photo_filter%names.size()],photo_frame,photo_format.to_upper(),photo_scale]
 
 func _toggle_photo_mode() -> void:
-	photo_mode = not photo_mode
-	get_tree().paused = photo_mode
+	if not photo_mode:
+		_photo_was_paused = get_tree().paused
+		photo_mode = true
+		get_tree().paused = true
+	else:
+		photo_mode = false
+		get_tree().paused = _photo_was_paused
 	if hud != null:
 		hud.root.visible = not photo_mode
 		if not photo_mode: hud.root.show()
@@ -3237,6 +3265,10 @@ func _capture_photo() -> void:
 		"jpg": err=image.save_jpg(path,0.9)
 		"webp": err=image.save_webp(path,false,0.9)
 		_: err=image.save_png(path)
+	if err == OK:
+		flash_screen(Color(1.0, 1.0, 1.0, 0.35))
+		if photo_info != null:
+			photo_info.text = "Снимок сохранён: %s" % path.get_file()
 	print("[SURWAVE] photo=",path," err=",err," metadata map=",map_data.get("name","")," character=",player.char_data.get("name","")," time=",elapsed," level=",level," combo=",combo," kills=",kills," trials=",GameManager.run_config.get("trials",[]))
 
 # ------------------------------------------------------------------ ПРОЧЕЕ
@@ -3247,10 +3279,10 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("photo_mode") and not ended:
 		_toggle_photo_mode()
 		get_viewport().set_input_as_handled()
-	elif photo_mode and event.is_action_pressed("photo_capture"):
+	elif photo_mode and (event.is_action_pressed("photo_capture") or (event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).physical_keycode == KEY_SPACE)):
 		_capture_photo(); get_viewport().set_input_as_handled()
 	elif photo_mode and event is InputEventKey and event.pressed and not event.echo:
-		match event.physical_keycode:
+		match (event as InputEventKey).physical_keycode:
 			KEY_H: photo_filter=(photo_filter+1)%5; _apply_photo_style()
 			KEY_R: photo_frame=(photo_frame+1)%4; _apply_photo_style()
 			KEY_F:
@@ -3258,6 +3290,7 @@ func _input(event: InputEvent) -> void:
 				for e in enemies: e.visible=not photo_enemies_hidden
 			KEY_J: photo_format={"png":"jpg","jpg":"webp","webp":"png"}[photo_format]; _apply_photo_style()
 			KEY_K: photo_scale=1 if photo_scale>=8 else photo_scale*2; _apply_photo_style()
+			KEY_ESCAPE: _toggle_photo_mode()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("interact") and qte_target != null:
 		_qte_press()

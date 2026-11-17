@@ -20,6 +20,7 @@ var color := Color(0.8, 0.9, 1.0)
 var target: Node2D = null
 var hit_cd: Dictionary = {}
 var dragon_breath := false
+var perk_summon := false
 
 func setup(g: Node) -> void:
 	game = g
@@ -40,8 +41,9 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 	visible = true
 	target = null
 	hit_cd.clear()
-	dragon_breath=bool(opts.get("dragon_breath",false))
-	orbit_angle = randf() * TAU
+	dragon_breath = bool(opts.get("dragon_breath", false))
+	perk_summon = bool(opts.get("perk_summon", false))
+	orbit_angle = float(opts.get("orbit_angle", randf() * TAU))
 	orbit_radius = float(opts.get("radius", 40.0))
 	global_position = opts.get("pos", game.player.global_position)
 	match kind:
@@ -52,11 +54,11 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 		"tornado": color = Color(0.75, 0.9, 1.0); radius = float(opts.get("radius", 44.0)); speed = 55.0
 		"phoenix": color = Color(1.0, 0.55, 0.2); radius = 12.0; speed = 150.0
 		"moth": color = Color(0.7, 0.9, 1.0); radius = 8.0; speed = 170.0
-		"scythe": color = Color(0.8, 0.7, 1.0); radius = 10.0; orbit_radius = 44.0
-		"holy_spear": color = Color(1.0, 0.95, 0.6); radius = 8.0; speed = 300.0
-		"thunder_beetle": color = Color(0.7, 0.8, 1.0); radius = 9.0; speed = 110.0
+		"scythe": color = Color(0.8, 0.7, 1.0); radius = 12.0; orbit_radius = 46.0
+		"holy_spear": color = Color(1.0, 0.95, 0.6); radius = 10.0; speed = 280.0
+		"thunder_beetle": color = Color(0.7, 0.8, 1.0); radius = 9.0; speed = 135.0
 		"shadow_clone": color = Color(0.35, 0.3, 0.45); radius = 10.0; speed = 0.0
-		"dragonling": color = Color(0.6, 0.9, 0.6); radius = 11.0; speed = 140.0
+		"dragonling": color = Color(0.6, 0.9, 0.6); radius = 11.0; speed = 150.0
 		"aura": color = Color(1.0, 0.9, 0.5); radius = float(opts.get("radius", 120.0)); speed = 0.0
 	var cls:={"spirit":"ally_spirit","skeleton":"ally_skeleton","turret":"ally_turret","blade":"ally_blade","orbit_blade":"ally_blade","tornado":"ally_tornado","phoenix":"ally_phoenix","moth":"ally_moth","scythe":"ally_scythe","holy_spear":"ally_spear","thunder_beetle":"ally_beetle","shadow_clone":"ally_clone","dragonling":"ally_dragon","aura":"ally_aura"}.get(kind,"ally_spirit")
 	if sprite == null:
@@ -64,6 +66,7 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 	var atex := Assets.tex(String(cls), color)
 	sprite.texture = atex
 	sprite.modulate = Color.WHITE
+	sprite.rotation = 0.0
 	var sc := maxf(0.65, (radius * 2.2) / float(maxi(1, atex.get_width())))
 	sprite.scale = Vector2(sc, sc)
 
@@ -81,8 +84,10 @@ func tick(delta: float) -> void:
 		return
 	attack_cd -= delta
 	match kind:
-		"spirit", "holy_spear":
+		"spirit":
 			_chase_and_touch(delta, true)
+		"holy_spear":
+			_spear_hunt(delta)
 		"skeleton", "dragonling", "phoenix", "thunder_beetle":
 			_chase_and_shoot(delta)
 		"turret":
@@ -104,6 +109,37 @@ func _nearest() -> Node2D:
 		return null
 	return res[0]
 
+func _spear_hunt(delta: float) -> void:
+	var speed_add := 1.0 + float(game.player.upg.mod("summon_speed"))
+	var tgt := _nearest()
+	if tgt != null:
+		var dir := (tgt.global_position - global_position)
+		if dir.length() > 1.0:
+			var move_dir := dir.normalized()
+			global_position += move_dir * speed * speed_add * delta
+			if sprite != null:
+				sprite.rotation = move_dir.angle() + PI * 0.25
+	else:
+		orbit_angle += delta * 2.4 * speed_add
+		var home := game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 36.0
+		var to_home := home - global_position
+		if to_home.length() > 2.0:
+			var mdir := to_home.normalized()
+			global_position += mdir * minf(to_home.length(), speed * speed_add * delta)
+			if sprite != null:
+				sprite.rotation = mdir.angle() + PI * 0.25
+	for enemy in game.enemies_in_radius(global_position, radius + 12.0):
+		var key: int = int(enemy.get_instance_id())
+		if float(hit_cd.get(key, 0.0)) > 0.0:
+			continue
+		hit_cd[key] = 0.35
+		game.damage_enemy(enemy, damage, {"source": "holy_spear", "knockback": 18.0, "knock_dir": (enemy.global_position - global_position)})
+		game.spawn_fx(enemy.global_position, color, 14.0, 0.18)
+	for key in hit_cd.keys():
+		hit_cd[key] = float(hit_cd[key]) - delta
+		if float(hit_cd[key]) <= 0.0:
+			hit_cd.erase(key)
+
 func _chase_and_touch(delta: float, die_on_hit: bool) -> void:
 	var tgt := _nearest()
 	if tgt == null:
@@ -120,6 +156,12 @@ func _chase_and_touch(delta: float, die_on_hit: bool) -> void:
 func _chase_and_shoot(delta: float) -> void:
 	var tgt := _nearest()
 	if tgt == null:
+		if game.player != null:
+			orbit_angle += delta * 1.4
+			var follow := game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 44.0
+			var to_f := follow - global_position
+			if to_f.length() > 6.0:
+				global_position += to_f.normalized() * minf(to_f.length(), speed * delta)
 		return
 	var dir: Vector2 = (tgt.global_position - global_position)
 	if dir.length() > 70.0:
@@ -128,7 +170,7 @@ func _chase_and_shoot(delta: float) -> void:
 		attack_cd = interval
 		match kind:
 			"thunder_beetle":
-				game.lightning_strike_at(tgt.global_position, 26.0, damage)
+				game.lightning_strike_at(tgt.global_position, 28.0, damage)
 			_:
 				if kind=="dragonling" and dragon_breath:
 					game.aoe_damage(tgt.global_position,48.0,damage,{"source":"dragon_breath"}); game.apply_status_radius(tgt.global_position,48.0,"burn",3.0,{"dps":4.0}); game.spawn_fx(tgt.global_position,Color("#ff6a20"),48.0,0.3)
@@ -146,17 +188,21 @@ func _shoot_nearest(delta: float) -> void:
 
 func _orbit(delta: float) -> void:
 	var speed_add := 1.0 + float(game.player.upg.mod("summon_speed"))
-	orbit_angle += delta * 2.6 * speed_add * (2.0 if kind == "orbit_blade" else 1.0)
+	orbit_angle += delta * 2.8 * speed_add * (2.0 if kind == "orbit_blade" else 1.0)
 	global_position = game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * orbit_radius
-	for enemy in game.enemies_in_radius(global_position, radius + 12.0):
+	if sprite != null:
+		sprite.rotation += delta * (10.0 if kind == "scythe" else 6.0) * speed_add
+	for enemy in game.enemies_in_radius(global_position, radius + 14.0):
 		var key: int = int(enemy.get_instance_id())
 		if float(hit_cd.get(key, 0.0)) > 0.0:
 			continue
-		hit_cd[key] = 0.5
+		hit_cd[key] = 0.45
 		game.damage_enemy(enemy, damage, {"source": "scythe" if kind == "scythe" else "summon"})
 	# остывание индивидуальных целей
 	for key in hit_cd.keys():
 		hit_cd[key] = float(hit_cd[key]) - delta
+		if float(hit_cd[key]) <= 0.0:
+			hit_cd.erase(key)
 
 func _tornado(delta: float) -> void:
 	var tgt := _nearest()

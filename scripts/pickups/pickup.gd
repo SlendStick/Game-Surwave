@@ -34,7 +34,8 @@ func spawn_at(pos: Vector2, k: String, val: float, c: Color, s: float = 5.0) -> 
 	sprite.texture = ptex
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.modulate = Color.WHITE
-	var sc := maxf(0.55, (size * 2.1) / float(maxi(1, ptex.get_width())))
+	var base_w := float(maxi(1, ptex.get_width()))
+	var sc := maxf(0.42, (size * 1.45) / base_w) if kind == "xp" else maxf(0.55, (size * 2.1) / base_w)
 	sprite.scale = Vector2(sc, sc)
 	rotation = 0.0
 

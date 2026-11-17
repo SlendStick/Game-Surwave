@@ -135,16 +135,16 @@ func _refresh_summary() -> void:
 func _build_characters() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.position = Vector2(0, 0)
-	scroll.size = Vector2(196, 244)
+	scroll.size = Vector2(158, 224)
 	content.add_child(scroll)
 	var list := VBoxContainer.new()
-	list.custom_minimum_size = Vector2(190, 0)
+	list.custom_minimum_size = Vector2(150, 0)
 	list.add_theme_constant_override("separation", 2)
 	scroll.add_child(list)
 	for ch in DB.characters:
 		var id := String(ch["id"])
 		var unlocked := GameManager.is_char_unlocked(id)
-		var b := UI.button(list, String(ch["name"]), 9, Vector2(186, 20))
+		var b := UI.button(list, String(ch["name"]), 9, Vector2(148, 20))
 		b.disabled = not unlocked
 		if not unlocked:
 			b.text = "%s (закрыто)" % String(ch["name"])
@@ -159,47 +159,65 @@ func _build_characters() -> void:
 				_rebuild()
 			else:
 				AudioManager.play_sfx("error"))
-	var details := UI.panel(content, Rect2(202, 0, 426, 244))
+
+	# --- средняя колонка: описание и характеристики
+	var details := UI.panel(content, Rect2(164, 0, 244, 224))
 	var dscroll := ScrollContainer.new()
-	dscroll.position = Vector2(0, 0)
-	dscroll.size = Vector2(426, 244)
+	dscroll.position = Vector2(8, 6)
+	dscroll.size = Vector2(228, 212)
 	dscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	details.add_child(dscroll)
 	var dbox := VBoxContainer.new()
-	dbox.custom_minimum_size = Vector2(410, 0)
+	dbox.custom_minimum_size = Vector2(220, 0)
 	dbox.add_theme_constant_override("separation", 4)
 	dscroll.add_child(dbox)
 	var ch2 := DB.character(String(sel["character"]))
-	var head := UI.hbox(dbox, 8)
-	var ctex := Assets.icon(String(ch2.get("cls", "mage")))
-	if ctex != null:
-		var frame := UI.panel(head, Rect2(0, 0, 44, 44), UI.PANEL_HI, UI.GOLD_DEEP)
-		frame.custom_minimum_size = Vector2(44, 44)
-		var portrait := TextureRect.new()
-		portrait.texture = ctex
-		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.position = Vector2(4, 4)
-		portrait.size = Vector2(36, 36)
-		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_child(portrait)
-	var htitle := UI.label(head, "%s — %s\nHP: %d" % [String(ch2.get("name", "")), String(ch2.get("role", "")), int(ch2.get("hp", 0))], 10, UI.GOLD, Vector2.ZERO)
-	htitle.custom_minimum_size = Vector2(340, 40)
+	var htitle := UI.label(dbox, "%s — %s · HP: %d" % [String(ch2.get("name", "")), String(ch2.get("role", "")), int(ch2.get("hp", 0))], 10, UI.GOLD, Vector2.ZERO)
+	htitle.custom_minimum_size = Vector2(216, 0)
+	htitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var text := "Пассивка: %s\n%s\n\nСкилл: %s (КД %.0f сек)\n%s" % [
 		String(ch2.get("passive", {}).get("name", "")), String(ch2.get("passive", {}).get("desc", "")),
 		String(ch2.get("skill", {}).get("name", "")), float(ch2.get("skill", {}).get("cd", 10.0)),
 		String(ch2.get("skill", {}).get("desc", ""))]
-	var l := UI.label(dbox, text, 9, UI.TEXT, Vector2.ZERO)
-	l.custom_minimum_size = Vector2(400, 0)
+	var l := UI.label(dbox, text, 8, UI.TEXT, Vector2.ZERO)
+	l.custom_minimum_size = Vector2(216, 0)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var ups: Array = ch2.get("upgrades", [])
 	var utxt := "Уникальные апгрейды (из сундуков):"
 	for up in ups:
 		utxt += "\n› %s — %s" % [String(up.get("name", "")), String(up.get("desc", ""))]
 	var l2 := UI.label(dbox, utxt, 8, UI.DIM, Vector2.ZERO)
-	l2.custom_minimum_size = Vector2(410, 0)
+	l2.custom_minimum_size = Vector2(216, 0)
 	l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	# --- правая колонка: большой HD pixel-art портрет персонажа
+	var p_frame := UI.panel(content, Rect2(414, 0, 198, 224), UI.PANEL_HI, UI.GOLD_DEEP)
+	var p_top := ColorRect.new()
+	p_top.color = Color(0.75, 0.62, 0.35, 0.7)
+	p_top.position = Vector2(1, 1)
+	p_top.size = Vector2(196, 1)
+	p_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p_frame.add_child(p_top)
+	var cls_id := String(ch2.get("cls", "mage"))
+	var ptex := Assets.icon("portrait_" + cls_id)
+	if ptex == null:
+		ptex = Assets.icon(cls_id)
+	if ptex != null:
+		var portrait := TextureRect.new()
+		portrait.texture = ptex
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.position = Vector2(11, 8)
+		portrait.size = Vector2(176, 176)
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p_frame.add_child(portrait)
+	var pname := UI.label(p_frame, String(ch2.get("name", "")).to_upper(), 10, UI.GOLD, Vector2(6, 188))
+	pname.size = Vector2(186, 14)
+	pname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var prole := UI.label(p_frame, String(ch2.get("role", "")), 8, UI.DIM, Vector2(6, 203))
+	prole.size = Vector2(186, 12)
+	prole.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 # ------------------------------------------------------------------ ОРУЖИЕ
 func _build_weapons() -> void:

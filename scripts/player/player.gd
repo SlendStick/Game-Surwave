@@ -462,6 +462,52 @@ func _tick_character(delta: float) -> void:
 						enemy.stun = maxf(float(enemy.stun), 1.0)
 	if upg.flag_num("loop_shadow") > 0.0:
 		pass
+	_tick_perk_summons()
+
+func _tick_perk_summons() -> void:
+	if game == null:
+		return
+	var kinds: Array = upg.flag_list("summon")
+	if kinds.is_empty():
+		return
+	var soul_knight := upg.flag_num("soul_knight") * float(souls_collected)
+	for kind_v in kinds:
+		var kind := String(kind_v)
+		if kind == "":
+			continue
+		var desired := 1 + int(S.summon_count) if kind in ["scythe", "holy_spear", "dragonling"] else 1
+		var active_list: Array = []
+		for a in game.allies:
+			if a.active and a.kind == kind and bool(a.perk_summon):
+				active_list.append(a)
+		var base_dmg := 12.0
+		match kind:
+			"scythe": base_dmg = 14.0
+			"holy_spear": base_dmg = 16.0
+			"dragonling": base_dmg = 10.0
+			"thunder_beetle": base_dmg = 18.0
+		var dmg := base_dmg * float(S.summon_dmg) + soul_knight
+		if kind == "holy_spear":
+			dmg += upg.flag_num("spear_soul") * float(souls_collected)
+		elif kind == "dragonling":
+			var mins := floorf(float(game.elapsed) / 60.0)
+			dmg = (base_dmg + upg.flag_num("dragon_flat") * mins) * float(S.summon_dmg) * (1.0 + upg.flag_num("dragon_growth") * mins) + soul_knight
+		for ex in active_list:
+			ex.damage = dmg
+			if kind == "dragonling":
+				ex.dragon_breath = upg.flag_on("dragon_breath")
+		var missing := desired - active_list.size()
+		for i in missing:
+			var slot := active_list.size() + i
+			var ang := TAU * float(slot) / float(maxi(1, desired))
+			game.spawn_ally(kind, {
+				"damage": dmg,
+				"duration": 999999.0,
+				"perk_summon": true,
+				"no_extra": true,
+				"orbit_angle": ang,
+				"interval": 0.9 if kind == "thunder_beetle" else 0.7,
+			})
 
 func _tick_periodic(delta: float) -> void:
 	var passive_id := String(char_data.get("passive", {}).get("id", ""))
