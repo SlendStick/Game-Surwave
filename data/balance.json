@@ -1,0 +1,149 @@
+{
+ "version": "1.0.0",
+ "player": {
+  "move_speed": 140.0,
+  "pickup_range": 84.0,
+  "iframes": 0.6,
+  "vision_radius": 190.0,
+  "dodge_cap": 0.75,
+  "crit_base": 0.05,
+  "crit_mult": 2.0,
+  "bullet_speed_default": 240.0,
+  "bullet_life": 2.4,
+  "burn_dps": 3.0,
+  "burn_dur": 3.0,
+  "burn_max_stacks": 5,
+  "freeze_dur": 2.0,
+  "lightning_damage": 22.0,
+  "lightning_radius": 24.0,
+  "smite_damage": 20.0,
+  "smite_radius": 96.0,
+  "smite_targets": 3,
+  "poison_max_stacks": 3,
+  "idle_reload_delay": 0.7,
+  "auto_aim_radius": 520.0
+ },
+ "run": {
+  "map_size": [
+   3200,
+   1800
+  ],
+  "max_enemies": 1500,
+  "max_level": 60,
+  "xp_base": 8,
+  "xp_growth": 1.16,
+  "spawn_interval_start": 2.8,
+  "spawn_interval_end": 0.45,
+  "spawn_batch_start": 1,
+  "spawn_batch_end": 22,
+  "spawn_ramp_seconds": 1800.0,
+  "pickup_xp": {
+   "fodder": 1,
+   "shooter": 2,
+   "elite": 8,
+   "miniboss": 50,
+   "boss": 500
+  },
+  "gold_chance": 0.05,
+  "heart_chance": 0.005,
+  "souls_per_kill": 0.02,
+  "souls_win": 250,
+  "souls_boss": 120,
+  "max_enemies_start": 16,
+  "xp_curve": {
+   "base": 10,
+   "growth": 1.15
+  },
+  "secret": {
+   "kills_without_damage": 1000,
+   "satanail_hp": 10000,
+   "shemhaz_hp": 7500
+  },
+  "max_enemies_cap_ease": 2.0,
+  "spawn_ramp_ease": 1.25,
+  "spawn_grace": 3.0,
+  "start_enemy_pressure": 0.5
+ },
+ "difficulty_base": {
+  "fodder_hp": 1.0,
+  "elite_hp": 1.0,
+  "boss_hp": 1.0
+ },
+ "modes": {
+  "standard": {
+   "duration": 1800.0,
+   "amulets": true,
+   "name": "Стандартный (30 мин)"
+  },
+  "quick": {
+   "duration": 600.0,
+   "amulets": false,
+   "name": "Быстрый (10 мин)"
+  },
+  "endless": {
+   "duration": 1000000000000.0,
+   "amulets": false,
+   "name": "Бесконечный"
+  }
+ },
+ "endless": {
+  "perk_stacks": 4,
+  "buff_every": 600.0,
+  "hp_add_mult": 5.0,
+  "speed_add_mult": 0.2,
+  "boss_rate_add": 0.25
+ },
+ "secret": {
+  "infernal_secret_boss_hp": 7500,
+  "sathan_hp": 10000,
+  "grotgar_no_hit": true
+ },
+ "knockback_base": {
+  "fodder": 40,
+  "shooter": 30,
+  "elite": 20,
+  "miniboss": 10,
+  "boss": 5
+ },
+ "knockback_time": 0.15,
+ "limits": {
+  "max_bullets": 500,
+  "max_enemy_bullets": 300,
+  "max_particles": 1000,
+  "max_pickups": 1200
+ },
+ "hp_windows": [
+  [
+   0.0,
+   1.0
+  ],
+  [
+   900.0,
+   1.5
+  ],
+  [
+   1200.0,
+   2.0
+  ],
+  [
+   1500.0,
+   2.5
+  ],
+  [
+   1740.0,
+   3.0
+  ]
+ ],
+ "weapon_level": {
+  "max_level": 8,
+  "xp_per_kill": 1,
+  "xp_base": 20,
+  "xp_growth": 1.35,
+  "dmg_step": 0.15,
+  "rate_step": 0.1,
+  "proj_levels": [
+   4,
+   7
+  ]
+ }
+}

@@ -1,0 +1,79 @@
+name: Surwave CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2-stable
+
+jobs:
+  validate:
+    name: Static & Data Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate JSON, res:// paths, data integrity, and tools
+        run: python3 tools/ci_validate_repo.py
+
+  godot-tests:
+    name: Godot Import & Automated Tests (${{ matrix.suite }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [core, matrix]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Godot ${{ env.GODOT_VERSION }}
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot-ci
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/share/godot-ci
+          URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL "$URL" -o /tmp/godot.zip
+          unzip -q -o /tmp/godot.zip -d ~/.local/share/godot-ci
+          rm -f /tmp/godot.zip
+          chmod +x ~/.local/share/godot-ci/Godot_v${GODOT_VERSION}_linux.x86_64
+
+      - name: Run Godot headless checks (${{ matrix.suite }})
+        run: |
+          GODOT_BIN="$HOME/.local/share/godot-ci/Godot_v${GODOT_VERSION}_linux.x86_64"
+          python3 tools/ci_run_godot_tests.py \
+            --godot "$GODOT_BIN" \
+            --suite "${{ matrix.suite }}" \
+            --log-dir "${{ runner.temp }}/surwave-logs-${{ matrix.suite }}"
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surwave-logs-${{ matrix.suite }}
+          path: ${{ runner.temp }}/surwave-logs-${{ matrix.suite }}
+          retention-days: 7

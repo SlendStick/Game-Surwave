@@ -1,0 +1,25 @@
+extends Node
+## Глобальная шина сигналов (EventBus).
+
+signal enemy_died(enemy_id: String, pos: Vector2, role: String)
+signal player_damaged(amount: int, hp_left: int)
+signal player_healed(amount: int, hp_left: int)
+signal player_died
+signal level_up(level: int)
+signal upgrade_picked(id: String, kind: String)
+signal synergy_unlocked(id: String)
+signal boss_spawned(boss_name: String, hp: float, is_final: bool)
+signal boss_damaged(hp_left: float, hp_max: float)
+signal boss_defeated(boss_name: String)
+signal run_ended(stats: Dictionary, victory: bool)
+signal xp_changed(cur: int, need: int, level: int)
+signal hp_changed(hp: int, max_hp: int)
+signal ammo_changed(cur: int, mag: int, reloading: bool)
+signal gold_changed(gold: int)
+signal souls_changed(souls: int)
+signal skill_used(skill_id: String, cooldown: float)
+signal skill_cooldown(left: float, total: float)
+signal notify(text: String)
+signal chest_opened(kind: String)
+signal secret_entered(map_id: String)
+signal summon_count_changed(count: int)

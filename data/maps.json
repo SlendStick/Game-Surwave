@@ -1,0 +1,1341 @@
+[
+ {
+  "id": "sands",
+  "name": "Выжженные Пески",
+  "unlock": "",
+  "palette": {
+   "bg": "#151208",
+   "bg2": "#22190f",
+   "obstacle": "#5c4e33",
+   "accent": "#6d6247",
+   "fog": "#1a160e",
+   "enemy": "#4a4432",
+   "motif": "dunes"
+  },
+  "desc": "Пустыня: зыбучие пески и песчаные бури.",
+  "roster": {
+   "fodder": [
+    "slime",
+    "bat"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_sands"
+  },
+  "obstacles": [
+   {
+    "kind": "damage",
+    "shape": "cactus",
+    "count": 28,
+    "w": 20,
+    "h": 34,
+    "damage": 1,
+    "interval": 1.2
+   },
+   {
+    "kind": "solid",
+    "shape": "rock",
+    "count": 26,
+    "w": 44,
+    "h": 34,
+    "hp": 30
+   },
+   {
+    "kind": "heal",
+    "shape": "water",
+    "count": 4,
+    "w": 104,
+    "h": 72,
+    "slow": 0.2,
+    "heal": 1
+   },
+   {
+    "kind": "decor",
+    "shape": "bone",
+    "count": 44,
+    "w": 16,
+    "h": 6
+   }
+  ],
+  "events": [
+   {
+    "kind": "sandstorm",
+    "interval": 105,
+    "params": {
+     "duration": 15,
+     "push": 30,
+     "dps": 0.5
+    }
+   },
+   {
+    "kind": "tumbleweed",
+    "interval": 38,
+    "params": {
+     "count": 6,
+     "damage": 1,
+     "speed": 150,
+     "life": 9
+    }
+   },
+   {
+    "kind": "quicksand",
+    "interval": 72,
+    "params": {
+     "count": 5,
+     "radius": 46,
+     "duration": 10,
+     "slow": 0.7,
+     "dps": 1.0
+    }
+   }
+  ],
+  "mods": {
+   "sandstorm": true
+  },
+  "boss": "sands",
+  "mood": {
+   "root": 50,
+   "scale": "hijaz",
+   "tempo": 88,
+   "wave": "oud"
+  }
+ },
+ {
+  "id": "tundra",
+  "name": "Замёрзшая Тундра",
+  "unlock": "beat_sands",
+  "palette": {
+   "bg": "#0d1013",
+   "bg2": "#171c21",
+   "obstacle": "#66717a",
+   "accent": "#6b757b",
+   "fog": "#101418",
+   "enemy": "#3c464b",
+   "motif": "ice"
+  },
+  "desc": "Тундра: метель, лёд и замёрзшие мертвецы.",
+  "roster": {
+   "fodder": [
+    "frozen_zombie",
+    "slime"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_tundra"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "tree",
+    "count": 32,
+    "w": 26,
+    "h": 40,
+    "hp": 18
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 22,
+    "w": 36,
+    "h": 30,
+    "hp": 24,
+    "reflect": 0.3
+   },
+   {
+    "kind": "slow",
+    "shape": "ash",
+    "count": 40,
+    "w": 52,
+    "h": 28,
+    "slow": 0.25
+   },
+   {
+    "kind": "slide",
+    "shape": "ice",
+    "count": 5,
+    "w": 170,
+    "h": 110
+   }
+  ],
+  "events": [
+   {
+    "kind": "avalanche",
+    "interval": 150,
+    "params": {
+     "width": 140,
+     "damage": 3
+    }
+   },
+   {
+    "kind": "blizzard",
+    "interval": 98,
+    "params": {
+     "duration": 18,
+     "push": 40
+    }
+   },
+   {
+    "kind": "ice_spikes",
+    "interval": 54,
+    "params": {
+     "count": 7,
+     "radius": 18,
+     "damage": 2,
+     "telegraph": 1.5
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "tundra",
+  "mood": {
+   "root": 48,
+   "scale": "minor",
+   "tempo": 82,
+   "wave": "ice"
+  }
+ },
+ {
+  "id": "peak",
+  "name": "Проклятый Пик",
+  "unlock": "beat_tundra",
+  "palette": {
+   "bg": "#100b0a",
+   "bg2": "#1b1210",
+   "obstacle": "#5c3a2c",
+   "accent": "#6b4a3c",
+   "fog": "#140d0b",
+   "enemy": "#3f3129",
+   "motif": "cracks"
+  },
+  "desc": "Гора: лава, обсидиан и падающие камни.",
+  "roster": {
+   "fodder": [
+    "slime",
+    "skeleton_warrior"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_peak"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "cliff",
+    "count": 16,
+    "w": 120,
+    "h": 92
+   },
+   {
+    "kind": "damage",
+    "shape": "lava",
+    "count": 9,
+    "w": 72,
+    "h": 28,
+    "damage": 2,
+    "interval": 0.8
+   },
+   {
+    "kind": "solid",
+    "shape": "pillar",
+    "count": 26,
+    "w": 26,
+    "h": 52,
+    "hp": 40
+   },
+   {
+    "kind": "slow",
+    "shape": "ash",
+    "count": 34,
+    "w": 60,
+    "h": 30,
+    "slow": 0.3
+   }
+  ],
+  "events": [
+   {
+    "kind": "rockfall",
+    "interval": 72,
+    "params": {
+     "count": 9,
+     "radius": 26,
+     "damage": 2,
+     "telegraph": 2.0
+    }
+   },
+   {
+    "kind": "eruption",
+    "interval": 165,
+    "params": {
+     "radius": 150,
+     "damage": 3,
+     "telegraph": 3.0,
+     "dot": 2.0,
+     "pools": 5
+    }
+   },
+   {
+    "kind": "rain",
+    "interval": 108,
+    "params": {
+     "count": 16,
+     "radius": 24,
+     "damage": 1,
+     "telegraph": 1.4
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "peak",
+  "mood": {
+   "root": 45,
+   "scale": "phrygian",
+   "tempo": 96,
+   "wave": "lava"
+  }
+ },
+ {
+  "id": "abyss",
+  "name": "Бездна Эхо",
+  "unlock": "beat_peak",
+  "palette": {
+   "bg": "#08090c",
+   "bg2": "#111419",
+   "obstacle": "#414d5e",
+   "accent": "#5a6472",
+   "fog": "#080a0d",
+   "enemy": "#2f353f",
+   "motif": "cracks"
+  },
+  "desc": "Пещера: кристаллы, эхо и темнота.",
+  "roster": {
+   "fodder": [
+    "bat",
+    "skeleton_warrior"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_abyss"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "stalagmite",
+    "count": 46,
+    "w": 20,
+    "h": 28,
+    "hp": 20
+   },
+   {
+    "kind": "damage",
+    "shape": "stalagmite",
+    "count": 22,
+    "w": 18,
+    "h": 26,
+    "damage": 2,
+    "interval": 3.0
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 16,
+    "w": 24,
+    "h": 32,
+    "hp": 16,
+    "reflect": 0.3
+   },
+   {
+    "kind": "slow",
+    "shape": "water",
+    "count": 3,
+    "w": 200,
+    "h": 110,
+    "slow": 0.35
+   }
+  ],
+  "events": [
+   {
+    "kind": "cave_in",
+    "interval": 100,
+    "params": {
+     "count": 7,
+     "radius": 32,
+     "damage": 2,
+     "telegraph": 2.2,
+     "duration": 12
+    }
+   },
+   {
+    "kind": "rain",
+    "interval": 64,
+    "params": {
+     "count": 20,
+     "radius": 16,
+     "damage": 1,
+     "telegraph": 1.0
+    }
+   },
+   {
+    "kind": "crystal_flash",
+    "interval": 52,
+    "params": {
+     "radius": 96,
+     "damage": 1
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "abyss",
+  "mood": {
+   "root": 47,
+   "scale": "dorian",
+   "tempo": 78,
+   "wave": "crystal"
+  }
+ },
+ {
+  "id": "forest",
+  "name": "Шёпот Древ",
+  "unlock": "beat_abyss",
+  "palette": {
+   "bg": "#0c100e",
+   "bg2": "#151c15",
+   "obstacle": "#3b4738",
+   "accent": "#5a6350",
+   "fog": "#12160f",
+   "enemy": "#3e4a34",
+   "motif": "tufts"
+  },
+  "desc": "Лес: густые кусты, шёпот деревьев и блуждающие огни.",
+  "roster": {
+   "fodder": [
+    "slime",
+    "bat"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_forest"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "tree",
+    "count": 46,
+    "w": 34,
+    "h": 22
+   },
+   {
+    "kind": "slow",
+    "shape": "bush",
+    "count": 30,
+    "w": 40,
+    "h": 26,
+    "slow": 0.3,
+    "hp": 10
+   },
+   {
+    "kind": "damage",
+    "shape": "mushroom",
+    "count": 16,
+    "w": 18,
+    "h": 18,
+    "damage": 1,
+    "interval": 1.6,
+    "poison": 0.6
+   },
+   {
+    "kind": "decor",
+    "shape": "flower",
+    "count": 70,
+    "w": 8,
+    "h": 8
+   }
+  ],
+  "events": [
+   {
+    "kind": "meteor",
+    "interval": 80,
+    "params": {
+     "count": 8,
+     "radius": 30,
+     "damage": 2,
+     "telegraph": 2.4,
+     "destroy": true
+    }
+   },
+   {
+    "kind": "wisps",
+    "interval": 58,
+    "params": {
+     "count": 4,
+     "duration": 9,
+     "speed": 26
+    }
+   },
+   {
+    "kind": "weather",
+    "interval": 150,
+    "params": {
+     "title": "Туман",
+     "kind": "fog",
+     "color": "#b9c2b4",
+     "duration": 20,
+     "vision": 0.4,
+     "dps": 0,
+     "amount": 90,
+     "wind": [
+      0.4,
+      0.0
+     ]
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "forest",
+  "mood": {
+   "root": 52,
+   "scale": "dorian",
+   "tempo": 90,
+   "wave": "flute"
+  }
+ },
+ {
+  "id": "rift",
+  "name": "Разлом Безумия",
+  "unlock": "beat_forest",
+  "palette": {
+   "bg": "#0d0f0a",
+   "bg2": "#181d10",
+   "obstacle": "#4c5a35",
+   "accent": "#5f6a45",
+   "fog": "#10140c",
+   "enemy": "#3a4229",
+   "motif": "tufts"
+  },
+  "desc": "Пустошь: токсичная жижа и трещины реальности.",
+  "roster": {
+   "fodder": [
+    "skeleton_warrior",
+    "slime"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_rift"
+  },
+  "obstacles": [
+   {
+    "kind": "damage",
+    "shape": "swamp",
+    "count": 22,
+    "w": 60,
+    "h": 36,
+    "damage": 1,
+    "interval": 1.0,
+    "poison": 1.0
+   },
+   {
+    "kind": "solid",
+    "shape": "tree",
+    "count": 38,
+    "w": 30,
+    "h": 42,
+    "hp": 14
+   },
+   {
+    "kind": "solid",
+    "shape": "scrap",
+    "count": 26,
+    "w": 34,
+    "h": 26,
+    "hp": 24
+   },
+   {
+    "kind": "damage",
+    "shape": "crystal",
+    "count": 12,
+    "w": 22,
+    "h": 30,
+    "damage": 1,
+    "interval": 1.0
+   }
+  ],
+  "events": [
+   {
+    "kind": "poison_geyser",
+    "interval": 52,
+    "params": {
+     "count": 6,
+     "radius": 34,
+     "damage": 2,
+     "telegraph": 1.4,
+     "poison": 1.5
+    }
+   },
+   {
+    "kind": "weather",
+    "interval": 128,
+    "params": {
+     "title": "Кислотный дождь",
+     "kind": "acid",
+     "color": "#7fff00",
+     "duration": 15,
+     "vision": 0.8,
+     "dps": 0.5,
+     "amount": 140,
+     "wind": [
+      0.2,
+      1.0
+     ]
+    }
+   },
+   {
+    "kind": "madness",
+    "interval": 76,
+    "params": {
+     "duration": 3
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "rift",
+  "mood": {
+   "root": 44,
+   "scale": "locrian",
+   "tempo": 100,
+   "wave": "noise"
+  }
+ },
+ {
+  "id": "graveyard",
+  "name": "Забытый Погост",
+  "unlock": "beat_rift",
+  "palette": {
+   "bg": "#0c0c0e",
+   "bg2": "#15151a",
+   "obstacle": "#6a6a60",
+   "accent": "#5d5f66",
+   "fog": "#0e0e11",
+   "enemy": "#3a3b40",
+   "motif": "plots"
+  },
+  "desc": "Кладбище: туман, вороны и восставшие мертвецы.",
+  "roster": {
+   "fodder": [
+    "skeleton_warrior",
+    "frozen_zombie"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_graveyard"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "grave",
+    "count": 48,
+    "w": 24,
+    "h": 32,
+    "hp": 18
+   },
+   {
+    "kind": "solid",
+    "shape": "cross",
+    "count": 24,
+    "w": 18,
+    "h": 38,
+    "hp": 14
+   },
+   {
+    "kind": "slow",
+    "shape": "ash",
+    "count": 16,
+    "w": 60,
+    "h": 40,
+    "slow": 0.2
+   },
+   {
+    "kind": "decor",
+    "shape": "pumpkin",
+    "count": 34,
+    "w": 14,
+    "h": 14
+   }
+  ],
+  "events": [
+   {
+    "kind": "ghost_hands",
+    "interval": 70,
+    "params": {
+     "count": 7,
+     "radius": 22,
+     "duration": 5
+    }
+   },
+   {
+    "kind": "necro_fog",
+    "interval": 112,
+    "params": {
+     "duration": 20,
+     "summons": 3,
+     "enemy": "skeleton_warrior"
+    }
+   },
+   {
+    "kind": "curse",
+    "interval": 54,
+    "params": {
+     "count": 3,
+     "radius": 46,
+     "duration": 8,
+     "dps": 1.0,
+     "slow": 0.4,
+     "curse": 4.0
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "graveyard",
+  "mood": {
+   "root": 46,
+   "scale": "minor",
+   "tempo": 76,
+   "wave": "organ"
+  }
+ },
+ {
+  "id": "hive",
+  "name": "Улей Проклятых",
+  "unlock": "beat_graveyard",
+  "palette": {
+   "bg": "#0b0d09",
+   "bg2": "#141710",
+   "obstacle": "#4a4152",
+   "accent": "#565f48",
+   "fog": "#0d100a",
+   "enemy": "#39412f",
+   "motif": "tufts"
+  },
+  "desc": "Болото: топь, ядовитые грибы и роящиеся твари.",
+  "roster": {
+   "fodder": [
+    "bat",
+    "slime",
+    "frozen_zombie"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_hive"
+  },
+  "obstacles": [
+   {
+    "kind": "slow",
+    "shape": "swamp",
+    "count": 58,
+    "w": 44,
+    "h": 34,
+    "slow": 0.4,
+    "damage": 1,
+    "interval": 2.0,
+    "poison": 0.6
+   },
+   {
+    "kind": "decor",
+    "shape": "reeds",
+    "count": 64,
+    "w": 8,
+    "h": 28
+   },
+   {
+    "kind": "solid",
+    "shape": "tree",
+    "count": 26,
+    "w": 30,
+    "h": 48,
+    "hp": 16
+   },
+   {
+    "kind": "damage",
+    "shape": "mushroom",
+    "count": 22,
+    "w": 18,
+    "h": 24,
+    "damage": 1,
+    "interval": 1.2,
+    "poison": 1.0
+   }
+  ],
+  "events": [
+   {
+    "kind": "weather",
+    "interval": 92,
+    "params": {
+     "title": "Ядовитые испарения",
+     "kind": "spores",
+     "color": "#a07fd0",
+     "duration": 15,
+     "vision": 0.45,
+     "dps": 0.5,
+     "poison": 1.0,
+     "slow": 0.2,
+     "amount": 120
+    }
+   },
+   {
+    "kind": "pull_zone",
+    "interval": 74,
+    "params": {
+     "count": 5,
+     "radius": 52,
+     "force": 40,
+     "duration": 8,
+     "dps": 1.5
+    }
+   },
+   {
+    "kind": "insect_swarm",
+    "interval": 54,
+    "params": {
+     "count": 2,
+     "duration": 10
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "hive",
+  "mood": {
+   "root": 45,
+   "scale": "phrygian",
+   "tempo": 84,
+   "wave": "swarm"
+  }
+ },
+ {
+  "id": "bloodmoon",
+  "name": "Кровавая Луна",
+  "unlock": "beat_hive",
+  "palette": {
+   "bg": "#120a0a",
+   "bg2": "#1e1010",
+   "obstacle": "#5e2a26",
+   "accent": "#7a3a34",
+   "fog": "#140b0b",
+   "enemy": "#43302c",
+   "motif": "cracks"
+  },
+  "desc": "Адская пустошь: лава, цепи и демоны.",
+  "roster": {
+   "fodder": [
+    "skeleton_warrior",
+    "bat"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_bloodmoon"
+  },
+  "obstacles": [
+   {
+    "kind": "damage",
+    "shape": "swamp",
+    "count": 24,
+    "w": 56,
+    "h": 36,
+    "damage": 1,
+    "interval": 1.0
+   },
+   {
+    "kind": "solid",
+    "shape": "bone",
+    "count": 30,
+    "w": 24,
+    "h": 10,
+    "hp": 10
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 12,
+    "w": 24,
+    "h": 32,
+    "hp": 18,
+    "reflect": 0.35
+   },
+   {
+    "kind": "decor",
+    "shape": "bone",
+    "count": 30,
+    "w": 16,
+    "h": 6
+   }
+  ],
+  "events": [
+   {
+    "kind": "weather",
+    "interval": 100,
+    "params": {
+     "title": "Кровавый дождь",
+     "kind": "rain",
+     "color": "#b8203a",
+     "duration": 16,
+     "vision": 0.7,
+     "dps": 0.8,
+     "amount": 150,
+     "wind": [
+      0.3,
+      1.0
+     ]
+    }
+   },
+   {
+    "kind": "meteor",
+    "interval": 84,
+    "params": {
+     "count": 10,
+     "radius": 28,
+     "damage": 2,
+     "telegraph": 2.2,
+     "destroy": true
+    }
+   },
+   {
+    "kind": "curse",
+    "interval": 60,
+    "params": {
+     "count": 4,
+     "radius": 50,
+     "duration": 8,
+     "dps": 1.2,
+     "slow": 0.4,
+     "curse": 4.0
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "bloodmoon",
+  "mood": {
+   "root": 43,
+   "scale": "phrygian",
+   "tempo": 108,
+   "wave": "choir"
+  }
+ },
+ {
+  "id": "chaos",
+  "name": "Разорванная Грань",
+  "unlock": "beat_bloodmoon",
+  "palette": {
+   "bg": "#0a0a0c",
+   "bg2": "#121216",
+   "obstacle": "#4e4459",
+   "accent": "#615a70",
+   "fog": "#0b0b0e",
+   "enemy": "#3a3742",
+   "motif": "stones"
+  },
+  "desc": "Хаос: осколки реальности и временные аномалии.",
+  "roster": {
+   "fodder": [
+    "bat",
+    "skeleton_warrior"
+   ],
+   "shooter": [
+    "dark_mage"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_chaos"
+  },
+  "obstacles": [
+   {
+    "kind": "damage",
+    "shape": "swamp",
+    "count": 20,
+    "w": 56,
+    "h": 36,
+    "damage": 1,
+    "interval": 1.1,
+    "poison": 0.8
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 18,
+    "w": 24,
+    "h": 32,
+    "hp": 16,
+    "reflect": 0.35
+   },
+   {
+    "kind": "solid",
+    "shape": "scrap",
+    "count": 32,
+    "w": 32,
+    "h": 28,
+    "hp": 22
+   }
+  ],
+  "events": [
+   {
+    "kind": "madness",
+    "interval": 68,
+    "params": {
+     "duration": 3
+    }
+   },
+   {
+    "kind": "lightning",
+    "interval": 64,
+    "params": {
+     "count": 6,
+     "radius": 40,
+     "damage": 2
+    }
+   },
+   {
+    "kind": "pull_zone",
+    "interval": 80,
+    "params": {
+     "count": 4,
+     "radius": 56,
+     "force": 46,
+     "duration": 7,
+     "dps": 1.2
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "chaos",
+  "mood": {
+   "root": 41,
+   "scale": "whole_tone",
+   "tempo": 112,
+   "wave": "glitch"
+  }
+ },
+ {
+  "id": "temple",
+  "name": "Забытый Храм",
+  "unlock": "beat_chaos",
+  "palette": {
+   "bg": "#0c0c0d",
+   "bg2": "#16161a",
+   "obstacle": "#6d6553",
+   "accent": "#6a6a72",
+   "fog": "#0f0f11",
+   "enemy": "#3f4045",
+   "motif": "stones"
+  },
+  "desc": "Руины: колонны, лианы и святые лучи.",
+  "roster": {
+   "fodder": [
+    "skeleton_warrior",
+    "frozen_zombie"
+   ],
+   "shooter": [
+    "goblin_archer"
+   ],
+   "elite": [
+    "dark_mage"
+   ],
+   "miniboss": "mb_temple"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "pillar",
+    "count": 40,
+    "w": 26,
+    "h": 56,
+    "hp": 30
+   },
+   {
+    "kind": "slow",
+    "shape": "ash",
+    "count": 20,
+    "w": 56,
+    "h": 30,
+    "slow": 0.22
+   },
+   {
+    "kind": "damage",
+    "shape": "lava",
+    "count": 6,
+    "w": 64,
+    "h": 26,
+    "damage": 2,
+    "interval": 0.9
+   },
+   {
+    "kind": "decor",
+    "shape": "bone",
+    "count": 34,
+    "w": 20,
+    "h": 8
+   }
+  ],
+  "events": [
+   {
+    "kind": "aoe_zone",
+    "interval": 60,
+    "params": {
+     "count": 5,
+     "radius": 40,
+     "damage": 2,
+     "telegraph": 1.8
+    }
+   },
+   {
+    "kind": "curse",
+    "interval": 74,
+    "params": {
+     "count": 3,
+     "radius": 48,
+     "duration": 8,
+     "dps": 1.0,
+     "slow": 0.35,
+     "curse": 4.0
+    }
+   },
+   {
+    "kind": "spawn",
+    "interval": 90,
+    "params": {
+     "count": 6,
+     "enemy": "skeleton_warrior"
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "temple",
+  "mood": {
+   "root": 50,
+   "scale": "major",
+   "tempo": 80,
+   "wave": "organ"
+  }
+ },
+ {
+  "id": "throne",
+  "name": "Тронный Зал Шелтика",
+  "unlock": "beat_temple",
+  "palette": {
+   "bg": "#0b0a0b",
+   "bg2": "#151214",
+   "obstacle": "#5a4a33",
+   "accent": "#6b5a52",
+   "fog": "#0d0b0c",
+   "enemy": "#3d373a",
+   "motif": "cracks"
+  },
+  "desc": "Тронный зал: золото, кровь и финальный бой.",
+  "roster": {
+   "fodder": [
+    "skeleton_warrior",
+    "werewolf"
+   ],
+   "shooter": [
+    "dark_mage"
+   ],
+   "elite": [
+    "werewolf"
+   ],
+   "miniboss": "mb_throne"
+  },
+  "obstacles": [
+   {
+    "kind": "solid",
+    "shape": "pillar",
+    "count": 30,
+    "w": 28,
+    "h": 60,
+    "hp": 36
+   },
+   {
+    "kind": "damage",
+    "shape": "lava",
+    "count": 8,
+    "w": 70,
+    "h": 28,
+    "damage": 2,
+    "interval": 0.8
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 10,
+    "w": 24,
+    "h": 32,
+    "hp": 20,
+    "reflect": 0.35
+   }
+  ],
+  "events": [
+   {
+    "kind": "rain",
+    "interval": 70,
+    "params": {
+     "count": 18,
+     "radius": 22,
+     "damage": 1,
+     "telegraph": 1.2
+    }
+   },
+   {
+    "kind": "eruption",
+    "interval": 120,
+    "params": {
+     "radius": 140,
+     "damage": 3,
+     "telegraph": 2.8,
+     "dot": 2.0,
+     "pools": 4,
+     "at_center": true
+    }
+   },
+   {
+    "kind": "spawn",
+    "interval": 95,
+    "params": {
+     "count": 5,
+     "enemy": "demon"
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "throne",
+  "mood": {
+   "root": 40,
+   "scale": "harmonic",
+   "tempo": 120,
+   "wave": "brass"
+  }
+ },
+ {
+  "id": "void",
+  "name": "Пустота",
+  "unlock": "secret",
+  "palette": {
+   "bg": "#060608",
+   "bg2": "#0d0c12",
+   "obstacle": "#3a3247",
+   "accent": "#57546a",
+   "fog": "#070709",
+   "enemy": "#2b2a33",
+   "motif": "stones"
+  },
+  "desc": "Секретная карта. Здесь ждёт САТАНАИЛ.",
+  "roster": {
+   "fodder": [
+    "bat",
+    "skeleton_warrior",
+    "demon"
+   ],
+   "shooter": [
+    "dark_mage"
+   ],
+   "elite": [
+    "fallen_angel"
+   ],
+   "miniboss": "mb_throne"
+  },
+  "obstacles": [
+   {
+    "kind": "damage",
+    "shape": "swamp",
+    "count": 20,
+    "w": 60,
+    "h": 36,
+    "damage": 2,
+    "interval": 0.9
+   },
+   {
+    "kind": "solid",
+    "shape": "obelisk",
+    "count": 24,
+    "w": 26,
+    "h": 54,
+    "hp": 30
+   },
+   {
+    "kind": "reflect",
+    "shape": "crystal",
+    "count": 14,
+    "w": 24,
+    "h": 34,
+    "hp": 18,
+    "reflect": 0.4
+   }
+  ],
+  "events": [
+   {
+    "kind": "aoe_zone",
+    "interval": 48,
+    "params": {
+     "count": 6,
+     "radius": 38,
+     "damage": 3,
+     "telegraph": 1.6
+    }
+   },
+   {
+    "kind": "madness",
+    "interval": 72,
+    "params": {
+     "duration": 3
+    }
+   },
+   {
+    "kind": "lightning",
+    "interval": 58,
+    "params": {
+     "count": 8,
+     "radius": 42,
+     "damage": 3
+    }
+   }
+  ],
+  "mods": {},
+  "boss": "satanail",
+  "mood": {
+   "root": 38,
+   "scale": "locrian",
+   "tempo": 130,
+   "wave": "dissonant"
+  }
+ }
+]

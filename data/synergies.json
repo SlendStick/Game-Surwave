@@ -1,0 +1,174 @@
+[
+ {
+  "id": "syn_reaper",
+  "name": "Пули Жнеца",
+  "requires": [
+   "damage_t3",
+   "fire_rate_t2a"
+  ],
+  "desc": "+10 урона пуль, -1 HP.",
+  "mods": {
+   "flat_dmg": 10.0,
+   "hp": -1
+  },
+  "flags": {}
+ },
+ {
+  "id": "syn_iceflame",
+  "name": "Ледяное Пламя",
+  "requires": [
+   "flame_t1",
+   "frost_t2a"
+  ],
+  "desc": "При заморозке — поджог 6 дпс.",
+  "mods": {},
+  "flags": {
+   "freeze_burn": 6.0
+  }
+ },
+ {
+  "id": "syn_weaponmaster",
+  "name": "Мастерство Оружия",
+  "requires": [
+   "reload_t2a",
+   "multishot_t2a",
+   "fire_rate_t1"
+  ],
+  "desc": "+30% урона, +15% скорострельности, +15% перезарядки, +1 магазин, +1 пробитие.",
+  "mods": {
+   "dmg": 0.3,
+   "fire_rate": 0.15,
+   "reload": 0.15,
+   "mag": 1,
+   "pierce": 1
+  },
+  "flags": {}
+ },
+ {
+  "id": "syn_smallmag",
+  "name": "Малый Магазин",
+  "requires": [
+   "multishot_t2b",
+   "reload_t2b"
+  ],
+  "desc": "+75% перезарядки, +50% урона, -4 магазина.",
+  "mods": {
+   "reload": 0.75,
+   "dmg": 0.5,
+   "mag": -4
+  },
+  "flags": {}
+ },
+ {
+  "id": "syn_overload",
+  "name": "Перегрузка",
+  "requires": [
+   "thunder_t3",
+   "flame_t2b"
+  ],
+  "desc": "Молния по горящему врагу вызывает взрыв 25 урона.",
+  "mods": {},
+  "flags": {
+   "overload": 25.0
+  }
+ },
+ {
+  "id": "syn_unbreakable",
+  "name": "Несокрушимый",
+  "requires": [
+   "fire_rate_t3",
+   "multishot_t2b"
+  ],
+  "desc": "+2 снаряда, +25% скорострельности, -25% скорости движения.",
+  "mods": {
+   "proj": 2,
+   "fire_rate": 0.25,
+   "move_speed": -0.25
+  },
+  "flags": {}
+ },
+ {
+  "id": "syn_summonpower",
+  "name": "Власть Призыва",
+  "requires": [
+   "summon_t2b",
+   "scythe_t2a"
+  ],
+  "desc": "+35% урона и скорости призывов, -35% урона пуль.",
+  "mods": {
+   "summon_dmg": 0.35,
+   "summon_speed": 0.35,
+   "dmg": -0.35
+  },
+  "flags": {}
+ },
+ {
+  "id": "syn_plague",
+  "name": "Моровая Чума",
+  "requires": [
+   "dark_t2a",
+   "damage_t3"
+  ],
+  "desc": "Убитые проклятием распространяют его.",
+  "mods": {},
+  "flags": {
+   "plague": true
+  }
+ },
+ {
+  "id": "syn_resonance",
+  "name": "Резонанс",
+  "requires": [
+   "pickup_t2a",
+   "thunder_t2b"
+  ],
+  "desc": "При получении патронов +35% скорострельности на 2 сек.",
+  "mods": {},
+  "flags": {
+   "resonance": 0.35
+  }
+ },
+ {
+  "id": "syn_windshadow",
+  "name": "Тень Ветра",
+  "requires": [
+   "dodge_t2b",
+   "fast_arrows_t3"
+  ],
+  "desc": "+10% скорострельности и +1 пробитие каждые 10 сек.",
+  "mods": {
+   "pierce": 1
+  },
+  "flags": {
+   "wind_shadow": true
+  }
+ },
+ {
+  "id": "syn_swordshield",
+  "name": "Меч и Щит",
+  "requires": [
+   "shield_t1",
+   "light_t2b"
+  ],
+  "desc": "Убийства карой снижают восстановление щита на 1 сек.",
+  "mods": {},
+  "flags": {
+   "sword_and_shield": true
+  }
+ },
+ {
+  "id": "syn_giant",
+  "name": "Исполин",
+  "requires": [
+   "health_t2b",
+   "light_t3"
+  ],
+  "desc": "+2 HP, +25% скорости, +25% размера.",
+  "mods": {
+   "hp": 2,
+   "move_speed": 0.25,
+   "size": 0.25
+  },
+  "flags": {}
+ }
+]
