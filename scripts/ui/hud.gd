@@ -639,7 +639,7 @@ func _refresh(delta: float) -> void:
 		timer_lbl.text = UI.fmt_time(maxf(0.0, float(game.wave_mgr.duration) - float(game.elapsed)))
 	fps_lbl.text = "%s %d" % [Loc.t("fps"), Engine.get_frames_per_second()]
 	if boss_box != null:
-		var has_live_boss := game.boss_enemy != null and is_instance_valid(game.boss_enemy) and game.boss_enemy.active and not game.boss_enemy.dead and game.boss_enemy.hp > 0.0
+		var has_live_boss: bool = game != null and game.boss_enemy != null and is_instance_valid(game.boss_enemy) and bool(game.boss_enemy.active) and not bool(game.boss_enemy.dead) and float(game.boss_enemy.hp) > 0.0
 		boss_box.visible = has_live_boss
 		if has_live_boss:
 			var b: Enemy = game.boss_enemy
@@ -963,7 +963,7 @@ func update_combo(value: int) -> void:
 func update_boss_bar(hp: float, hp_max: float) -> void:
 	if boss_box == null:
 		return
-	var has_live_boss := game != null and game.boss_enemy != null and is_instance_valid(game.boss_enemy) and game.boss_enemy.active and not game.boss_enemy.dead
+	var has_live_boss: bool = game != null and game.boss_enemy != null and is_instance_valid(game.boss_enemy) and bool(game.boss_enemy.active) and not bool(game.boss_enemy.dead)
 	boss_box.visible = has_live_boss and hp > 0.0
 	if not boss_box.visible:
 		return
