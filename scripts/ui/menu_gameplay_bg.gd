@@ -53,7 +53,7 @@ func _next_slide() -> void:
 	var mob_list: Array = []
 	for i in rng.randi_range(12, 18):
 		var eid := String(fodder[rng.randi() % maxi(1, fodder.size())])
-		var ang := rng.uniform(0.0, TAU)
+		var ang: float = rng.randf_range(0.0, TAU)
 		var dist := rng.randf_range(65.0, 240.0)
 		mob_list.append({
 			"id": eid,
@@ -64,7 +64,7 @@ func _next_slide() -> void:
 	var boss_id := "boss_" + mid
 	if not Assets.has_real_sprite(boss_id):
 		boss_id = "boss_shemhaz"
-	var b_ang := rng.uniform(0.0, TAU)
+	var b_ang: float = rng.randf_range(0.0, TAU)
 	var boss_pos := (hero_pos + Vector2(cos(b_ang), sin(b_ang)) * 135.0).clamp(Vector2(54, 54), Vector2(586, 306))
 
 	# Кристаллы опыта на земле
@@ -78,7 +78,7 @@ func _next_slide() -> void:
 		"map_name": String(m.get("name", mid)),
 		"hero_cls": hero_cls,
 		"hero_pos": hero_pos,
-		"hero_vel": Vector2.RIGHT.rotated(rng.uniform(0.0, TAU)) * 22.0,
+		"hero_vel": Vector2.RIGHT.rotated(rng.randf_range(0.0, TAU)) * 22.0,
 		"obs": obs_list,
 		"mobs": mob_list,
 		"boss_id": boss_id,
