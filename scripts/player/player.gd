@@ -1078,16 +1078,10 @@ func _on_last_shot() -> void:
 		var hits_max := int(r_cfg.get("retribution_targets", 4))
 		var r_radius := float(r_cfg.get("retribution_radius", 150.0))
 		var dmg := retribution + upg.flag_num("retribution_per_hp") * float(hp)
-		var struck := 0
-		for e in game.nearest_enemy(global_position, r_radius):
-			if struck >= hits_max:
-				break
-			if e == null or not is_instance_valid(e) or not e.active:
-				continue
+		for e in game.nearest_enemies(global_position, r_radius, hits_max):
 			game.damage_enemy(e, dmg * dmg_multiplier(), {"source": "retribution", "holy": true})
 			game.spawn_perk_fx("smite", e.global_position, 70.0, 0.38)
 			game.spawn_fx(e.global_position, Color(1.0, 0.96, 0.78), 26.0, 0.24, true)
-			struck += 1
 		game.spawn_fx(global_position, Color(1, 0.95, 0.7), 54.0, 0.26)
 		game.spawn_perk_fx("holy", global_position, 60.0, 0.3)
 		AudioManager.play_sfx("smite", 1.05)

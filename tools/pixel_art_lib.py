@@ -154,6 +154,18 @@ def save_png(path: Path, w: int, h: int, pixels: list[Color]) -> None:
     path.write_bytes(png)
 
 
+def bezier(p0, p1, p2, n: int = 26) -> list[tuple[float, float]]:
+    """Точки квадратичной кривой Безье — для плавных лезвий и дуг."""
+    out = []
+    for i in range(n + 1):
+        t = i / n
+        out.append((
+            (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
+            (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1],
+        ))
+    return out
+
+
 class Canvas:
     def __init__(self, w: int, h: int, fill: Color = (0, 0, 0, 0)) -> None:
         self.w = w
@@ -270,6 +282,31 @@ class Canvas:
                     continue
                 px_x = ox + (w - 1 - dx if mirror_x else dx)
                 self.px(px_x, oy + dy, col)
+
+    def tapered(self, pts: list[tuple[float, float]], w0: float, w1: float, col: Color,
+                blend: bool = False, side: float = 1.0) -> list[tuple[float, float]]:
+        """Мазок переменной толщины вдоль ломаной (лезвия, клыки, рога).
+
+        Возвращает точки режущей кромки — удобно подсветить их отдельным цветом.
+        """
+        edge: list[tuple[float, float]] = []
+        n = len(pts)
+        for i, (x, y) in enumerate(pts):
+            t = i / max(1, n - 1)
+            nx, ny = 0.0, -1.0
+            if i + 1 < n:
+                dx, dy = pts[i + 1][0] - x, pts[i + 1][1] - y
+            else:
+                dx, dy = x - pts[i - 1][0], y - pts[i - 1][1]
+            ln = math.hypot(dx, dy) or 1.0
+            nx, ny = -dy / ln * side, dx / ln * side
+            w = w0 + (w1 - w0) * t
+            k = 0.0
+            while k <= w:
+                self.px(int(round(x + nx * k)), int(round(y + ny * k)), col, blend)
+                k += 1.0
+            edge.append((x + nx * w, y + ny * w))
+        return edge
 
     def outline(self, col: Color = (10, 8, 6, 255), diagonal: bool = False) -> None:
         src = list(self.buf)

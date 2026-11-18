@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from pixel_art_lib import Canvas, Color, c, draw_icon_frame, mix, mul
+from pixel_art_lib import Canvas, Color, bezier, c, draw_icon_frame, mix, mul
 
 OUT = Path(__file__).resolve().parent.parent / "assets" / "sprites"
 
@@ -309,15 +309,56 @@ def generate_allies() -> int:
     cv.outline(c("night"))
     save_a("spirit", cv)
 
-    # boomerang: бронзовая V-образная пластина с бликом
-    cv = Canvas(24, 24)
-    cv.line(6, 18, 12, 4, c("brass"), 3)
-    cv.line(12, 4, 18, 18, c("brass"), 3)
-    cv.line(7, 17, 12, 5, c("gold_lt"))
-    cv.line(12, 5, 17, 17, c("gold_lt"))
-    cv.px(12, 6, c("cream"))
-    cv.px(9, 12, c("gold_glow"))
-    cv.px(15, 12, c("gold_glow"))
+    # boomerang: массивный резной бумеранг — тёмное дерево, латунные кольца,
+    # заклёпки, кожаная обмотка и золотой блик по кромке
+    cv = Canvas(32, 32)
+    wood = c("soil")
+    wood_lt = c("leather")
+    wood_hi = c("leather_lt")
+    brass = c("bronze")
+    gold = c("gold")
+    gold_lt = c("gold_lt")
+    # тёмная подложка-контур (силуэт читается на любом фоне)
+    cv.line(5, 5, 15, 21, c("black"), 7)
+    cv.line(27, 5, 17, 21, c("black"), 7)
+    # дерево плеч
+    cv.line(5, 5, 15, 20, wood, 5)
+    cv.line(27, 5, 17, 20, wood, 5)
+    cv.line(6, 6, 15, 19, wood_lt, 3)
+    cv.line(26, 6, 17, 19, wood_lt, 3)
+    # продольные волокна и внутренняя тень
+    cv.line(7, 7, 14, 18, mul(wood, 0.72))
+    cv.line(25, 7, 18, 18, mul(wood, 0.72))
+    cv.line(8, 7, 15, 18, wood_hi)
+    cv.line(24, 7, 17, 18, wood_hi)
+    # латунные кольца-фитинги
+    for bx, by in ((11, 12), (21, 12)):
+        cv.rect(bx - 2, by - 1, 4, 3, c("black"))
+        cv.rect(bx - 1, by - 1, 3, 3, brass)
+        cv.px(bx, by, gold_lt)
+        cv.px(bx - 1, by + 1, mul(brass, 0.6))
+    # тень на внутренней кромке — объём
+    cv.line(9, 11, 13, 17, mul(wood, 0.5))
+    cv.line(23, 11, 19, 17, mul(wood, 0.5))
+    # кожаная обмотка у локтя
+    cv.rect(13, 16, 6, 4, c("black"))
+    cv.rect(13, 17, 6, 2, mul(wood_lt, 0.55))
+    cv.px(15, 18, gold)
+    cv.px(17, 18, gold)
+    # навершия плеч
+    for tx, ty in ((5, 5), (27, 5)):
+        cv.rect(tx - 2, ty - 2, 4, 4, c("black"))
+        cv.rect(tx - 1, ty - 1, 3, 3, brass)
+        cv.px(tx, ty, gold_lt)
+        cv.px(tx, ty - 1, gold)
+        cv.px(tx, ty - 3, gold)
+    # золотые блики по кромке + заклёпки
+    cv.line(6, 6, 14, 17, gold_lt)
+    cv.line(26, 6, 18, 17, gold_lt)
+    cv.px(12, 14, gold)
+    cv.px(20, 14, gold)
+    cv.px(16, 21, gold)
+    cv.px(16, 22, mul(gold, 0.65))
     cv.outline(c("black"))
     save_a("boomerang", cv)
 
@@ -502,8 +543,27 @@ def _draw_symbol_icon(name: str, accent: Color, motif: str) -> Canvas:
         cv.px(13, 9, c("gold_glow"))
         cv.line(8, 8, 10, 5, hi)
     elif motif == "scythe":
-        cv.line(9, 18, 15, 6, c("leather_lt"))
-        cv.poly([(15, 5), (6, 7), (9, 10), (15, 7)], hi)
+        # призрачный серп: костяная рукоять, широкое лезвие, свечение
+        cv.line(4, 21, 16, 6, c("black"), 4)
+        cv.line(4, 21, 16, 6, c("bone"), 2)
+        cv.px(4, 21, c("iron_dk"))
+        cv.px(5, 21, c("iron"))
+        cv.px(9, 15, c("parchment"))
+        cv.px(12, 11, c("parchment"))
+        cv.rect(14, 4, 3, 4, c("iron_dk"))
+        cv.px(15, 5, c("gold"))
+        spine = bezier((17, 6), (9, 0), (2, 9), 22)
+        cv.tapered(spine, 4.5, 0.4, c("black"), side=-1.0)
+        cv.tapered(spine, 3.0, 0.4, hi, side=-1.0)
+        edge = cv.tapered(spine, 1.8, 0.4, mix(hi, c("white"), 0.5), side=-1.0)
+        for ex, ey in edge:
+            cv.px(int(round(ex)), int(round(ey)), c("white"))
+        cv.px(17, 6, c("white"))
+        cv.px(2, 9, c("white"))
+        cv.px(11, 1, (accent[0], accent[1], accent[2], 140), True)
+        cv.px(20, 8, (accent[0], accent[1], accent[2], 120), True)
+        cv.px(6, 16, (hi[0], hi[1], hi[2], 100), True)
+        cv.px(20, 13, (accent[0], accent[1], accent[2], 90), True)
     elif motif == "boot":
         cv.rect(8, 6, 5, 9, c("leather_lt"))
         cv.rect(8, 14, 9, 4, accent)

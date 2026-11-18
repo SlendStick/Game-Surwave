@@ -153,7 +153,7 @@ func _boomerang_tick(delta: float) -> void:
 			var home: Vector2 = ppos + Vector2.RIGHT.rotated(orbit_angle) * BOOMERANG_ORBIT
 			global_position = global_position.lerp(home, clampf(8.0 * delta, 0.0, 1.0))
 			if boom_timer <= 0.0 and game.player != null:
-				var cand: Array = game.nearest_enemy(ppos, BOOMERANG_RANGE)
+				var cand: Array = game.nearest_enemies(ppos, BOOMERANG_RANGE, 6)
 				if not cand.is_empty():
 					var slot := _boomerang_slot()
 					var tgt: Node2D = cand[slot % cand.size()]
@@ -267,13 +267,8 @@ func _chase_and_shoot(delta: float) -> void:
 		attack_cd = interval
 		match kind:
 			"thunder_beetle":
-				var targets: Array = game.nearest_enemy(global_position, 260.0)
-				var struck := 0
-				for b_tgt in targets:
-					if struck >= 2:
-						break
+				for b_tgt in game.nearest_enemies(global_position, 260.0, 2):
 					game.lightning_strike_at(b_tgt.global_position, 28.0, damage)
-					struck += 1
 			_:
 				if kind=="dragonling" and dragon_breath:
 					game.aoe_damage(tgt.global_position,48.0,damage,{"source":"dragon_breath"}); game.apply_status_radius(tgt.global_position,48.0,"burn",3.0,{"dps":4.0}); game.spawn_fx(tgt.global_position,Color("#ff6a20"),48.0,0.3); game.spawn_perk_fx("fireball", tgt.global_position, 52.0, 0.30)

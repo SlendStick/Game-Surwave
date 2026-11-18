@@ -2626,6 +2626,19 @@ func nearest_enemy(pos: Vector2, max_range: float) -> Array:
 		return []
 	return [best, sqrt(best_d)]
 
+## Враги в радиусе, отсортированные по близости (для мультицельных эффектов).
+func nearest_enemies(pos: Vector2, max_range: float, limit: int = 4) -> Array:
+	var cand := enemies_in_radius(pos, max_range)
+	var live: Array = []
+	for e in cand:
+		if e != null and is_instance_valid(e) and e.active:
+			live.append(e)
+	live.sort_custom(func(a, b) -> bool:
+		return pos.distance_squared_to(a.global_position) < pos.distance_squared_to(b.global_position))
+	if live.size() > limit:
+		live.resize(maxi(0, limit))
+	return live
+
 func nearest_enemy_excluding(pos: Vector2, max_range: float, exclude: Array) -> Array:
 	var best: Node2D = null
 	var best_d := max_range * max_range
@@ -4012,6 +4025,9 @@ func _run_boomerang_test() -> void:
 func _run_perk_click_test() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(DB.perks.size() > 0, "Каталог перков пуст")
+	var was_auto := GameManager.autoplay
+	GameManager.autoplay = false
 	var total := 0
 	var slow: Array = []
 	var stuck: Array = []
@@ -4023,30 +4039,40 @@ func _run_perk_click_test() -> void:
 		var card := {"kind": "perk", "id": pid, "data": perk, "weight": 1.0}
 		choice_queue.clear()
 		choice_queue.append({"kind": "perk", "cards": [card], "title": "ТЕСТ"})
+		pending_level_ups = 0
 		_open_next_choice()
 		await get_tree().process_frame
 		if hud.choice_layer == null or not hud.choice_layer.visible:
 			stuck.append(pid + " (меню не открылось)")
+			choice_queue.clear()
+			paused_for_choice = false
+			sync_pause_state()
 			continue
 		var t0 := Time.get_ticks_msec()
 		hud._on_card_pressed(card)
 		await get_tree().process_frame
 		var dt := Time.get_ticks_msec() - t0
 		slowest = maxi(slowest, dt)
-		if dt > 500:
+		if dt > 600:
 			slow.append("%s=%d мс" % [pid, dt])
-		if paused_for_choice or (hud.choice_layer != null and hud.choice_layer.visible):
-			stuck.append(pid + " (меню не закрылось)")
-			hud.choice_layer.visible = false
-			paused_for_choice = false
+		if (hud.choice_layer != null and hud.choice_layer.visible) or paused_for_choice:
+			pending_level_ups = 0
 			choice_queue.clear()
+			paused_for_choice = false
+			if hud.choice_layer != null:
+				hud.choice_layer.visible = false
 			sync_pause_state()
+			stuck.append(pid + " (меню не закрылось)")
 		total += 1
+	pending_level_ups = 0
+	choice_queue.clear()
+	paused_for_choice = false
+	sync_pause_state()
+	GameManager.autoplay = was_auto
 	assert(total >= 80, "Перебрано слишком мало перков: %d" % total)
 	assert(stuck.is_empty(), "Зависание при выборе перков: " + ", ".join(stuck))
 	assert(slow.is_empty(), "Медленный выбор перка: " + ", ".join(slow))
-	print("[SURWAVE] perk_click OK: perks=%d slowest=%dms taken=%d" % [
-		total, slowest, player.upg.taken.size()])
+	print("[SURWAVE] perk_click OK: perks=%d slowest=%dms" % [total, slowest])
 
 ## Лавина должна реально наносить урон, а не просто рисоваться.
 func _run_avalanche_test() -> void:

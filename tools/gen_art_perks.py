@@ -8,7 +8,7 @@ import math
 import random
 from pathlib import Path
 
-from pixel_art_lib import Canvas, Color, c, mix, mul
+from pixel_art_lib import Canvas, Color, bezier, c, mix, mul
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "sprites"
@@ -152,8 +152,60 @@ def _draw_motif_scene(cv: Canvas, motif: str, accent: Color, hi: Color, variant:
         if variant >= 2:
             for sx in (22, 74):
                 cv.poly([(sx - 5, 38), (sx, 10), (sx + 5, 38)], hi)
-    elif motif in ("curse", "soul", "scythe"):
-        # Necrotic skull, spectral wisps, or reaper scythe
+    elif motif == "scythe":
+        # Призрачный серп: длинная костяная рукоять, широкое лезвие-полумесяц,
+        # сорванные души и холодное свечение. Вариант меняет сцену.
+        ghost = c("ghost_violet")
+        bone = c("bone")
+        cv.ellipse(cx + 6, cy + 10, 40, 17, (ghost[0], ghost[1], ghost[2], 42), True)
+        cv.ellipse(cx + 30, cy + 2, 18, 10, (accent[0], accent[1], accent[2], 34), True)
+        # рукоять: костяные сегменты с железными кольцами
+        cv.line(8, 45, 56, 21, c("black"), 5)
+        cv.line(8, 45, 56, 21, bone, 3)
+        for i in range(7):
+            t = i / 6.0
+            sx = int(8 + (56 - 8) * t)
+            sy = int(45 + (21 - 45) * t)
+            cv.px(sx, sy, c("parchment"))
+            if i % 3 == 1:
+                cv.px(sx, sy, c("iron_dk"))
+                cv.px(sx + 1, sy, c("iron"))
+        # железный воротник
+        cv.rect(52, 17, 7, 8, c("black"))
+        cv.rect(53, 18, 5, 6, c("iron_dk"))
+        cv.rect(54, 19, 3, 4, c("iron"))
+        cv.px(55, 20, c("gold"))
+        # лезвие: широкое у основания, тонкое к острию
+        spine = bezier((57, 19), (30, 2), (8, 26), 40)
+        cv.tapered(spine, 12.0, 0.5, c("black"), side=-1.0)
+        cv.tapered(spine, 9.5, 0.5, hi, side=-1.0)
+        edge = cv.tapered(spine, 7.0, 0.5, mix(hi, c("white"), 0.45), side=-1.0)
+        for ex, ey in edge:
+            cv.px(int(round(ex)), int(round(ey)), c("white"))
+        cv.px(9, 25, c("white"))
+        cv.px(57, 18, c("white"))
+        # тёмная внутренняя кромка и зубцы на обухе
+        inner = cv.tapered(spine, 0.5, 9.0, mul(accent, 0.55), side=1.0)
+        for i, (ix, iy) in enumerate(inner[::4]):
+            cv.px(int(round(ix)), int(round(iy)), mul(accent, 0.8))
+        # души, сорванные лезвием
+        for i in range(4 + variant):
+            a = i * 1.9 + variant * 0.8
+            sx = int(cx + 8 + math.cos(a) * (13 + i * 3))
+            sy = int(cy + 4 + math.sin(a) * (8 + i * 2))
+            cv.ellipse(sx, sy, 3, 3.6, ghost)
+            cv.ellipse(sx, sy - 1, 2, 2.2, mix(ghost, c("white"), 0.35))
+            cv.px(sx - 1, sy - 1, c("white"))
+            cv.line(sx, sy + 4, sx + 1, sy + 8, (ghost[0], ghost[1], ghost[2], 110))
+        if variant >= 2:
+            # «двойной удар»: призрачный след второго серпа
+            ghost_spine = bezier((60, 26), (34, 10), (12, 34), 40)
+            cv.tapered(ghost_spine, 8.0, 0.5, (hi[0], hi[1], hi[2], 90), True, side=-1.0)
+        # искры
+        for i in range(9 + variant * 3):
+            cv.px(rng.randint(8, 86), rng.randint(2, 38), (hi[0], hi[1], hi[2], 160), True)
+    elif motif in ("curse", "soul"):
+        # Necrotic skull / spectral wisps
         cv.ellipse(cx, cy - 2, 11, 12, c("parchment"))
         cv.rect(cx - 6, cy + 7, 12, 5, c("bone"))
         cv.rect(cx - 5, cy - 3, 3, 3, c("black"))
@@ -166,8 +218,6 @@ def _draw_motif_scene(cv: Canvas, motif: str, accent: Color, hi: Color, variant:
             wy = int(cy + math.sin(ang) * 14)
             cv.ellipse(wx, wy, 4, 4, accent)
             cv.px(wx, wy, c("white"))
-        if motif == "scythe":
-            cv.line(18, 42, 76, 6, c("frost"), 2)
     elif motif == "smite":
         # Golden heavenly beam from above + halo cross
         cv.rect(cx - 8, 2, 16, 42, (accent[0], accent[1], accent[2], 95), True)

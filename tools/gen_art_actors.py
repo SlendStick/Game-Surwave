@@ -470,6 +470,111 @@ def _biome_themes() -> dict:
     }
 
 
+
+def _biome_rim(cv: Canvas, acc_c) -> None:
+    """Подсветка силуэта со стороны света — читаемость на тёмном фоне любой карты."""
+    edge = []
+    for y in range(cv.h):
+        for x in range(cv.w):
+            if cv.get(x, y)[3] < 180:
+                continue
+            if cv.get(x - 1, y)[3] < 60 or cv.get(x, y - 1)[3] < 60:
+                edge.append((x, y))
+    for x, y in edge:
+        cv.px(x, y, (acc_c[0], acc_c[1], acc_c[2], 96), True)
+
+
+def _solid(cv: Canvas, x: int, y: int) -> bool:
+    return cv.get(x, y)[3] >= 150
+
+
+def _kind_details(cv: Canvas, kind: str, prop: str, tint_c, acc_c, eye_c, bob: int) -> None:
+    """Детали поверх силуэта: у каждого врага свои признаки, плюс приметы биома."""
+    cx = 16
+    cy = 20 + bob
+    if kind in ("slime", "slime_small"):
+        small = kind == "slime_small"
+        # блики желе и пузырьки
+        for bx, by in ((cx - 5, cy - 5), (cx + 4, cy - 3), (cx + 1, cy + 4)):
+            if 0 <= bx < cv.w and 0 <= by < cv.h and _solid(cv, bx, by):
+                cv.px(bx, by, (255, 255, 255, 110), True)
+        if _solid(cv, cx - 2, cy + 2):
+            cv.px(cx - 2, cy + 2, eye_c)
+        if prop == "frost":
+            cv.px(cx, cy - 8, c("snow_lt"))
+            cv.px(cx - 1, cy - 7, acc_c)
+    elif kind == "goblin_archer":
+        # колчан за спиной
+        for i in range(3):
+            cv.line(cx - 9 + i, cy - 10, cx - 6 + i, cy - 16, c("leather_lt"))
+            cv.px(cx - 6 + i, cy - 16, acc_c)
+        cv.px(cx + 2, cy - 5, eye_c)
+        if _solid(cv, cx, cy + 1):
+            cv.px(cx, cy + 1, c("gold"))
+        cv.px(cx - 4, cy - 2, eye_c)
+    elif kind == "frozen_zombie":
+        for i, (sx, sy) in enumerate(((cx - 7, cy - 8), (cx + 6, cy - 7), (cx + 2, cy - 12))):
+            cv.line(sx, sy, sx, sy - 3, c("snow_lt"))
+            cv.px(sx, sy - 4, c("ice_glow"))
+        cv.px(cx - 3, cy - 4, c("ice_glow"))
+        cv.px(cx + 3, cy - 4, c("ice_glow"))
+        if prop == "magma":
+            cv.px(cx, cy + 4, c("lava"))
+    elif kind == "bat":
+        for sgn in (-1, 1):
+            cv.line(cx + sgn * 4, cy - 2, cx + sgn * 9, cy - 5, mul(acc_c, 0.7))
+            cv.line(cx + sgn * 5, cy, cx + sgn * 10, cy - 2, mul(acc_c, 0.55))
+        cv.px(cx - 1, cy + 5, c("white"))
+        cv.px(cx + 1, cy + 5, c("white"))
+        cv.px(cx - 4, cy - 4, eye_c)
+        cv.px(cx + 4, cy - 4, eye_c)
+    elif kind == "skeleton_warrior":
+        for i in range(3):
+            cv.px(cx - 3 + i * 3, cy + 1, c("bone"))
+        cv.px(cx - 6, cy - 2, acc_c)
+        cv.px(cx + 6, cy - 2, acc_c)
+        cv.line(cx + 8, cy - 6, cx + 10, cy - 12, c("iron"))
+        cv.px(cx + 10, cy - 13, eye_c)
+        cv.px(cx - 2, cy - 5, eye_c)
+    elif kind == "dark_mage":
+        for i in range(3):
+            cv.px(cx - 5 + i * 4, cy + 5, acc_c)
+        cv.px(cx - 1, cy - 7, eye_c)
+        cv.px(cx + 1, cy - 7, eye_c)
+        cv.px(cx + 8, cy - 10, eye_c)
+        cv.px(cx + 8, cy - 11, c("white"))
+    elif kind == "werewolf":
+        for i in range(4):
+            cv.px(cx - 6 + i * 4, cy - 9 - (i % 2), mul(acc_c, 0.9))
+        cv.px(cx - 3, cy + 6, c("bone"))
+        cv.px(cx, cy + 6, c("bone"))
+        cv.px(cx + 3, cy + 6, c("bone"))
+        cv.px(cx - 3, cy - 4, eye_c)
+        cv.px(cx + 3, cy - 4, eye_c)
+    elif kind == "demon":
+        cv.px(cx - 5, cy - 11, eye_c)
+        cv.px(cx + 5, cy - 11, eye_c)
+        cv.px(cx - 2, cy + 1, c("lava"))
+        cv.px(cx + 2, cy + 2, c("gold_glow"))
+        cv.line(cx + 7, cy + 4, cx + 9, cy + 9, mul(acc_c, 0.9))
+    elif kind == "fallen_angel":
+        # обломок нимба
+        cv.line(cx - 6, cy - 13, cx + 6, cy - 13, acc_c)
+        cv.px(cx - 7, cy - 12, acc_c)
+        cv.px(cx + 7, cy - 12, acc_c)
+        for sgn in (-1, 1):
+            cv.line(cx + sgn * 7, cy - 4, cx + sgn * 11, cy + 3, mul(acc_c, 0.8))
+        cv.px(cx - 2, cy - 5, eye_c)
+        cv.px(cx + 2, cy - 5, eye_c)
+    # общие приметы биома
+    if prop == "void":
+        cv.px(cx - 8, cy + 8, (0, 0, 0, 180), True)
+        cv.px(cx + 8, cy + 6, (0, 0, 0, 160), True)
+    elif prop == "infernal":
+        cv.px(cx - 9, cy + 7, c("ember_red"))
+        cv.px(cx + 9, cy + 5, c("lava"))
+
+
 def _draw_themed_enemy(kind: str, map_id: str, phase: int = 0) -> Canvas:
     cv = _draw_enemy(kind, phase)
     themes = _biome_themes()
@@ -557,6 +662,8 @@ def _draw_themed_enemy(kind: str, map_id: str, phase: int = 0) -> Canvas:
         cv.px(cx, 3 + bob, (0, 0, 0, 0))
         cv.px(cx - 2, 9 + bob, eye_c)
         cv.px(cx + 2, 9 + bob, eye_c)
+    _kind_details(cv, kind, prop, tint_c, acc_c, eye_c, bob)
+    _biome_rim(cv, acc_c)
     cv.outline(c("black"))
     return cv
 
@@ -573,19 +680,12 @@ def generate_enemies() -> int:
         walk = [_draw_enemy(kind, p) for p in range(4)]
         total += _save_anim(kind, idle[0], idle, walk)
 
+    # Облик для каждой карты: у всех врагов свой облик на каждом биоме
+    # (даже если карта пока не спавнит этого врага — ростеры меняются).
     maps = json.loads((ROOT / "data" / "maps.json").read_text(encoding="utf-8"))
     for m in maps:
         mid = m["id"]
-        roster = m.get("roster", {})
-        e_set: set[str] = set()
-        for k in ("fodder", "shooter", "elite"):
-            for eid in roster.get(k, []):
-                e_set.add(str(eid))
-        if "slime" in e_set:
-            e_set.add("slime_small")
-        for eid in sorted(e_set):
-            if eid not in enemies:
-                continue
+        for eid in sorted(enemies):
             idle = [_draw_themed_enemy(eid, mid, 0), _draw_themed_enemy(eid, mid, 2)]
             walk = [_draw_themed_enemy(eid, mid, p) for p in range(4)]
             total += _save_anim(f"{eid}__{mid}", idle[0], idle, walk)
