@@ -813,9 +813,11 @@ func _run_bossfight_test() -> void:
 		phases_seen += be.phase + 1
 		# финальные боссы завершают забег — их только проверяем по фазам/атакам
 		if key == "shemhaz" or key == "satanail":
+			# без _die(): финальные боссы завершают забег, а нам нужен весь ростер
 			be.dead = true
 			be.active = false
-			be.queue_free()
+			be.visible = false
+			enemies.erase(be)
 			boss_enemy = null
 			checked += 1
 			await get_tree().process_frame

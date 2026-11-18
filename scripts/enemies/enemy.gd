@@ -767,6 +767,13 @@ func _pdm(pr: Dictionary, def: float) -> int:
 	# спека: урон атак 5–20 в шкале HP; в игре это сердца → /4 с потолком 3
 	return clampi(int(round(float(pr.get("damage", def)) * mult / 4.0)), 1, 3)
 
+## DPS зон босса: та же конвертация шкалы HP → сердца (мин. 0.5).
+func _pdot(pr: Dictionary, key: String, def: float) -> float:
+	var mult := 1.0
+	if boss and game != null and game.has_method("boss_dmg_scale"):
+		mult = float(game.boss_dmg_scale())
+	return maxf(0.5, float(pr.get(key, def)) * mult / 4.0)
+
 func _exec_pattern(p: Dictionary) -> void:
 	attack_anim = 0.42
 	var kind := String(p.get("type", ""))
@@ -817,7 +824,7 @@ func _exec_pattern(p: Dictionary) -> void:
 					status_to_target("stun", dc_root))
 		"storm_aura":
 			# Огненный/Тёмный Шторм: зона вокруг босса
-			game.spawn_hazard_zone(global_position, float(pr.get("dps", 3.0)), float(pr.get("duration", 5.0)),
+			game.spawn_hazard_zone(global_position, _pdot(pr, "dps", 3.0), float(pr.get("duration", 5.0)),
 				float(pr.get("radius", 128.0)), Color(String(pr.get("color", "#ff4500"))), {})
 			game.notify("Шторм!")
 		"ring":
@@ -845,7 +852,7 @@ func _exec_pattern(p: Dictionary) -> void:
 				var off := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(36.0, 86.0)
 				game.spawn_enemy(String(pr.get("enemy", "")), global_position + off)
 		"aoe":
-			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 90.0)), float(_pdm(pr, 12)), float(pr.get("delay", 1.2)), vivid, float(pr.get("dot", 0.0)))
+			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 90.0)), float(_pdm(pr, 12)), float(pr.get("delay", 1.2)), vivid, _pdot(pr, "dot", 0.0))
 		"dash":
 			# Телеграф рывка вместо мгновенного удара через весь экран
 			charge_dir = dir
@@ -858,12 +865,12 @@ func _exec_pattern(p: Dictionary) -> void:
 			for i in int(pr.get("count", 5)):
 				var pos := player_pos + Vector2(randf_range(-140, 140), randf_range(-140, 140))
 				game.spawn_delayed_aoe(pos, float(pr.get("radius", 56.0)), float(_pdm(pr, 14)), 1.0, Color(1, 0.5, 0.2))
-				game.spawn_event_fx("meteor", pos, 1.0, 1.6, float(pr.get("radius", 56.0)))
+				game.spawn_event_fx("meteor", pos, 1.0, float(pr.get("radius", 56.0)))
 		"spikes":
 			for i in int(pr.get("count", 5)):
 				var pos2: Vector2 = player_pos + Vector2(randf_range(-90, 90), randf_range(-90, 90)) if i > 0 else player_pos
 				game.spawn_delayed_aoe(pos2, float(pr.get("radius", 40.0)), float(_pdm(pr, 10)), 1.2, Color(0.8, 0.5, 1.0))
-				game.spawn_event_fx("ice_spikes", pos2, 1.2, 1.8, float(pr.get("radius", 40.0)))
+				game.spawn_event_fx("ice_spikes", pos2, 1.2, float(pr.get("radius", 40.0)))
 		"teleport":
 			game.spawn_fx(global_position, vivid, radius * 1.4, 0.25)
 			global_position = game.clamp_to_map(player_pos + Vector2.RIGHT.rotated(randf() * TAU) * 120.0)
@@ -909,14 +916,16 @@ func _exec_pattern(p: Dictionary) -> void:
 				status_to_target("curse", float(pr.get("duration", 6.0)), {})
 				game.spawn_fx(global_position + dir * 40.0, Color(0.75, 0.25, 0.85), 60.0, 0.4)
 		"seal":
-			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 96.0)), float(_pdm(pr, 15)), 3.0, Color(0.7, 0.15, 0.45), float(pr.get("pool_dps", 6.0)))
+			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 96.0)), float(_pdm(pr, 15)), 3.0, Color(0.7, 0.15, 0.45), _pdot(pr, "pool_dps", 6.0))
 		"apocalypse":
 			game.apocalypse(float(_pdm(pr, 12)))
 		"heal":
 			hp = minf(max_hp, hp + float(pr.get("amount", 40.0)))
 		"mirror":
 			for i in int(pr.get("count", 2)):
-				game.spawn_enemy("crystal_spider", global_position + Vector2.RIGHT.rotated(randf() * TAU) * 60.0)
+				# «Зеркало»: иллюзии из ростера карты (раньше спавнился
+				# несуществующий crystal_spider и паттерн молча ничего не делал)
+				game.spawn_from_role("fodder")
 		"beam":
 			var b_len := float(pr.get("length", 260.0))
 			var b_dmg := _pdm(pr, 3)

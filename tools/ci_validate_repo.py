@@ -805,6 +805,50 @@ RELIC_MOD_KEYS = {
 }
 
 
+def _call_args(src: str, func_name: str) -> list[list[str]]:
+    """Аргументы всех вызовов func_name(...) с учётом вложенных скобок и строк."""
+    out: list[list[str]] = []
+    needle = func_name + "("
+    idx = 0
+    while True:
+        start = src.find(needle, idx)
+        if start < 0:
+            break
+        i = start + len(needle)
+        depth = 1
+        quote = ""
+        cur: list[str] = []
+        buf = ""
+        while i < len(src) and depth > 0:
+            ch = src[i]
+            if quote:
+                buf += ch
+                if ch == quote:
+                    quote = ""
+            elif ch in "\"'":
+                quote = ch
+                buf += ch
+            elif ch in "([{":
+                depth += 1
+                buf += ch
+            elif ch in ")]}":
+                depth -= 1
+                if depth == 0:
+                    break
+                buf += ch
+            elif ch == "," and depth == 1:
+                cur.append(buf.strip())
+                buf = ""
+            else:
+                buf += ch
+            i += 1
+        if buf.strip():
+            cur.append(buf.strip())
+        out.append(cur)
+        idx = i
+    return out
+
+
 def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
     """Боссфайты по docs/ПРОМПТ_БОССФАЙТЫ.md: ростер, фазы, атаки, реликвии, масштаб."""
     bosses_doc = loaded.get("data/bosses.json")
@@ -942,6 +986,21 @@ def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
     for snippet in ("func _pdm(", "func init_boss(", "boss_rate_scale()"):
         if snippet not in enemy_src:
             fail(f"enemy.gd: нет «{snippet}»", errors)
+    # spawn_event_fx(ev_kind, pos, tele, radius, extra: Dictionary) — 5-м аргументом
+    # раньше передавали число, что падало в рантайме при атаке «метеор»/«шипы».
+    for call_args in _call_args(enemy_src, "spawn_event_fx"):
+        if len(call_args) >= 5 and not call_args[4].startswith("{"):
+            fail(f"enemy.gd: spawn_event_fx 5-й аргумент должен быть Dictionary: {call_args[4]}", errors)
+    # атаки не должны спавнить несуществующих врагов (раньше mirror звал crystal_spider)
+    for m in re.finditer(r'spawn_enemy\("([a-z_]+)"', enemy_src):
+        if m.group(1) not in enemy_ids:
+            fail(f"enemy.gd: spawn_enemy зовёт несуществующего врага «{m.group(1)}»", errors)
+    if 'spawn_from_role("fodder")' not in enemy_src:
+        fail("enemy.gd: атака «mirror» должна призывать врагов из ростера карты", errors)
+    for name in ("func _pdot(", "func _pdm("):
+        if name not in enemy_src:
+            fail(f"enemy.gd: нет {name}", errors)
+
     if 'GameManager.meta["relics"]' not in game_src and 'meta.get("relics"' not in game_src:
         fail("game.gd: реликвии не сохраняются в мета-прогресс", errors)
     if 'data/relics.json' not in (ROOT / "scripts/autoload/db.gd").read_text(encoding="utf-8"):
