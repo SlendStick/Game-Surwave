@@ -5282,7 +5282,8 @@ func net_toggle_pause() -> void:
 		return
 	# Паузы в коопе нет: меню открывается только у этого игрока, мир живёт.
 	# Пока меню открыто, герой прозрачный и неуязвимый (см. _tick_net_safety).
-	net_paused = not net_paused
+	var showing := hud != null and hud.pause_layer != null and hud.pause_layer.visible
+	net_paused = not showing
 	if hud != null and hud.pause_layer != null:
 		hud.pause_layer.visible = net_paused
 		if net_paused:
