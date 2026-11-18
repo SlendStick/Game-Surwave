@@ -3762,12 +3762,6 @@ func _pulse_map_event(kind: String, p: Dictionary) -> void:
 					run_later(tele, func() -> void:
 						_destroy_obstacles_in(p_copy, m_rad, 3))
 			notify("Метеоритный дождь!")
-		"pfx":
-			# Эффект перка/способности напарника — чистая визуализация.
-			net_fx_echo = true
-			spawn_perk_fx(String(data.get("k", "holy")), Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
-				float(data.get("s", 32)), float(data.get("d", 0.3)))
-			net_fx_echo = false
 		"weather":
 			var wcol := Color(0.7, 0.7, 0.7)
 			var ccode := String(p.get("color", "#c0c0c0"))
@@ -4923,7 +4917,7 @@ func _net_on_state(peer_id: int, state: Dictionary) -> void:
 		_net_spawn_shot_ghost(sh as Array)
 	for np in net_proxies:
 		if np.peer_id == peer_id:
-			var was_dead := np.dead
+			var was_dead: bool = bool(np.dead)
 			np.apply_state(state)
 			# Смерть напарника определяет его собственная машина (HP у него
 			# локально авторитетно): хост лишь реагирует на флаг и роняет душу.
@@ -5223,6 +5217,12 @@ func _net_on_event(kind: String, data: Dictionary) -> void:
 			partner_perks.append({"peer": int(data.get("peer", 0)), "name": String(data.get("name", ""))})
 			if partner_perks.size() > 8:
 				partner_perks.pop_front()
+		"pfx":
+			# Эффект перка/способности напарника — чистая визуализация.
+			net_fx_echo = true
+			spawn_perk_fx(String(data.get("k", "holy")), Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
+				float(data.get("s", 32)), float(data.get("d", 0.3)))
+			net_fx_echo = false
 		"pause":
 			net_apply_pause(bool(data.get("on", false)), String(data.get("name", "")))
 		"pickup":

@@ -773,6 +773,11 @@ def check_network_v2(errors: list[str]) -> None:
     if "player.hp = clampi" in snap_body:
         fail("game.gd: снапшот перезаписывает HP клиента — HP должен считать сам клиент", errors)
 
+    ev_at = game.find("func _net_on_event(")
+    pfx_at = game.find('"pfx":')
+    if ev_at < 0 or pfx_at < ev_at:
+        fail("game.gd: обработчик события pfx стоит не в _net_on_event", errors)
+
     net_player = (ROOT / "scripts/game/net_player.gd").read_text(encoding="utf-8")
     for key in ("var away", "var safe_left", "var touch_cd", "var pending_shots"):
         if key not in net_player:
