@@ -166,7 +166,7 @@ var solid_cells: Dictionary = {}
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.game = self
-	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN if bool(GameManager.setting("crosshair", true)) else Input.MOUSE_MODE_VISIBLE)
+	GameManager.set_cursor_hidden(bool(GameManager.setting("crosshair", true)))
 	mode = String(GameManager.run_config.get("mode", "standard"))
 	var seed_value := int(GameManager.run_config.get("seed", 0))
 	if seed_value == 0:
@@ -1471,9 +1471,8 @@ func _sync_cursor() -> void:
 			or (hud.pause_layer != null and hud.pause_layer.visible) \
 			or (hud.end_layer != null and hud.end_layer.visible)
 	var hide := bool(GameManager.setting("crosshair", true)) and not overlay
-	var want := Input.MOUSE_MODE_HIDDEN if hide else Input.MOUSE_MODE_VISIBLE
-	if Input.get_mouse_mode() != want:
-		Input.set_mouse_mode(want)
+	# Само переключение режима мыши делает GameManager (работает и на паузе).
+	GameManager.set_cursor_hidden(hide)
 
 func _process(delta: float) -> void:
 	_sync_cursor()
@@ -3115,6 +3114,8 @@ func sync_pause_state() -> void:
 		if hud.syn_layer != null and hud.syn_layer.visible:
 			should_pause = true
 	get_tree().paused = should_pause
+	# На паузе _process игры не идёт — курсор переключаем здесь же.
+	_sync_cursor()
 
 func remove_perk_for_level(perk_id: String, deduct_level: bool) -> bool:
 	if player == null:

@@ -29,6 +29,11 @@ var cheat_frozen := false
 const MAP_ORDER := ["sands", "tundra", "peak", "abyss", "forest", "rift", "graveyard", "hive",
 	"bloodmoon", "chaos", "temple", "throne"]
 
+## Курсор: игра просит спрятать его только в бою со «своим прицелом».
+## Применяется каждый кадр автозагрузкой, поэтому меню паузы и выбор перков
+## (когда дерево стоит на паузе) всё равно получают видимый курсор.
+var cursor_hidden := false
+
 func _ready() -> void:
 	# F11 и настройки должны работать и на паузе/в экране выбора перков
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -429,6 +434,22 @@ func cycle_window_mode() -> String:
 ## Применяет режим окна. В headless-режиме (CI) ничего не трогает.
 ## Используется API окна (а не DisplayServer напрямую): оно само следит за порядком
 ## переключения, поэтому режимы реально срабатывают и на Windows, и на Linux.
+## Единственная точка, где мы трогаем режим мыши.
+func set_cursor_hidden(hidden: bool) -> void:
+	cursor_hidden = hidden
+	_apply_cursor()
+
+func _apply_cursor() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var want := Input.MOUSE_MODE_HIDDEN if cursor_hidden else Input.MOUSE_MODE_VISIBLE
+	if Input.get_mouse_mode() != want:
+		Input.set_mouse_mode(want)
+
+func _process(_delta: float) -> void:
+	# Работает и на паузе (PROCESS_MODE_ALWAYS): курсор не «залипает».
+	_apply_cursor()
+
 func apply_window_mode(mode: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
