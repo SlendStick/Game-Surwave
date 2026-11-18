@@ -441,14 +441,16 @@ func _settings_cycle(parent: Control, key: String, text: String, values: Array, 
 	var l := UI.label(cell, text, 8, UI.TEXT)
 	l.custom_minimum_size = Vector2(104, 18)
 	l.clip_text = true
-	var current := String(GameManager.setting(key, def_value))
+	var raw_cur: Variant = GameManager.setting(key, def_value)
+	var current := raw_cur if raw_cur is String else str(raw_cur)
 	var idx := values.find(current)
 	if idx < 0:
 		idx = 0
 	var b := UI.button(cell, String(names[idx]), 8, Vector2(140, 20))
 	b.custom_minimum_size = Vector2(140, 20)
 	b.pressed.connect(func() -> void:
-		var cur := String(GameManager.setting(key, def_value))
+		var raw_now: Variant = GameManager.setting(key, def_value)
+		var cur := raw_now if raw_now is String else str(raw_now)
 		var i := values.find(cur)
 		if i < 0:
 			i = 0
@@ -464,7 +466,8 @@ func _settings_slider(parent: Control, key: String, text: String) -> void:
 	s.min_value = 0.0
 	s.max_value = 1.0
 	s.step = 0.05
-	s.value = float(GameManager.setting(key, 0.8))
+	var raw: Variant = GameManager.setting(key, 0.8)
+	s.value = float(raw) if (raw is int or raw is float) else 0.8
 	s.custom_minimum_size = Vector2(168, 16)
 	s.value_changed.connect(func(val: float) -> void: GameManager.set_setting(key, val))
 	cell.add_child(s)
@@ -475,7 +478,8 @@ func _settings_text(parent: Control, key: String, text: String, def_value: Strin
 	l.custom_minimum_size = Vector2(96, 18)
 	l.clip_text = true
 	var edit := LineEdit.new()
-	edit.text = String(GameManager.setting(key, def_value))
+	var raw_text: Variant = GameManager.setting(key, def_value)
+	edit.text = raw_text if raw_text is String else str(raw_text)
 	edit.max_length = max_len
 	edit.custom_minimum_size = Vector2(160, 20)
 	edit.add_theme_font_override("font", UI.crisp_font())
@@ -629,7 +633,7 @@ func _build_network(body: Control) -> void:
 			status = "Сервер открыт. Друзья подключаются по вашему IP."
 		_open_overlay("network", true))
 	UI.label(body, "IP ХОСТА (локальная сеть или интернет)", 9, UI.GOLD, Vector2(0, 70))
-	var ip_edit := _net_edit(body, String(GameManager.setting("net_last_ip", "")), Vector2(0, 84), Vector2(254, 20), "192.168.1.10", 40)
+	var ip_edit := _net_edit(body, str(GameManager.setting("net_last_ip", "")), Vector2(0, 84), Vector2(254, 20), "192.168.1.10", 40)
 	var port_edit := _net_edit(body, str(int(GameManager.setting("net_port", 7777))), Vector2(188, 110), Vector2(66, 20), "7777", 5)
 	var join_btn := UI.button(body, "ПОДКЛЮЧИТЬСЯ", 9, Vector2(180, 24))
 	join_btn.position = Vector2(0, 108)
