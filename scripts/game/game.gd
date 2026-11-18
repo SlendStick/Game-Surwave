@@ -3522,16 +3522,38 @@ func run_map_event(ev: Dictionary) -> void:
 	if kind == "":
 		return
 	var p: Dictionary = (ev.get("params", {}) as Dictionary).duplicate(true)
-	var dur := float(p.get("duration", randf_range(30.0, 60.0)))
-	if not p.has("duration") or _is_weather_event(kind):
-		dur = clampf(dur, 30.0, 60.0)
-		p["duration"] = dur
+	# Любое событие карты длится 30–60 с (раньше короткие ивенты и непогода
+	# заканчивались за 10–18 с и почти не ощущались в игре).
+	var dur := clampf(float(p.get("duration", randf_range(30.0, 60.0))), 30.0, 60.0)
+	p["duration"] = dur
 	active_events.append({
 		"kind": kind, "params": p, "left": dur, "total": dur,
 		"pulse_cd": 0.0, "pulse_every": _event_pulse_interval(kind),
 	})
 	_pulse_map_event(kind, p)
+	if _is_weather_event(kind):
+		_broadcast_weather()
 	notify(_event_title(kind))
+
+## Хост: отправить клиентам текущую непогоду, чтобы буран/туман был виден всем.
+func _broadcast_weather() -> void:
+	if not (net_active and net_host) or weather.is_empty():
+		return
+	var fx_kind := "fog"
+	var col := Color(0.8, 0.8, 0.8)
+	var wind := Vector2(1, 0.25)
+	if weather_fx != null:
+		if String(weather_fx.kind) != "":
+			fx_kind = String(weather_fx.kind)
+		col = weather_fx.tint
+		wind = weather_fx.wind
+	Net.send_event("weather", {
+		"title": String(weather.get("title", "Непогода")),
+		"kind": fx_kind, "color": col,
+		"duration": float(weather.get("total", 40.0)),
+		"vision": float(weather.get("vision", 1.0)),
+		"wind": wind,
+	})
 
 func _is_weather_event(kind: String) -> bool:
 	return kind in ["weather", "sandstorm", "blizzard", "stormal", "fog", "necro_fog", "madness"]
@@ -4990,6 +5012,11 @@ func _net_on_event(kind: String, data: Dictionary) -> void:
 			if enemy != null and enemy.active:
 				damage_enemy(enemy, float(data.get("amount", 1.0)),
 					{"source": String(data.get("source", "net")), "silent": true})
+		"weather":
+			# Только визуал: урон/замедление считает хост.
+			start_weather(String(data.get("title", "Непогода")), String(data.get("kind", "fog")),
+				data.get("color", Color(0.8, 0.8, 0.8)), float(data.get("duration", 40.0)),
+				{"vision": float(data.get("vision", 1.0)), "wind": data.get("wind", Vector2(1, 0.25))})
 		"boss":
 			AudioManager.set_boss_layer(true)
 			AudioManager.play_sfx("boss")
