@@ -52,6 +52,8 @@ func _ready() -> void:
 		set_setting("hud_vitals", OS.get_environment("SURW_HUD_VITALS"))
 	if OS.get_environment("SURW_SCREEN") == "select":
 		call_deferred("goto_select")
+	if OS.get_environment("SURW_SHOTS") != "":
+		call_deferred("_dev_screenshot_sequence")
 	if OS.get_environment("SURW_SHOT") != "":
 		call_deferred("_dev_screenshot")
 
@@ -69,6 +71,54 @@ func _dev_screenshot() -> void:
 	print("[SURWAVE] shot ", path, " err=", err)
 	if OS.get_environment("SURW_SHOT_KEEP") == "":
 		get_tree().quit()
+
+## Серия снимков экрана для графической проверки: SURW_SHOTS="8,20,40" —
+## секунды от старта, SURW_SHOT_DIR — папка, SURW_SHOT_KEEP — не закрывать игру.
+## Работает только с настоящим рендерером (X11/OpenGL), не в --headless.
+func _shot_dir() -> String:
+	var dir := OS.get_environment("SURW_SHOT_DIR")
+	if dir == "":
+		dir = "user://shots"
+	if dir.begins_with("user://") or dir.begins_with("res://"):
+		return ProjectSettings.globalize_path(dir)
+	return dir
+
+func _dev_screenshot_sequence() -> void:
+	var times: Array = []
+	for part in OS.get_environment("SURW_SHOTS").split(",", false):
+		var raw := part.strip_edges()
+		if raw.is_valid_float():
+			times.append(float(raw))
+	if times.is_empty():
+		return
+	var dir := _shot_dir()
+	DirAccess.make_dir_recursive_absolute(dir)
+	var tag := OS.get_environment("SURW_SHOT_TAG")
+	if tag == "":
+		tag = "shot"
+	var started := Time.get_ticks_msec()
+	var index := 0
+	for sec in times:
+		var wait_ms := float(sec) * 1000.0 - float(Time.get_ticks_msec() - started)
+		if wait_ms > 0.0:
+			# ignore_time_scale: снимки идут по реальному времени даже при slow-mo
+			await get_tree().create_timer(wait_ms / 1000.0, true, false, true).timeout
+		await RenderingServer.frame_post_draw
+		var img := get_viewport().get_texture().get_image()
+		if img == null or img.is_empty():
+			push_warning("[SURWAVE] shot пустой кадр (нет рендерера?)")
+			continue
+		var path := "%s/%s_%02d_%03ds.png" % [dir, tag, index, int(sec)]
+		var err := img.save_png(path)
+		print("[SURWAVE] shot=", path, " err=", err, " size=", img.get_width(), "x", img.get_height(), " scene=", _current_scene_name())
+		index += 1
+	if OS.get_environment("SURW_SHOT_KEEP") == "":
+		print("[SURWAVE] shots done: %d" % index)
+		get_tree().quit()
+
+func _current_scene_name() -> String:
+	var cs := get_tree().current_scene
+	return String(cs.name) if cs != null else "?"
 
 ## Автозапуск забега для автоматических проверок (без участия игрока).
 func _autostart_test() -> void:

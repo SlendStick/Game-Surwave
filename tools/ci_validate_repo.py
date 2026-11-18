@@ -1030,6 +1030,32 @@ def check_dynamic_inference(errors: list[str]) -> None:
             fail(f"{path.relative_to(ROOT)}:{line}: «{m.group(0).strip()}» — нужен явный тип (:= не выводится)", errors)
 
 
+def check_playtest_shots(errors: list[str]) -> None:
+    """Графическая проверка: серия снимков, скрипт локального прогона и CI-джоба."""
+    gm = (ROOT / "scripts/autoload/game_manager.gd").read_text(encoding="utf-8")
+    for token in ("SURW_SHOTS", "_dev_screenshot_sequence", "SURW_SHOT_TAG", "frame_post_draw"):
+        if token not in gm:
+            fail(f"game_manager.gd: нет части графической проверки «{token}»", errors)
+
+    script = ROOT / "tools/playtest_shots.sh"
+    if not script.exists():
+        fail("нет tools/playtest_shots.sh (локальный графический прогон)", errors)
+    else:
+        if not script.stat().st_mode & 0o111:
+            fail("tools/playtest_shots.sh не исполняемый (chmod +x)", errors)
+
+    ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    for token in ("Playtest screenshots", "xvfb-run", "SURW_SHOTS=", "docs/playtest"):
+        if token not in ci:
+            fail(f".github/workflows/ci.yml: джоба снимков без «{token}»", errors)
+
+    doc = ROOT / "docs/ГРАФИЧЕСКИЙ_ПРОГОН.md"
+    if not doc.exists():
+        fail("нет docs/ГРАФИЧЕСКИЙ_ПРОГОН.md", errors)
+    if not (ROOT / "docs/playtest").is_dir():
+        fail("нет папки docs/playtest для кадров", errors)
+
+
 def check_hud_tweaks(loaded: dict[str, object], errors: list[str]) -> None:
     """Иконка навыка рядом со шкалами героя и отключаемые всплывающие надписи."""
     hud = (ROOT / "scripts/ui/hud.gd").read_text(encoding="utf-8")
@@ -1095,6 +1121,7 @@ def main() -> int:
     check_boss_fights(loaded, errors)
     check_hud_tweaks(loaded, errors)
     check_dynamic_inference(errors)
+    check_playtest_shots(errors)
     check_python_tools(errors)
 
     if errors:

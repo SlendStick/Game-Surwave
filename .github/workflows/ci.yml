@@ -28,6 +28,87 @@ jobs:
       - name: Validate JSON, res:// paths, data integrity, and tools
         run: python3 tools/ci_validate_repo.py
 
+  screenshots:
+    name: Playtest screenshots (Xvfb + OpenGL)
+    needs: validate
+    # Рендер игры в виртуальном дисплее и коммит кадров в docs/playtest.
+    # Запускается вручную (workflow_dispatch) или когда в сообщении коммита есть [shots].
+    if: github.event_name == 'workflow_dispatch' || (github.event.head_commit && contains(github.event.head_commit.message, '[shots]'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Godot ${{ env.GODOT_VERSION }}
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot-ci
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/share/godot-ci
+          URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL "$URL" -o /tmp/godot.zip
+          unzip -q -o /tmp/godot.zip -d ~/.local/share/godot-ci
+          rm -f /tmp/godot.zip
+          chmod +x ~/.local/share/godot-ci/Godot_v${GODOT_VERSION}_linux.x86_64
+
+      - name: Install virtual display and software OpenGL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            xvfb libgl1 libglx-mesa0 libgl1-mesa-dri libxkbcommon0 \
+            libxcursor1 libxi6 libxinerama1 libxrandr2 libxext6
+
+      - name: Import project resources
+        run: |
+          GODOT_BIN="$HOME/.local/share/godot-ci/Godot_v${GODOT_VERSION}_linux.x86_64"
+          xvfb-run -a "$GODOT_BIN" --headless --path . --import || true
+
+      - name: Render playtest frames
+        run: |
+          GODOT_BIN="$HOME/.local/share/godot-ci/Godot_v${GODOT_VERSION}_linux.x86_64"
+          mkdir -p docs/playtest
+          run_shots() {
+            xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT_BIN" \
+              --path . --rendering-driver opengl3 --audio-driver Dummy --resolution 1280x720 \
+              -- --autoplay --god || echo "прогон завершился с ошибкой"
+          }
+          echo "== обычный бой =="
+          SURW_SHOT_DIR="$PWD/docs/playtest" SURW_SHOT_TAG=game SURW_SHOTS="10,22" SURW_MAP=forest run_shots
+          echo "== босс и смена фаз =="
+          SURW_SHOT_DIR="$PWD/docs/playtest" SURW_SHOT_TAG=boss SURW_SHOTS="8,14" SURW_MAP=sands SURW_BOSS_TEST=0.45 run_shots
+          echo "== экран выбора героя =="
+          SURW_SHOT_DIR="$PWD/docs/playtest" SURW_SHOT_TAG=select SURW_SHOTS="3" SURW_SCREEN=select run_shots
+          ls -la docs/playtest || true
+
+      - name: Upload screenshots as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surwave-screens
+          path: docs/playtest/*.png
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit screenshots back to the branch
+        run: |
+          git config user.name "surwave-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add docs/playtest
+          if git diff --cached --quiet; then
+            echo "новых кадров нет"
+            exit 0
+          fi
+          git commit -m "Playtest screenshots (авто) [skip ci]"
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
   godot-tests:
     name: Godot Import & Automated Tests (${{ matrix.suite }})
     needs: validate
