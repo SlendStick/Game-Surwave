@@ -76,6 +76,14 @@ func tgt_pos() -> Vector2:
 	var t := tgt()
 	return t.global_position if t != null else global_position
 
+## Статус (горение, замедление, стан) на текущую цель, а не только на хоста.
+func status_to_target(status: String, dur: float, data: Dictionary = {}) -> void:
+	if game == null or net_remote:
+		return
+	var t: Node2D = tgt()
+	if t != null and t is Player:
+		(t as Player).add_status(status, dur, data)
+
 ## Урон игроку или сетевому напарнику — единая точка вместо game.damage_player.
 func hurt_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false, source_role: String = "") -> void:
 	if game == null or net_remote:
@@ -390,10 +398,11 @@ func _tick_specials(delta: float) -> void:
 	# аура холода (замёрзший зомби)
 	var aura := float(flags.get("cold_aura", 0.0))
 	if aura > 0.0 and to_player.length() < aura:
-		game.player.add_status("slow", 0.25, {"amount": float(flags.get("cold_slow", 0.15))})
+		status_to_target("slow", 0.25, {"amount": float(flags.get("cold_slow", 0.15))})
 	# кровожадность (оборотень, при HP игрока < 50%)
 	if flags.get("bloodlust") != null and not boss:
-		if float(game.player.hp) / maxf(1.0, float(game.player.max_hp)) < 0.5:
+		var bl: Node2D = tgt()
+		if bl != null and float(bl.get("hp")) / maxf(1.0, float(bl.get("max_hp"))) < 0.5:
 			speed = float(data.get("speed", 50.0)) * (1.0 + float(flags["bloodlust"]))
 	# рывок (оборотень): charger уже двигает, здесь только fx
 	if dashing:
@@ -544,7 +553,7 @@ func _normal_tick(delta: float) -> void:
 		if attack_cd <= 0.0:
 			attack_cd = float(behavior["slow_zone"].get("interval", 5.0))
 			game.spawn_hazard_zone(player_pos, 0.0, float(behavior["slow_zone"].get("duration", 3.0)), float(behavior["slow_zone"].get("radius", 56.0)), Color(0.4, 0.7, 0.4), true)
-			game.player.add_status("slow", float(behavior["slow_zone"].get("duration", 3.0)), {"amount": float(behavior["slow_zone"].get("slow", 0.8))})
+			status_to_target("slow", float(behavior["slow_zone"].get("duration", 3.0)), {"amount": float(behavior["slow_zone"].get("slow", 0.8))})
 	if behavior.has("pull"):
 		attack_cd -= delta
 		if attack_cd <= 0.0:
@@ -569,7 +578,7 @@ func _normal_tick(delta: float) -> void:
 		if attack_cd <= 0.0:
 			attack_cd = float(behavior["shout"].get("interval", 6.0))
 			if to_player.length() < float(behavior["shout"].get("radius", 140.0)):
-				game.player.add_status("stun", float(behavior["shout"].get("stun", 2.0)))
+				status_to_target("stun", float(behavior["shout"].get("stun", 2.0)))
 				game.spawn_fx(global_position, Color(0.8, 0.8, 1.0), float(behavior["shout"].get("radius", 140.0)), 0.4)
 	if behavior.has("debuff"):
 		attack_cd -= delta
@@ -577,16 +586,16 @@ func _normal_tick(delta: float) -> void:
 			attack_cd = float(behavior["debuff"].get("interval", 8.0))
 			var pick := randi() % 3
 			if pick == 0:
-				game.player.add_status("slow", float(behavior["debuff"].get("duration", 10.0)), {"amount": 0.5})
+				status_to_target("slow", float(behavior["debuff"].get("duration", 10.0)), {"amount": 0.5})
 			elif pick == 1:
-				game.player.add_status("curse", float(behavior["debuff"].get("duration", 10.0)), {})
+				status_to_target("curse", float(behavior["debuff"].get("duration", 10.0)), {})
 			else:
-				game.player.add_status("poison", float(behavior["debuff"].get("duration", 10.0)), {"dps": 1.0})
+				status_to_target("poison", float(behavior["debuff"].get("duration", 10.0)), {"dps": 1.0})
 	if behavior.has("charm"):
 		attack_cd -= delta
 		if attack_cd <= 0.0:
 			attack_cd = float(behavior["charm"].get("interval", 10.0))
-			game.player.add_status("charm", float(behavior["charm"].get("duration", 3.0)))
+			status_to_target("charm", float(behavior["charm"].get("duration", 3.0)))
 	if behavior.has("dive"):
 		attack_cd -= delta
 		if attack_cd <= 0.0:
@@ -660,7 +669,9 @@ func _try_contact_damage() -> void:
 			EventBus.ammo_changed.emit(game.player.mag, int(game.player.S.mag), false)
 		if flags.has("push_on_hit"):
 			p.global_position += (p.global_position - global_position).normalized() * float(flags["push_on_hit"]) * 0.2
-		hurt_player(dmg, global_position, false, role)
+		# Контактный урон — именно локальному герою: сетевые напарники
+		# обработаны отдельным циклом выше, иначе они получали бы урон дважды.
+		game.damage_player(dmg, global_position, false, role)
 		# отталкивание врага от игрока
 		knock = (global_position - p.global_position).normalized() * 120.0
 
@@ -773,7 +784,7 @@ func _exec_pattern(p: Dictionary) -> void:
 				if tgt_pos().distance_to(global_position) < r1:
 					if not game.start_dodge_qte(slam_dmg, global_position, self):
 						hurt_player(slam_dmg, global_position)
-					game.player.add_status("slow", slam_dur, {"amount": slam_slow}))
+					status_to_target("slow", slam_dur, {"amount": slam_slow}))
 		"dark_chains":
 			# Тёмные Цепи с чётким телеграфом
 			var r2 := float(pr.get("radius", 192.0))
@@ -787,7 +798,7 @@ func _exec_pattern(p: Dictionary) -> void:
 				if tgt_pos().distance_to(global_position) < r2:
 					if not game.start_dodge_qte(dc_dmg, global_position, self):
 						hurt_player(dc_dmg, global_position)
-					game.player.add_status("stun", dc_root))
+					status_to_target("stun", dc_root))
 		"storm_aura":
 			# Огненный/Тёмный Шторм: зона вокруг босса
 			game.spawn_hazard_zone(global_position, float(pr.get("dps", 3.0)), float(pr.get("duration", 5.0)),
@@ -879,7 +890,7 @@ func _exec_pattern(p: Dictionary) -> void:
 				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a4), int(pr.get("damage", 12)), {"speed": 220.0, "color": Color(0.85, 0.35, 0.95), "homing": true})
 		"gaze":
 			if player_pos.distance_to(global_position) < float(pr.get("radius", 128.0)):
-				game.player.add_status("curse", float(pr.get("duration", 6.0)), {})
+				status_to_target("curse", float(pr.get("duration", 6.0)), {})
 				game.spawn_fx(global_position + dir * 40.0, Color(0.75, 0.25, 0.85), 60.0, 0.4)
 		"seal":
 			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 96.0)), float(pr.get("damage", 15)), 3.0, Color(0.7, 0.15, 0.45), float(pr.get("pool_dps", 6.0)))

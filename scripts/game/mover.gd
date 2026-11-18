@@ -86,9 +86,11 @@ func tick(delta: float) -> void:
 			game.spawn_fx(global_position, Color(color.r, color.g, color.b, 0.6), radius * 2.0, 0.25)
 		deactivate()
 		return
-	if chase > 0.0 and game != null and game.player != null:
+	if chase > 0.0 and game != null:
 		var hunt: Node2D = game.nearest_target(global_position)
-		var hunt_pos: Vector2 = hunt.global_position if hunt != null else game.player.global_position
+		if hunt == null:
+			return
+		var hunt_pos: Vector2 = hunt.global_position
 		var want: Vector2 = (hunt_pos - global_position).normalized() * vel.length()
 		vel = vel.lerp(want * chase, clampf(delta * 1.5, 0.0, 1.0))
 	global_position += vel * delta
@@ -128,7 +130,7 @@ func tick(delta: float) -> void:
 
 func _touch(delta: float) -> void:
 	hit_cd = maxf(0.0, hit_cd - delta)
-	if game.player == null or hit_cd > 0.0:
+	if hit_cd > 0.0:
 		return
 	var victim: Node2D = game.nearest_target(global_position)
 	if victim == null:
@@ -139,4 +141,4 @@ func _touch(delta: float) -> void:
 	if damage > 0.0:
 		game.hurt_target(victim, int(damage), global_position)
 	if dot > 0.0 and victim is Player:
-		game.player.add_status("poison", 3.0, {"dps": dot})
+		(victim as Player).add_status("poison", 3.0, {"dps": dot})

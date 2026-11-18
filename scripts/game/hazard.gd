@@ -104,30 +104,36 @@ func tick(delta: float) -> void:
 func _apply_hit() -> void:
 	if hits_enemies:
 		game.aoe_damage(global_position, radius, damage, {"source": "hazard"})
-	if hits_player and game.player != null:
+	if hits_player:
 		for t in game.players_in_radius(global_position, radius + 6.0):
 			if t is NetPlayer:
 				game.hurt_target(t, int(damage), global_position)
 				continue
-			var ward := 0.5 if game.player.has_meta("ward") else 1.0
+			var pl := t as Player
+			if pl == null:
+				continue
+			var ward := 0.5 if pl.has_meta("ward") else 1.0
 			game.damage_player(int(float(damage) * ward), global_position)
 			if root > 0.0:
-				game.player.add_status("stun", root)
+				pl.add_status("stun", root)
 			if burns:
-				game.player.add_status("burn", 3.0, {"dps": 4.0})
+				pl.add_status("burn", 3.0, {"dps": 4.0})
 
 func _apply_dot(step: float) -> void:
 	if hits_enemies:
 		game.aoe_damage(global_position, radius, dps * step, {"source": "hazard_dot"})
-	if hits_player and game.player != null:
+	if hits_player:
 		for t in game.players_in_radius(global_position, radius + 6.0):
 			if t is NetPlayer:
 				game.hurt_target(t, maxi(1, int(dps * step)), global_position)
 				continue
-			game.player._damage_over_time(dps * step)
+			var pl := t as Player
+			if pl == null:
+				continue
+			pl._damage_over_time(dps * step)
 			if slow > 0.0:
-				game.player.add_status("slow", 0.4, {"amount": slow})
+				pl.add_status("slow", 0.4, {"amount": slow})
 			if root > 0.0:
-				game.player.add_status("stun", 0.4)
+				pl.add_status("stun", 0.4)
 			if burns:
-				game.player.add_status("burn", 2.0, {"dps": 3.0})
+				pl.add_status("burn", 2.0, {"dps": 3.0})

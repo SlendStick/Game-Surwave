@@ -1686,6 +1686,12 @@ func _tick_pickups(delta: float) -> void:
 	for p in pickups:
 		if p.active:
 			p.tick(delta)
+	# Лут клиента живёт в «призраках» по снапшоту — их тоже тикаем,
+	# иначе магнита и подбора у второго игрока не будет вовсе.
+	if net_active and not net_host:
+		for pk in net_pickup_ghosts:
+			if pk != null and is_instance_valid(pk) and pk.active:
+				pk.tick(delta)
 
 func _tick_allies(delta: float) -> void:
 	for a in allies:

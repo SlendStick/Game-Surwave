@@ -711,6 +711,54 @@ def check_gdscript_duplicate_funcs(errors: list[str]) -> None:
     ok(f"Проверено {checked} GDScript-файлов на дубликаты функций")
 
 
+def check_network_v2(errors: list[str]) -> None:
+    """Кооп 2.0: единые точки урона/целей, снапшот с душами, подборы по id."""
+    game = (ROOT / "scripts/game/game.gd").read_text(encoding="utf-8")
+    enemy = (ROOT / "scripts/enemies/enemy.gd").read_text(encoding="utf-8")
+    hazard = (ROOT / "scripts/game/hazard.gd").read_text(encoding="utf-8")
+    mover = (ROOT / "scripts/game/mover.gd").read_text(encoding="utf-8")
+    hud = (ROOT / "scripts/ui/hud.gd").read_text(encoding="utf-8")
+
+    required_game = [
+        "func player_targets(", "func nearest_target(", "func players_in_radius(",
+        "func hurt_target(", "func partner_info(", "func _spawn_revive_crystal(",
+        "func _tick_revive_crystals(", "func net_apply_revive(",
+        "func net_toggle_pause(", "func net_apply_pause(",
+        "func send_chat(", "func send_emote(", "func report_perk(",
+        "func _check_world_growth(", "func _grow_world(", "func _generate_band(",
+        "func _tick_active_events(", "func _pulse_map_event(",
+    ]
+    for name in required_game:
+        if name not in game:
+            fail(f"game.gd: нет {name}", errors)
+    for key in ['"rc"', '"pk"', '"sk"', 'var is_boss :=', "net_pickup_ghosts"]:
+        if key not in game:
+            fail(f"game.gd: снапшот/кооп не содержит {key}", errors)
+    if "xp/xn/lv" in game or '"xn":' in game:
+        fail("game.gd: в снапшоте остался общий опыт (xp/xn/lv) — у игроков он свой", errors)
+
+    for path, src in (
+        ("scripts/enemies/enemy.gd", enemy),
+        ("scripts/game/hazard.gd", hazard),
+        ("scripts/game/mover.gd", mover),
+    ):
+        if "game.player.global_position" in src:
+            fail(f"{path}: урон/цели всё ещё завязаны только на хосте (game.player)", errors)
+    if "tgt_pos()" not in enemy or "chase_target" not in enemy:
+        fail("enemy.gd: нет выбора цели среди всех игроков", errors)
+
+    for name in ("push_chat", "flash_message", "open_emote_wheel", "partner_info"):
+        if f"func {name}(" not in hud and name != "partner_info":
+            fail(f"hud.gd: нет {name}()", errors)
+    if "emote_wheel" not in hud or "party_box" not in hud:
+        fail("hud.gd: нет колеса эмоций или панели напарников", errors)
+
+    weather = (ROOT / "scripts/game/weather_fx.gd").read_text(encoding="utf-8")
+    if "FADE_TIME" not in weather:
+        fail("weather_fx.gd: нет плавного появления/исчезновения непогоды", errors)
+    ok("Кооп 2.0: цели/урон по всем игрокам, души, чат, эмоции, боссы, бесконечный мир")
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -735,6 +783,7 @@ def main() -> int:
     check_gdscript_duplicate_children(errors)
     check_gdscript_statements(errors)
     check_gdscript_duplicate_funcs(errors)
+    check_network_v2(errors)
     check_python_tools(errors)
 
     if errors:
