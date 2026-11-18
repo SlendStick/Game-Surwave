@@ -102,6 +102,18 @@ CORE_TESTS: list[TestCase] = [
         expect_re=r"\[SURWAVE\] cheat OK: .*problems=0",
     ),
     TestCase(
+        name="network_layer",
+        env={"SURW_NET_TEST": "1"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] net OK:",
+    ),
+    TestCase(
+        name="boomerang_perk",
+        env={"SURW_BOOM_TEST": "1", "SURW_MAP": "forest"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] boomerang OK:",
+    ),
+    TestCase(
         name="abilities",
         env={"SURW_ABILITY_TEST": "1"},
         args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
@@ -318,8 +330,11 @@ def run_case(godot_bin: str, tc: TestCase, log_dir: Path) -> tuple[bool, str]:
         print("  Matched fatal lines:")
         for f in fatals[:10]:
             print(f"    {f}")
+        # по одной аннотации на каждую ошибку, чтобы причина читалась из API
+        for f in fatals[:12]:
+            gh_error(f"{tc.name}: ошибка", f)
     print("  Tail of output:")
-    for ln in lines[-25:]:
+    for ln in lines[-60:]:
         print(f"    {ln.rstrip()}")
     return False, reason
 

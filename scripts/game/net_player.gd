@@ -110,8 +110,8 @@ func update_visual(delta: float) -> void:
 	var prev := global_position
 	global_position = global_position.lerp(target_pos, clampf(14.0 * delta, 0.0, 1.0))
 	move_dir = (global_position - prev) / maxf(0.0001, delta)
+	var stretch := 1.0 + clampf(move_dir.length() * 0.0016, 0.0, 0.08)
 	if sprite != null:
-		var stretch := 1.0 + clampf(move_dir.length() * 0.0016, 0.0, 0.08)
 		sprite.position.y = -absf(sin(float(Time.get_ticks_msec()) * 0.012)) * (2.2 if move_dir.length() > 4.0 else 0.0)
 		sprite.flip_h = aim.x < -0.1
 		sprite.modulate = Color(1.6, 0.85, 0.85) if hit_flash > 0.0 else Color.WHITE
@@ -132,4 +132,4 @@ func update_visual(delta: float) -> void:
 		if hp_bar.texture != null:
 			hp_bar.scale = Vector2(maxf(0.01, 22.0 * ratio) / float(maxi(1, hp_bar.texture.get_width())), 1.0)
 		hp_bar.visible = not dead and hp < max_hp
-	visibility = not dead
+	visible = not dead

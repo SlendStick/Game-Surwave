@@ -563,8 +563,10 @@ func _build_settings(body: Control) -> void:
 	_settings_text(r10, "net_name", "Имя в сети", Net.my_name, false, 16)
 	_settings_text(r10, "net_port", "Порт", "7777", true, 5)
 
-	var reset := UI.button(body, "ТОЧНО СБРОСИТЬ?" if reset_armed else Loc.t("reset_save"), 9, Vector2(206, 22))
-	reset.position = Vector2(0, 258)
+	_settings_section(v, "СБРОС")
+	var r11 := UI.hbox(v, 8)
+	var reset := UI.button(r11, "ТОЧНО СБРОСИТЬ?" if reset_armed else Loc.t("reset_save"), 9, Vector2(206, 22))
+	reset.custom_minimum_size = Vector2(206, 22)
 	reset.add_theme_color_override("font_color", UI.DANGER if reset_armed else UI.DIM)
 	reset.pressed.connect(func() -> void:
 		if reset_armed:
@@ -578,7 +580,10 @@ func _build_settings(body: Control) -> void:
 			reset_armed = true
 			AudioManager.play_sfx("error")
 		_open_overlay("settings"))
-	UI.label(body, "F11 — оконный / окно на весь экран / полный экран. Настройки сохраняются сразу.", 8, UI.DIM, Vector2(214, 262))
+	var r11_hint := UI.label(r11, "F11 — переключение режима окна.", 8, UI.DIM)
+	r11_hint.custom_minimum_size = Vector2(320, 18)
+	var foot := UI.label(v, "Настройки сохраняются сразу. F11 циклично меняет оконный / «окно на весь экран» / полный экран.", 8, UI.MUTED)
+	foot.custom_minimum_size = Vector2(556, 14)
 
 # ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
 func _net_edit(parent: Control, value: String, pos: Vector2, size: Vector2, placeholder: String, max_len: int = 24) -> LineEdit:

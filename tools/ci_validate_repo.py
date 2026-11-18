@@ -277,6 +277,272 @@ def check_sprites(loaded: dict[str, object], errors: list[str]) -> None:
     ok(f"Validated {checked} required pixel-art PNG assets in assets/sprites/")
 
 
+BALANCE_LIMITS = {
+    # ключ -> (минимум, максимум)
+    "xp_gain_mult": (0.2, 0.7),
+    "heart_chance": (0.0, 0.003),
+    "enemy_proj_speed": (0.4, 1.0),
+}
+SETTINGS_KEYS = [
+    "window_mode", "camera_shake", "vignette", "crosshair", "aim_line",
+    "hit_stop", "combo_fx", "screen_flash", "camera_distance", "net_name", "net_port",
+]
+
+
+def check_balance_and_net(errors: list[str]) -> None:
+    balance = json.loads((ROOT / "data" / "balance.json").read_text(encoding="utf-8"))
+    run = balance.get("run", {})
+    for key, (lo, hi) in BALANCE_LIMITS.items():
+        if key not in run:
+            fail(f"balance.run.{key} отсутствует (настройка баланса потеряна)", errors)
+            continue
+        value = float(run[key])
+        if not (lo <= value <= hi):
+            fail(f"balance.run.{key}={value} вне диапазона {lo}..{hi}", errors)
+    pickups = run.get("pickup_xp", {})
+    for role in ("fodder", "shooter", "elite", "miniboss", "boss"):
+        if role not in pickups:
+            fail(f"balance.run.pickup_xp.{role} отсутствует", errors)
+    ok(f"Баланс: xp×{run.get('xp_gain_mult')} hearts {run.get('heart_chance')} "
+       f"снаряды ×{run.get('enemy_proj_speed')} (pickup_xp: {len(pickups)} ролей)")
+
+    # сеть: файлы и публичный API
+    net = ROOT / "scripts" / "autoload" / "net_manager.gd"
+    net_player = ROOT / "scripts" / "game" / "net_player.gd"
+    for path in (net, net_player):
+        if not path.exists():
+            fail(f"нет файла сетевого кооп:{path.relative_to(ROOT)}", errors)
+    net_src = net.read_text(encoding="utf-8") if net.exists() else ""
+    for fn in ("host_game", "join_game", "start_lan_listen", "lan_list", "send_player_state",
+               "request_damage", "start_session", "max_players", "broadcast_snapshot"):
+        if f"func {fn}()" not in net_src and f"func {fn}(" not in net_src:
+            fail(f"net_manager.gd: нет функции {fn}()", errors)
+
+    menu = (ROOT / "scripts" / "ui" / "main_menu.gd").read_text(encoding="utf-8")
+    if "СЕТЕВАЯ ИГРА" not in menu:
+        fail("main_menu.gd: нет кнопки «СЕТЕВАЯ ИГРА»", errors)
+    for mode in ("windowed", "borderless", "fullscreen"):
+        if mode not in menu:
+            fail(f"main_menu.gd: режим окна {mode} не предлагается", errors)
+    game_manager = (ROOT / "scripts" / "autoload" / "game_manager.gd").read_text(encoding="utf-8")
+    if "WINDOW_MODES" not in game_manager:
+        fail("game_manager.gd: нет WINDOW_MODES", errors)
+
+    save = (ROOT / "scripts" / "autoload" / "save_manager.gd").read_text(encoding="utf-8")
+    missing = [k for k in SETTINGS_KEYS if f'"{k}"' not in save]
+    if missing:
+        fail("save_manager.gd: в default_data()[\"settings\"] нет ключей " + ", ".join(missing), errors)
+    ok(f"Сеть и настройки: {len(SETTINGS_KEYS)} ключей, режимы окна, лобби")
+
+    # бумеранг вместо копья в дереве перков
+    perks = json.loads((ROOT / "data" / "perks.json").read_text(encoding="utf-8"))
+    trees = perks.get("trees", []) if isinstance(perks, dict) else []
+    all_perks = perks.get("perks", []) if isinstance(perks, dict) else perks
+    tree_ids = [str(t.get("id", "")) for t in trees if isinstance(t, dict)]
+    if "boomerang" not in tree_ids:
+        fail("perks.json: нет дерева boomerang", errors)
+    else:
+        tree_perks = [p for p in all_perks if str(p.get("tree", "")) == "boomerang"]
+        if len(tree_perks) < 4:
+            fail(f"Дерево бумеранга подозрительно короткое: {len(tree_perks)} перков", errors)
+        if not any(str(p.get("flags", {}).get("summon", "")) == "boomerang" for p in tree_perks):
+            fail("Дерево бумеранга не призывает бумеранг (flags.summon)", errors)
+        if any("копь" in str(p.get("name", "")).lower() for p in tree_perks):
+            fail("В дереве бумеранга остались перки-копья", errors)
+        ok(f"Бумеранг: {len(tree_perks)} перков в дереве")
+
+    ally = (ROOT / "scripts" / "game" / "ally.gd").read_text(encoding="utf-8")
+    for token in ("BOOMERANG_RANGE", "BOOMERANG_ORBIT", "boom_state"):
+        if token not in ally:
+            fail(f"ally.gd: нет механике бумеранга ({token})", errors)
+    for spr in ("ally_boomerang.png", "icon_tree_boomerang.png", "vfx_boomerang_0.png",
+                "illus_boomerang_t1.png", "illus_boomerang_t3.png"):
+        if not (ROOT / "assets" / "sprites" / spr).exists():
+            fail(f"нет спрайта бумеранга assets/sprites/{spr}", errors)
+
+    # документация
+    for doc in ("docs/СЕТЕВОЙ_КООП.md", "README.md"):
+        if not (ROOT / doc).exists():
+            fail(f"нет документа {doc}", errors)
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    if "1.5.0" not in readme:
+        fail("README.md: версия не обновлена до 1.5.0", errors)
+
+
+# Частые опечатки в свойствах узлов Godot: скрипт падает на этапе парсинга
+# ("Identifier ... not declared"), а статически это видно сразу.
+GD_KNOWN_PROPS = [
+    "visible", "position", "global_position", "rotation", "scale", "modulate",
+    "texture", "text", "size", "color", "mouse_filter", "z_index", "speed",
+    "velocity", "direction", "offset", "pivot_offset", "self_modulate", "flip_h",
+    "flip_v", "centered", "frame", "playing", "volume_db", "stream", "paused",
+    "alignment", "autowrap_mode", "clip_text", "max_lines_visible",
+]
+GD_DECL_RE = re.compile(r"^\s*(?:@?onready\s+)?(?:var|const|signal|func|class_name)\s+([A-Za-z_][A-Za-z0-9_]*)")
+GD_FOR_RE = re.compile(r"\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
+GD_FUNC_RE = re.compile(r"^\s*(?:static\s+)?func\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([^)]*)\)")
+GD_ASSIGN_RE = re.compile(r"^\s{1,}([A-Za-z_][A-Za-z0-9_]*)\s*(?:\+|-|\*|/)?=(?!=)")
+
+
+def _lev(a: str, b: str) -> int:
+    if abs(len(a) - len(b)) > 2:
+        return 9
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def check_gdscript_typos(errors: list[str]) -> None:
+    checked = 0
+    for path in sorted((ROOT / "scripts").rglob("*.gd")):
+        src = path.read_text(encoding="utf-8")
+        declared: set[str] = set()
+        for line in src.splitlines():
+            m = GD_DECL_RE.match(line)
+            if m:
+                declared.add(m.group(1))
+            for m in GD_FOR_RE.finditer(line):
+                declared.add(m.group(1))
+            m = GD_FUNC_RE.match(line)
+            if m:
+                for param in m.group(1).split(","):
+                    name = param.strip().split(":")[0].split("=")[0].strip()
+                    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+                        declared.add(name)
+        for idx, line in enumerate(src.splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            m = GD_ASSIGN_RE.match(line)
+            if not m:
+                continue
+            name = m.group(1)
+            if name in declared or name in GD_KNOWN_PROPS:
+                continue
+            best = min(GD_KNOWN_PROPS, key=lambda prop: _lev(name, prop))
+            if best != name and _lev(name, best) <= 3:
+                fail(f"{path.relative_to(ROOT)}:{idx}: похоже на опечатку «{name}» "
+                     f"вместо «{best}» (скрипт не скомпилируется)", errors)
+        checked += 1
+    ok(f"Проверено {checked} GDScript-файлов на опечатки в свойствах узлов")
+
+
+GD_LOCAL_VAR_RE = re.compile(r"^(\t+)(?:var|const)\s+([A-Za-z_][A-Za-z0-9_]*)")
+GD_FUNC_HEAD_RE = re.compile(r"^(?:static\s+)?func\s+[A-Za-z_][A-Za-z0-9_]*\s*\(")
+
+
+def _indent_of(line: str) -> int:
+    return len(line) - len(line.lstrip("\t"))
+
+
+def _param_names(header: str) -> list[str]:
+    names: list[str] = []
+    start = header.find("(")
+    if start < 0:
+        return names
+    depth = 0
+    chunk = ""
+    for ch in header[start:]:
+        if ch == "(":
+            depth += 1
+            if depth == 1:
+                continue
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        if depth == 1:
+            chunk += ch
+    for part in chunk.split(","):
+        name = part.strip().split(":")[0].split("=")[0].strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            names.append(name)
+    return names
+
+
+def check_gdscript_scopes(errors: list[str]) -> None:
+    """Ловит локальные переменные, использованные вне своего блока.
+
+    В GDScript переменная, объявленная в `if`/`for`/`match`, видна только внутри
+    этого блока и вложенных в него. Использование в соседнем блоке или выше —
+    ошибка компиляции, которую легко внести при правке кода.
+    """
+    checked = 0
+    for path in sorted((ROOT / "scripts").rglob("*.gd")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        stack: list[tuple[int, int]] = []  # (отступ заголовка, id блока)
+        decls: dict[str, list[tuple[tuple[int, ...], int]]] = {}
+        next_id = 0
+        skip_until = 0
+        in_string = False
+        for idx, raw in enumerate(lines, 1):
+            if in_string:
+                if raw.count('"""') % 2 == 1:
+                    in_string = False
+                continue
+            if idx <= skip_until or not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            if raw.count('"""') % 2 == 1:
+                in_string = True
+            stripped = raw.strip()
+            indent = _indent_of(raw)
+
+            if GD_FUNC_HEAD_RE.match(raw):
+                stack = [(0, next_id)]
+                next_id += 1
+                decls = {}
+                header = raw
+                probe = idx
+                while ")" not in header and probe < len(lines):
+                    probe += 1
+                    header += " " + lines[probe - 1].strip()
+                skip_until = probe if probe > idx else idx
+                func_scope = (stack[0][1],)
+                for name in _param_names(header):
+                    decls.setdefault(name, []).append((func_scope, idx))
+                continue
+
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            path_ids = tuple(block_id for _, block_id in stack)
+
+            m = GD_LOCAL_VAR_RE.match(raw)
+            if m:
+                name = m.group(2)
+                if len(name) >= 3:
+                    decls.setdefault(name, []).append((path_ids, idx))
+            else:
+                clean = re.sub(r'"[^"]*"', '""', raw)
+                if "func(" in clean:
+                    for name in _param_names(clean[clean.index("func(") + 4:]):
+                        decls.setdefault(name, []).append((path_ids, idx))
+                for fm in GD_FOR_RE.finditer(clean):
+                    decls.setdefault(fm.group(1), []).append((path_ids, idx))
+                for word in set(re.findall(r"(?<![\w.])[A-Za-z_][A-Za-z0-9_]{2,}\b(?!\s*\()", clean)):
+                    sites = decls.get(word)
+                    if not sites:
+                        continue
+                    ok_scope = False
+                    for scope, _decl_line in sites:
+                        if len(scope) <= len(path_ids) and path_ids[: len(scope)] == scope:
+                            ok_scope = True
+                            break
+                    if not ok_scope:
+                        decl_line = sites[-1][1]
+                        fail(f"{path.relative_to(ROOT)}:{idx}: «{word}» объявлена внутри блока "
+                             f"(строка {decl_line}) и здесь уже не видна — "
+                             f"GDScript не скомпилируется", errors)
+
+            if stripped.endswith(":"):
+                stack.append((indent, next_id))
+                next_id += 1
+        checked += 1
+    ok(f"Проверено {checked} GDScript-файлов на области видимости локальных переменных")
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -294,6 +560,9 @@ def main() -> int:
     check_text_and_res_paths(errors)
     check_data_integrity(loaded, errors)
     check_sprites(loaded, errors)
+    check_balance_and_net(errors)
+    check_gdscript_typos(errors)
+    check_gdscript_scopes(errors)
     check_python_tools(errors)
 
     if errors:

@@ -235,6 +235,8 @@ func _ready() -> void:
 	if OS.get_environment("SURW_CONTROLS_TEST") != "": call_deferred("_run_controls_test")
 	if OS.get_environment("SURW_PAUSE_TEST") != "": call_deferred("_run_pause_test")
 	if OS.get_environment("SURW_UI_TEST") != "": call_deferred("_run_ui_test")
+	if OS.get_environment("SURW_NET_TEST") != "": call_deferred("_run_net_test")
+	if OS.get_environment("SURW_BOOM_TEST") != "": call_deferred("_run_boomerang_test")
 	if OS.get_environment("SURW_HAZARD_TEST") != "": call_deferred("_run_hazard_test")
 	if OS.get_environment("SURW_MAP_DUMP") != "": call_deferred("_run_map_dump")
 	if OS.get_environment("SURW_VIS_TEST") != "": call_deferred("_run_vis_test")
@@ -1202,6 +1204,31 @@ func _run_ui_test() -> void:
 	var xp_base := int(round(float(xp_cfg.get("base", 10.0))))
 	assert(_xp_for_level(1) == xp_base, "Кривая XP некорректна: %d вместо %d" % [_xp_for_level(1), xp_base])
 	assert(_xp_for_level(41) > _xp_for_level(40) and _xp_for_level(41) < _xp_for_level(40) * 2, "Поздняя кривая XP некорректна")
+	# 7) настройки: ни одна кнопка не должна наезжать на другую (баг из скриншота)
+	mm.call("_open_overlay", "settings")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var ov: Control = mm.get("overlay") as Control
+	assert(ov != null, "Окно настроек не создалось")
+	var buttons: Array = ov.find_children("*", "Button", true, false)
+	var placed: Array = []
+	var overlaps := 0
+	for node in buttons:
+		var b := node as Button
+		if b == null or not b.is_visible_in_tree():
+			continue
+		var r := Rect2(b.global_position, b.size)
+		if r.size.x <= 0.0 or r.size.y <= 0.0:
+			continue
+		r = r.grow(-1.5)
+		for other in placed:
+			if r.intersects(other):
+				overlaps += 1
+				print("[SURWAVE] settings_overlap %s %s" % [b.text, str(r)])
+				break
+		placed.append(r)
+	assert(placed.size() >= 10, "В настройках слишком мало кнопок: %d" % placed.size())
+	assert(overlaps == 0, "Кнопки настроек перекрываются: %d" % overlaps)
 	mm.queue_free()
 	print("[SURWAVE] ui OK: cards=%d hotkey=2 end_rows=%d out_of_bounds=%d" % [cards.size(), end_panel.get_child_count(), problems])
 
@@ -3857,6 +3884,97 @@ func _capture_photo() -> void:
 		if photo_info != null:
 			photo_info.text = "Снимок сохранён: %s" % path.get_file()
 	print("[SURWAVE] photo=",path," err=",err," metadata map=",map_data.get("name","")," character=",player.char_data.get("name","")," time=",elapsed," level=",level," combo=",combo," kills=",kills," trials=",GameManager.run_config.get("trials",[]))
+
+## Проверка сетевого слоя: режимы окна, хост/лобби, скорость вражеских снарядов.
+## Полноценный ENet-обмен между двумя процессами проверяет ручной тест, здесь —
+## вся локальная логика, которая может сломаться при рефакторинге.
+func _run_net_test() -> void:
+	await get_tree().process_frame
+	assert(Net.max_players() >= 2, "Сетевой кооп не поддерживает несколько игроков")
+	assert(Net.default_port() > 1024, "Порт по умолчанию некорректен: %d" % Net.default_port())
+	assert(GameManager.WINDOW_MODES.size() == 3, "Должно быть три режима окна")
+	var before_mode := GameManager.window_mode()
+	var next_mode := GameManager.cycle_window_mode()
+	assert(next_mode != before_mode, "Режим окна не переключился")
+	GameManager.set_setting("window_mode", before_mode)
+	assert(GameManager.camera_zoom_scale() > 0.5, "Масштаб камеры из настроек некорректен")
+	var err := Net.host_game(18777)
+	assert(err == "", "Не удалось поднять сервер: " + err)
+	await get_tree().process_frame
+	assert(Net.is_host(), "Сервер не поднялся в режиме хоста")
+	assert(Net.lobby_players.size() == 1, "В лобби не появился хост")
+	Net.set_loadout("gavan", "shotgun")
+	var host_entry: Dictionary = Net.lobby_players.get("1", {})
+	assert(String(host_entry.get("character", "")) == "gavan", "Выбор героя не сохранился в лобби")
+	assert(String(host_entry.get("weapon", "")) == "shotgun", "Выбор оружия не сохранился в лобби")
+	var table := Net.loadout_table()
+	assert(table.has("1"), "Таблица загрузок пуста")
+	Net.start_lan_listen()
+	assert(Net.lan_list() is Array, "Список хостов локальной сети не читается")
+	Net.leave_session("тест")
+	assert(not Net.enabled, "Сеть не отключилась после выхода")
+	var empty_ip_error := Net.join_game("")
+	assert(empty_ip_error != "", "Пустой IP должен давать понятную ошибку")
+	Net.shutdown()
+	# вражеский снаряд: множитель из баланса и жёсткий потолок
+	spawn_enemy_bullet(player.global_position + Vector2(40, 0), Vector2.RIGHT, 1, {"speed": 300.0})
+	assert(not ebullets.is_empty(), "Снаряд врага не создан")
+	var eb: EnemyBullet = ebullets[ebullets.size() - 1]
+	var speed_now := eb.vel.length()
+	assert(speed_now <= 190.5, "Снаряд врага слишком быстрый: %.1f" % speed_now)
+	assert(speed_now < 300.0 * float(DB.balance["run"].get("enemy_proj_speed", 0.74)) + 1.0,
+		"Множитель скорости вражеских снарядов не применился: %.1f" % speed_now)
+	print("[SURWAVE] net OK: players=%d port=%d window=%s ebullet=%.1f" % [
+		Net.max_players(), Net.default_port(), GameManager.window_mode_name(), speed_now])
+
+## Проверка бумеранга: перк призывает его, он вылетает к цели и возвращается.
+func _run_boomerang_test() -> void:
+	await get_tree().process_frame
+	var perk_found := false
+	for perk in DB.perks:
+		if String(perk.id) == "boomerang_t1":
+			perk_found = true
+			assert(String(perk.get("flags", {}).get("summon", "")) == "boomerang",
+				"Перк Бумеранг не призывает бумеранг")
+	assert(perk_found, "В дереве перков нет Бумеранга")
+	assert(DB.tree_by_id.has("boomerang"), "Дерево Бумеранга не зарегистрировано")
+	player.upg.apply_flags({"summon": "boomerang"})
+	player._tick_perk_summons()
+	var boom: Ally = null
+	for a in allies:
+		if a.active and a.kind == "boomerang":
+			boom = a
+			break
+	assert(boom != null, "Бумеранг не призвался")
+	assert(boom.boom_state == "idle", "Бумеранг начал не в режиме ожидания: " + boom.boom_state)
+	assert(boom.sprite != null and boom.sprite.texture != null, "У бумеранга нет текстуры")
+	player.global_position = map_rect.get_center()
+	boom.global_position = player.global_position + Vector2(30.0, 0.0)
+	var enemy := spawn_enemy("slime", player.global_position + Vector2(120.0, 0.0))
+	assert(enemy != null, "Не удалось создать врага для теста бумеранга")
+	var seen_out := false
+	var seen_back := false
+	for i in 500:
+		enemy.hp = maxf(enemy.hp, 9999.0)
+		boom.tick(0.05)
+		if boom.boom_state == "out":
+			seen_out = true
+		elif boom.boom_state == "back":
+			seen_back = true
+		if seen_out and seen_back:
+			break
+	assert(seen_out, "Бумеранг не вылетел к цели")
+	assert(seen_back, "Бумеранг не вернулся к игроку")
+	enemy.deactivate()
+	for i in 200:
+		boom.tick(0.05)
+	var home_dist := boom.global_position.distance_to(player.global_position)
+	assert(home_dist < Ally.BOOMERANG_ORBIT + 46.0, "Бумеранг не вернулся в строй: %.1f px" % home_dist)
+	assert(boom.speed < 240.0, "Бумеранг слишком быстрый: %.1f" % boom.speed)
+	for a in allies:
+		if a.perk_summon:
+			a.deactivate()
+	print("[SURWAVE] boomerang OK: state=%s dist=%.1f speed=%.0f" % [boom.boom_state, home_dist, boom.speed])
 
 # ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
 ## Хост считает мир и рассылает снапшоты (10 Гц) + состояния игроков (20 Гц).
