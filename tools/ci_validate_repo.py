@@ -594,11 +594,13 @@ def check_playtest_fixes(loaded: dict[str, object], errors: list[str]) -> None:
 
     # курсор и режимы окна
     game_src = (ROOT / "scripts" / "game" / "game.gd").read_text(encoding="utf-8")
+    gm_src = (ROOT / "scripts" / "autoload" / "game_manager.gd").read_text(encoding="utf-8")
     if "func _sync_cursor()" not in game_src:
         fail("game.gd: нет _sync_cursor() — курсор в меню паузы/перков может пропасть", errors)
-    if "MOUSE_MODE_VISIBLE" not in game_src:
-        fail("game.gd: курсор никогда не становится видимым", errors)
-    gm_src = (ROOT / "scripts" / "autoload" / "game_manager.gd").read_text(encoding="utf-8")
+    if "MOUSE_MODE_VISIBLE" not in game_src and "MOUSE_MODE_VISIBLE" not in gm_src:
+        fail("курсор никогда не становится видимым (нет MOUSE_MODE_VISIBLE)", errors)
+    if "set_cursor_hidden" not in gm_src:
+        fail("game_manager.gd: нет set_cursor_hidden() — курсор не возвращается в меню", errors)
     for token in ("func apply_window_mode(", "MODE_EXCLUSIVE_FULLSCREEN", "func _fit_window("):
         if token not in gm_src:
             fail(f"game_manager.gd: нет {token} — режимы окна не переключаются", errors)
