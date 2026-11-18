@@ -687,6 +687,30 @@ def check_gdscript_statements(errors: list[str]) -> None:
     ok(f"Проверено {checked} GDScript-файлов на недопустимые операторы")
 
 
+GD_FUNC_RX = re.compile(r"^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def check_gdscript_duplicate_funcs(errors: list[str]) -> None:
+    """Godot падает с Parse Error, если функция объявлена дважды в одном скрипте."""
+    checked = 0
+    for path in (ROOT / "scripts").rglob("*.gd"):
+        seen: dict[str, int] = {}
+        checked += 1
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            m = GD_FUNC_RX.match(line)
+            if not m:
+                continue
+            name = m.group(1)
+            if name in seen:
+                fail(
+                    f"{path.relative_to(ROOT)}:{i}: функция {name}() уже объявлена в строке {seen[name]}",
+                    errors,
+                )
+            else:
+                seen[name] = i
+    ok(f"Проверено {checked} GDScript-файлов на дубликаты функций")
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -710,6 +734,7 @@ def main() -> int:
     check_gdscript_scopes(errors)
     check_gdscript_duplicate_children(errors)
     check_gdscript_statements(errors)
+    check_gdscript_duplicate_funcs(errors)
     check_python_tools(errors)
 
     if errors:

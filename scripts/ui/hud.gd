@@ -453,35 +453,39 @@ func _pick_emote(idx: int) -> void:
 	emote_pick = idx
 	close_emote_wheel(true)
 
-func _input(event: InputEvent) -> void:
+## Кооп-ввод (чат, колесо эмоций). Вызывается из общего _input.
+func _input_coop(event: InputEvent) -> bool:
 	if game == null or not bool(game.get("net_active")):
-		return
+		return false
 	if chat_input != null and chat_input.visible:
 		if event.is_action_pressed("pause"):
 			chat_input.visible = false
 			chat_input.release_focus()
 			get_viewport().set_input_as_handled()
-		return
+			return true
+		return false
 	if event.is_action_pressed("chat"):
 		if (choice_layer != null and choice_layer.visible) or (pause_layer != null and pause_layer.visible) or (end_layer != null and end_layer.visible):
-			return
+			return false
 		open_chat()
 		get_viewport().set_input_as_handled()
-		return
+		return true
 	if event.is_action_pressed("emote"):
 		open_emote_wheel()
-		return
+		return emote_open
 	if event.is_action_released("emote"):
 		close_emote_wheel(true)
-		return
+		return true
 	if emote_open and event is InputEventMouseMotion:
 		_hover_emote()
-		return
+		return true
 	if emote_open and event is InputEventKey and event.pressed and not event.echo:
 		var k := (event as InputEventKey).physical_keycode
 		if k >= KEY_1 and k <= KEY_6:
 			_pick_emote(k - KEY_1)
 			get_viewport().set_input_as_handled()
+			return true
+	return false
 
 func setup(g: Node) -> void:
 	game = g
@@ -1642,6 +1646,8 @@ func _input(event: InputEvent) -> void:
 				cheat_console.close_all()
 			toggle_pause()
 			get_viewport().set_input_as_handled()
+		return
+	if _input_coop(event):
 		return
 	if _input_choice_hotkey(event):
 		get_viewport().set_input_as_handled()
