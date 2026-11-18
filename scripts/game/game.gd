@@ -1478,7 +1478,7 @@ func _run_controls_test() -> void:
 	assert(icon_pos.distance_to(Vector2(86.0, 46.0)) > 40.0, "Иконка навыка осталась в углу в режиме «над игроком»")
 	# всплывающие надписи управляются настройкой toasts (по умолчанию выкл.)
 	assert(hud.toast_box != null, "В HUD нет контейнера всплывающих надписей")
-	var toasts_before := hud.toast_box.get_child_count()
+	var toasts_before: int = hud.toast_box.get_child_count()
 	GameManager.set_setting("toasts", false)
 	notify("проверка тостов")
 	await get_tree().process_frame

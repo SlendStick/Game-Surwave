@@ -1019,6 +1019,17 @@ def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
         fail("assets/sprites: нет спрайта boss_void.png", errors)
 
 
+def check_dynamic_inference(errors: list[str]) -> None:
+    """`var x := hud.prop` нельзя: у Node-типизированной ссылки нет типа значения."""
+    # проверяем только динамические свойства HUD (hud — Node, тип значения неизвестен)
+    pattern = re.compile(r"\bvar\s+([a-z_][a-z0-9_]*)\s*:=\s*hud\.[a-z_][a-z0-9_]*\s*(?![.\w(])")
+    for path in sorted((ROOT / "scripts").rglob("*.gd")):
+        src = path.read_text(encoding="utf-8")
+        for m in pattern.finditer(src):
+            line = src.count("\n", 0, m.start()) + 1
+            fail(f"{path.relative_to(ROOT)}:{line}: «{m.group(0).strip()}» — нужен явный тип (:= не выводится)", errors)
+
+
 def check_hud_tweaks(loaded: dict[str, object], errors: list[str]) -> None:
     """Иконка навыка рядом со шкалами героя и отключаемые всплывающие надписи."""
     hud = (ROOT / "scripts/ui/hud.gd").read_text(encoding="utf-8")
@@ -1083,6 +1094,7 @@ def main() -> int:
     check_network_v2(errors)
     check_boss_fights(loaded, errors)
     check_hud_tweaks(loaded, errors)
+    check_dynamic_inference(errors)
     check_python_tools(errors)
 
     if errors:
