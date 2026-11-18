@@ -101,6 +101,9 @@ var pending_aoe: Array = []
 var pulls: Array = []
 var flash_rect: ColorRect = null
 var flash_left := 0.0
+var vision_rect: ColorRect = null
+var vision_mat: ShaderMaterial = null
+var _xp_frac := 0.0
 var kills_without_damage := 0
 var pentagram_spawned := false
 
@@ -190,10 +193,12 @@ func _ready() -> void:
 	wave_mgr.setup(self, map_data, mode, diff_mods)
 	events_mgr = MapEvents.new()
 	events_mgr.setup(self, map_data)
+	_setup_vision_layer()
 	_setup_hud()
 	_setup_photo_ui()
 	_apply_map_mods()
 	_apply_trials()
+	AudioManager.stop_music()
 	AudioManager.play_music(map_data.get("mood", {}))
 	AudioManager.play_ambience(String(map_data.get("id", "sands")))
 	AudioManager.set_boss_layer(false)
@@ -439,7 +444,7 @@ func hit_obstacle(obstacle: Dictionary, amount: float) -> void:
 	if node != null and is_instance_valid(node):
 		node.queue_free()
 	_unregister_obstacle(obstacle)
-	if randf() < 0.25:
+	if not player.has_meta("no_heal") and randf() < 0.07:
 		spawn_pickup("heart", rect.get_center(), 1.0)
 
 func _unregister_obstacle(obstacle: Dictionary) -> void:
@@ -1205,15 +1210,38 @@ func _run_pause_test() -> void:
 			print("[SURWAVE] pause_out %s %s" % [String(it["name"]), str(r)])
 			bad += 1
 	assert(hud.pause_confirm_layer != null and not hud.pause_confirm_layer.visible, "Окно подтверждения паузы отсутствует")
+	hud._open_pause_settings()
+	await get_tree().process_frame
+	assert(hud.pause_settings_layer != null and hud.pause_settings_layer.visible, "Окно настроек паузы не открылось")
+	hud.toggle_pause()
+	await get_tree().process_frame
+	assert(pause_layer_visible() and not hud.pause_settings_layer.visible, "Esc должен сначала закрыть настройки паузы")
 	hud._open_pause_confirm("restart", "Тест подтверждения")
 	await get_tree().process_frame
-	assert(hud.pause_confirm_layer.visible, "Подтверждение «Заново» не открылось")
+	assert(hud.pause_confirm_layer.visible, "Подтверждение «Рестарт» не открылось")
 	hud.toggle_pause()
 	await get_tree().process_frame
 	assert(pause_layer_visible() and not hud.pause_confirm_layer.visible, "Esc должен сначала закрыть подтверждение")
 	hud.toggle_pause()
 	await get_tree().process_frame
 	assert(not get_tree().paused, "Пауза не снялась повторным Esc")
+	# Фоторежим + пауза + удаление перка + сундук + вспышка + дальность спавна
+	set_photo_mode(true)
+	assert(photo_mode and get_tree().paused, "Фоторежим не поставил игру на паузу")
+	hud.toggle_pause()
+	assert(not photo_mode and pause_layer_visible() and get_tree().paused, "Пауза не открылась из фоторежима")
+	hud.toggle_pause()
+	assert(not get_tree().paused, "Пауза не снялась после фоторежима")
+	level = 5
+	var before_perks := upg.taken.size()
+	var first_perk_id := String(upg.taken.keys()[0])
+	assert(remove_perk_for_level(first_perk_id, true), "Не удалось убрать перк за уровень")
+	assert(level == 4 and upg.taken.size() == before_perks - 1, "Уровень или список перков не обновился")
+	flash_screen(Color.WHITE)
+	_tick_flash(0.5)
+	assert(flash_rect.color.a <= 0.001 and not flash_rect.visible, "Вспышка экрана не погасла")
+	var far_pos := _spawn_position()
+	assert(far_pos.distance_to(player.global_position) >= 340.0, "Враг заспавнился слишком близко: %.1f" % far_pos.distance_to(player.global_position))
 	print("[SURWAVE] pause OK: perks=%d stats=%d layout_problems=%d" % [hud.pause_perk_list.get_child_count(), hud.pause_stats.get_child_count(), bad])
 
 func pause_layer_visible() -> bool:
@@ -1377,6 +1405,8 @@ func _prof(name: String, t0: int) -> void:
 	prof[name] = float(prof.get(name, 0.0)) + float(Time.get_ticks_usec() - t0) / 1000.0
 
 func _process(delta: float) -> void:
+	_tick_flash(delta)
+	_tick_vision()
 	if not run_started or ended:
 		return
 	if get_tree().paused:
@@ -1418,7 +1448,6 @@ func _process(delta: float) -> void:
 	events_mgr.tick(delta)
 	_tick_audio(delta)
 	_tick_perf_guard(delta)
-	_tick_flash(delta)
 	_tick_camera(delta)
 	_cleanup()
 	_check_end_conditions()
@@ -1891,22 +1920,21 @@ func spawn_from_role(role: String) -> Enemy:
 	return spawn_enemy(enemy_id, pos)
 
 func _spawn_position() -> Vector2:
-	var view := Vector2(640, 360)
 	var center := player.global_position
-	var side := randi() % 4
-	var pos := center
-	match side:
-		0:
-			pos = center + Vector2(randf_range(-view.x, view.x), -view.y * 0.5 - 64.0)
-		1:
-			pos = center + Vector2(randf_range(-view.x, view.x), view.y * 0.5 + 64.0)
-		2:
-			pos = center + Vector2(-view.x * 0.5 - 64.0, randf_range(-view.y, view.y))
-		_:
-			pos = center + Vector2(view.x * 0.5 + 64.0, randf_range(-view.y, view.y))
-	pos.x = clampf(pos.x, 20.0, map_rect.size.x - 20.0)
-	pos.y = clampf(pos.y, 20.0, map_rect.size.y - 20.0)
-	return pos
+	var best_pos := center
+	var best_dist := -1.0
+	for i in 12:
+		var ang := randf() * TAU
+		var dist := randf_range(420.0, 540.0)
+		var cand := clamp_to_map(center + Vector2.RIGHT.rotated(ang) * dist)
+		var d := cand.distance_to(center)
+		var obs := obstacle_at(cand, 12.0)
+		if obs.is_empty() and d >= 360.0:
+			return cand
+		if d > best_dist and (obs.is_empty() or best_dist < 0.0):
+			best_dist = d
+			best_pos = cand
+	return best_pos
 
 # ------------------------------------------------------------------ ЧИТЫ
 ## Точка спавна для чит-меню: рядом с игроком, но не внутри него.
@@ -2568,12 +2596,63 @@ func _phase_sequence(boss_node: Node2D, phase_no: int, mega: bool) -> void:
 			3: spawn_fx(boss_node.global_position,Color("#ffd700"),384.0 if mega else 256.0,1.0)
 			4: camera_zoom_target=BASE_CAMERA_ZOOM + (0.12 if mega else 0.05); notify("БОЙ ПРОДОЛЖАЕТСЯ")
 
+func _setup_vision_layer() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 2
+	add_child(layer)
+	vision_rect = ColorRect.new()
+	vision_rect.color = Color.WHITE
+	vision_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vision_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var shader := Shader.new()
+	shader.code = """shader_type canvas_item;
+uniform vec2 player_uv = vec2(0.5, 0.5);
+uniform vec2 viewport_size = vec2(640.0, 360.0);
+uniform float radius_px = 190.0;
+uniform float outer_alpha = 0.85;
+void fragment() {
+	vec2 delta = (UV - player_uv) * viewport_size;
+	float d = length(delta);
+	float inner = radius_px * 0.56;
+	float outer = radius_px * 1.10;
+	float t = smoothstep(inner, outer, d);
+	COLOR = vec4(0.014, 0.014, 0.026, t * outer_alpha);
+}"""
+	vision_mat = ShaderMaterial.new()
+	vision_mat.shader = shader
+	vision_rect.material = vision_mat
+	layer.add_child(vision_rect)
+
+func current_vision_radius() -> float:
+	var base_v := float(player.S.vision) if player != null else 190.0
+	return maxf(68.0, base_v * vision_mult)
+
+func _tick_vision() -> void:
+	if vision_rect == null or vision_mat == null:
+		return
+	vision_rect.visible = run_started and not ended and not photo_mode and player != null
+	if not vision_rect.visible:
+		return
+	var cam_center := camera.get_screen_center_position() if camera != null else player.global_position
+	var zoom_v := camera.zoom.x if camera != null else BASE_CAMERA_ZOOM
+	var vp_size := get_viewport_rect().size
+	if vp_size.x < 10.0 or vp_size.y < 10.0:
+		vp_size = Vector2(640.0, 360.0)
+	var p_screen := (player.global_position - cam_center) * zoom_v + vp_size * 0.5
+	var p_uv := Vector2(p_screen.x / vp_size.x, p_screen.y / vp_size.y)
+	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
+	vision_mat.set_shader_parameter("player_uv", p_uv)
+	vision_mat.set_shader_parameter("viewport_size", vp_size)
+	vision_mat.set_shader_parameter("radius_px", current_vision_radius() * zoom_v)
+	vision_mat.set_shader_parameter("outer_alpha", clampf(0.82 + float(dark_lvl - 1) * 0.008, 0.82, 0.93))
+
 func _setup_flash_layer() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 20
+	layer.layer = 8
 	add_child(layer)
 	flash_rect = ColorRect.new()
 	flash_rect.color = Color(1, 1, 1, 0)
+	flash_rect.visible = false
 	flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(flash_rect)
@@ -2583,16 +2662,24 @@ func _tick_flash(delta: float) -> void:
 		return
 	if flash_left > 0.0:
 		flash_left = maxf(0.0, flash_left - delta)
-		var a := flash_rect.color.a
-		flash_rect.color = Color(flash_rect.color.r, flash_rect.color.g, flash_rect.color.b, maxf(0.0, a - delta * 1.8))
+	var a := flash_rect.color.a
+	if a > 0.0:
+		var next_a := maxf(0.0, a - delta * 2.2)
+		flash_rect.color = Color(flash_rect.color.r, flash_rect.color.g, flash_rect.color.b, next_a)
+		if next_a <= 0.001:
+			flash_rect.color.a = 0.0
+			flash_rect.visible = false
+	else:
+		flash_rect.visible = false
 
 ## Короткая вспышка экрана (используется боссами и событиями карт).
 func flash_screen(col: Color) -> void:
-	if flash_rect == null or not GameManager.setting("post_fx",true):
+	if flash_rect == null or ended or not GameManager.setting("post_fx",true):
 		return
 	var g := Gfx.gothic(col, 0.3)
-	flash_rect.color = Color(g.r, g.g, g.b, 0.42)
-	flash_left = 0.35
+	flash_rect.visible = true
+	flash_rect.color = Color(g.r, g.g, g.b, 0.30)
+	flash_left = 0.25
 
 func notify(text: String) -> void:
 	EventBus.notify.emit(text)
@@ -2627,9 +2714,16 @@ func _xp_for_level(lvl: int) -> int:
 
 func add_xp(amount: float) -> void:
 	var dark_xp := maxf(0.1, 1.0 + float(diff_mods.get("xp", 0.0)))
-	var ev_xp := 1.5 if xp_boost_left > 0.0 else 1.0
-	var gain := amount * float(player.S.xp_mult) * dark_xp * trial_xp_mult * ev_xp
-	var gained := maxi(1, int(round(gain))) if amount > 0.0 else 0
+	var ev_xp := 1.4 if xp_boost_left > 0.0 else 1.0
+	var base_mult := float(DB.balance["run"].get("xp_gain_mult", 0.65))
+	var gain := amount * base_mult * float(player.S.xp_mult) * dark_xp * trial_xp_mult * ev_xp
+	if amount <= 0.0:
+		return
+	_xp_frac += gain
+	var gained := int(floorf(_xp_frac))
+	_xp_frac -= float(gained)
+	if gained <= 0:
+		return
 	xp += gained
 	while xp >= xp_need and level < int(DB.balance["run"].get("max_level", 60)):
 		xp -= xp_need
@@ -2648,7 +2742,7 @@ func collect_pickup(pickup: Pickup) -> void:
 	var combo_cfg: Dictionary = Progression.cfg.get("combo", {})
 	match pickup.kind:
 		"xp":
-			var xp_per := float(combo_cfg.get("xp_per", 0.015))
+			var xp_per := float(combo_cfg.get("xp_per", 0.008)) * 0.55
 			add_xp(pickup.value * (1.0 + float(combo) * xp_per))
 			AudioManager.play_sfx("xp", clampf(1.0 + float(level) * 0.02, 1.0, 2.0))
 			if player.upg.flag_num("recharge_ammo") > 0.0 and randf() < player.upg.flag_num("recharge_ammo"):
@@ -2704,13 +2798,13 @@ func on_enemy_death(enemy: Enemy) -> void:
 	var xp_val := float(enemy.data.get("xp", xp_table.get(role, 1)))
 	# Поздняя игра и догоняющий (catch-up) бонус опыта за усиленных врагов
 	if elapsed > 600.0:
-		xp_val *= 1.0 + minf(0.75, ((elapsed - 600.0) / 60.0) * 0.025)
-	if level < int(elapsed / 45.0):
-		xp_val *= 1.20
+		xp_val *= 1.0 + minf(0.35, ((elapsed - 600.0) / 60.0) * 0.015)
+	if level < int(elapsed / 60.0):
+		xp_val *= 1.15
 	spawn_pickup("xp", enemy.global_position, xp_val)
 	if randf() < float(DB.balance["run"].get("gold_chance", 0.05)) * dark_drop:
 		spawn_pickup("gold", enemy.global_position, float(rng.randi_range(1, 3)))
-	if not player.has_meta("no_heal") and randf() < float(DB.balance["run"].get("heart_chance", 0.005)) * float(director_mods.get("heal",1.0)) * dark_drop:
+	if not player.has_meta("no_heal") and randf() < float(DB.balance["run"].get("heart_chance", 0.0018)) * float(director_mods.get("heal",1.0)):
 		spawn_pickup("heart", enemy.global_position, 1.0)
 	var soul_chance := (float(DB.balance["run"].get("souls_per_kill", 0.02)) + player.upg.flag_num("soul_drop") + player.upg.flag_num("soul_drop_bonus")) * dark_drop
 	if randf() < soul_chance:
@@ -2779,20 +2873,65 @@ func open_chest(tier: int) -> void:
 	choice_queue.clear()
 	var char_id := String(GameManager.run_config.get("character", "aldar"))
 	if tier >= 3:
-		# босс: выбор 1 из 3 печатей
-		choice_queue.append({"kind": "seal", "cards": upg.seal_choices(3), "title": Loc.t("seal")})
+		# босс: выбор 1 из 3 печатей (или специализация при исчерпании печатей)
+		var seals := upg.seal_choices(3)
+		if not seals.is_empty():
+			choice_queue.append({"kind": "seal", "cards": seals, "title": Loc.t("seal")})
+		else:
+			choice_queue.append({"kind": "spec", "cards": upg.spec_choices(char_id, 3), "title": Loc.t("specialization")})
 	elif tier == 2:
-		# мини-босс: перк + специализация + шанс тома
-		choice_queue.append({"kind": "perk", "cards": upg.elite_choices(char_id, 4), "title": Loc.t("chest")})
+		# мини-босс: только специализация (без перков)
 		choice_queue.append({"kind": "spec", "cards": upg.spec_choices(char_id, 3), "title": Loc.t("specialization")})
-		if randf() < 0.5:
-			choice_queue.append({"kind": "seal", "cards": upg.seal_choices(3), "title": Loc.t("seal")})
 	else:
-		# элита: перк + иногда специализация
-		choice_queue.append({"kind": "perk", "cards": upg.elite_choices(char_id, 4), "title": Loc.t("chest")})
-		if randf() < 0.3:
-			choice_queue.append({"kind": "spec", "cards": upg.spec_choices(char_id, 2), "title": Loc.t("specialization")})
+		# элитный сундук: только специализация (без перков)
+		choice_queue.append({"kind": "spec", "cards": upg.spec_choices(char_id, 2), "title": Loc.t("specialization")})
 	_open_next_choice()
+
+func sync_pause_state() -> void:
+	if ended:
+		get_tree().paused = false
+		return
+	var should_pause := photo_mode or GameManager.cheat_open or paused_for_choice
+	if hud != null:
+		if hud.pause_layer != null and hud.pause_layer.visible:
+			should_pause = true
+		if hud.syn_layer != null and hud.syn_layer.visible:
+			should_pause = true
+	get_tree().paused = should_pause
+
+func remove_perk_for_level(perk_id: String, deduct_level: bool) -> bool:
+	if player == null:
+		return false
+	if deduct_level and level <= 1:
+		return false
+	if not player.upg.remove_perk(perk_id):
+		return false
+	var allowed_summons := player.upg.flag_list("summon")
+	for a in allies:
+		if a != null and a.active and bool(a.perk_summon) and not allowed_summons.has(String(a.kind)):
+			a.deactivate()
+	player.recalc()
+	player.hp = mini(player.hp, player.max_hp)
+	player.mag = mini(player.mag, int(player.S.mag))
+	if deduct_level:
+		level = maxi(1, level - 1)
+		xp_need = _xp_for_level(level)
+		xp = mini(xp, maxi(0, xp_need - 1))
+	else:
+		# Трата текущего повышения уровня из экрана выбора перков
+		if not choice_queue.is_empty():
+			choice_queue.pop_front()
+		paused_for_choice = false
+		if hud != null and hud.choice_layer != null:
+			hud.choice_layer.visible = false
+		sync_pause_state()
+		_open_next_choice()
+	EventBus.xp_changed.emit(xp, xp_need, level)
+	EventBus.hp_changed.emit(player.hp, player.max_hp)
+	EventBus.ammo_changed.emit(player.mag, int(player.S.mag), player.reloading)
+	var pdata: Dictionary = DB.perk(perk_id)
+	notify("Убран перк: %s" % String(pdata.get("name", perk_id)))
+	return true
 
 func _open_level_up() -> void:
 	if paused_for_choice or not choice_queue.is_empty():
@@ -2824,7 +2963,7 @@ func _open_next_choice() -> void:
 			choice_queue.pop_front()
 			continue
 		paused_for_choice = true
-		get_tree().paused = true
+		sync_pause_state()
 		hud.open_choice(cards, String(menu.get("title", "")), String(menu.get("kind", "perk")))
 		return
 	if pending_level_ups > 0:
@@ -2848,8 +2987,8 @@ func _card_vfx_kind(card: Dictionary) -> String:
 
 func _on_choice_made(card: Dictionary) -> void:
 	if choice_queue.is_empty():
-		get_tree().paused = false
 		paused_for_choice = false
+		sync_pause_state()
 		return
 	choice_queue.pop_front()
 	upg.take_card(card)
@@ -2859,8 +2998,8 @@ func _on_choice_made(card: Dictionary) -> void:
 	player.mag = mini(player.mag, int(player.S.mag))
 	if player != null:
 		spawn_perk_fx(_card_vfx_kind(card), player.global_position, 64.0, 0.42)
-	get_tree().paused = false
 	paused_for_choice = false
+	sync_pause_state()
 	_open_next_choice()
 
 # ------------------------------------------------------------------ ИВЕНТЫ КАРТ
@@ -3414,6 +3553,18 @@ func _finish_run(win: bool, secret_win: bool) -> void:
 		return
 	ended = true
 	victory = win
+	photo_mode = false
+	if photo_layer != null:
+		photo_layer.visible = false
+	if hud != null and hud.root != null:
+		hud.root.visible = true
+	flash_left = 0.0
+	if flash_rect != null:
+		flash_rect.color.a = 0.0
+		flash_rect.visible = false
+	if vision_rect != null:
+		vision_rect.visible = false
+	stop_weather()
 	get_tree().paused = false
 	AudioManager.set_boss_layer(false)
 	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
@@ -3505,14 +3656,11 @@ func _apply_photo_style() -> void:
 	var names=["НОРМА","СЕПИЯ","ХОЛОДНЫЙ","НУАР","РЕТРО"]
 	photo_info.text="%s · рамка %d · %s ×%d · F12/P выход · SPACE/F5 снимок · H/R/F/J/K" % [names[photo_filter%names.size()],photo_frame,photo_format.to_upper(),photo_scale]
 
-func _toggle_photo_mode() -> void:
-	if not photo_mode:
-		_photo_was_paused = get_tree().paused
-		photo_mode = true
-		get_tree().paused = true
-	else:
-		photo_mode = false
-		get_tree().paused = _photo_was_paused
+func set_photo_mode(enabled: bool) -> void:
+	if photo_mode == enabled:
+		return
+	photo_mode = enabled
+	sync_pause_state()
 	if hud != null:
 		hud.root.visible = not photo_mode
 		if not photo_mode: hud.root.show()
@@ -3520,6 +3668,9 @@ func _toggle_photo_mode() -> void:
 	if not photo_mode and photo_enemies_hidden:
 		photo_enemies_hidden=false
 		for e in enemies: e.visible=true
+
+func _toggle_photo_mode() -> void:
+	set_photo_mode(not photo_mode)
 
 func _capture_photo() -> void:
 	if DisplayServer.get_name()=="headless":
@@ -3548,15 +3699,12 @@ func _capture_photo() -> void:
 
 # ------------------------------------------------------------------ ПРОЧЕЕ
 func _input(event: InputEvent) -> void:
-	# при открытой чит-консоли Esc принадлежит ей, пауза не дёргается
-	if GameManager.cheat_open and event.is_action_pressed("pause"):
-		return
 	if event.is_action_pressed("photo_mode") and not ended:
 		_toggle_photo_mode()
 		get_viewport().set_input_as_handled()
 	elif photo_mode and (event.is_action_pressed("photo_capture") or (event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).physical_keycode == KEY_SPACE)):
 		_capture_photo(); get_viewport().set_input_as_handled()
-	elif photo_mode and event is InputEventKey and event.pressed and not event.echo:
+	elif photo_mode and event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).physical_keycode in [KEY_H, KEY_R, KEY_F, KEY_J, KEY_K]:
 		match (event as InputEventKey).physical_keycode:
 			KEY_H: photo_filter=(photo_filter+1)%5; _apply_photo_style()
 			KEY_R: photo_frame=(photo_frame+1)%4; _apply_photo_style()
@@ -3565,7 +3713,6 @@ func _input(event: InputEvent) -> void:
 				for e in enemies: e.visible=not photo_enemies_hidden
 			KEY_J: photo_format={"png":"jpg","jpg":"webp","webp":"png"}[photo_format]; _apply_photo_style()
 			KEY_K: photo_scale=1 if photo_scale>=8 else photo_scale*2; _apply_photo_style()
-			KEY_ESCAPE: _toggle_photo_mode()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("interact") and qte_target != null:
 		_qte_press()
@@ -3573,6 +3720,7 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("pause"):
 		if hud != null and not ended:
 			hud.toggle_pause()
+			get_viewport().set_input_as_handled()
 	if event is InputEventMouseButton and photo_mode:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP: camera.zoom = (camera.zoom + Vector2(0.1,0.1)).clamp(Vector2(0.5,0.5),Vector2(4,4))
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN: camera.zoom = (camera.zoom - Vector2(0.1,0.1)).clamp(Vector2(0.5,0.5),Vector2(4,4))

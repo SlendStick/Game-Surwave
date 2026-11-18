@@ -15,6 +15,9 @@ var spec_mult := 3.0
 var endless := false
 var choice_count := 5
 var log: Array = []
+var _extra_ops: Array = []
+var _card_records: Array = []
+var _replaying := false
 
 # модификаторы, которые являются целыми (прибавка, а не процент)
 const INT_MODS := ["hp", "mag", "proj", "pierce", "bounce", "summon_count"]
@@ -33,6 +36,8 @@ func reset() -> void:
 	evolution_done = false
 	specialization_pending = 0
 	log.clear()
+	_extra_ops.clear()
+	_card_records.clear()
 
 # ------------------------------------------------------------------ утилиты
 func mod(key: String, def: float = 0.0) -> float:
@@ -64,6 +69,8 @@ func flag_list(key: String) -> Array:
 	return []
 
 func apply_mods(mods: Dictionary, mult: float = 1.0) -> void:
+	if not _replaying and not mods.is_empty():
+		_extra_ops.append({"op": "mods", "mods": mods.duplicate(true), "mult": mult})
 	for key in mods.keys():
 		var value := float(mods[key]) * mult
 		if INT_MODS.has(key):
@@ -75,6 +82,8 @@ func apply_mods(mods: Dictionary, mult: float = 1.0) -> void:
 			add[key] = float(add.get(key, 0.0)) + value
 
 func apply_flags(new_flags: Dictionary) -> void:
+	if not _replaying and not new_flags.is_empty():
+		_extra_ops.append({"op": "flags", "flags": new_flags.duplicate(true)})
 	for key in new_flags.keys():
 		var value: Variant = new_flags[key]
 		if not flags.has(key):
@@ -235,9 +244,11 @@ func take_card(card: Dictionary) -> String:
 	var kind := String(card.get("kind", ""))
 	var data: Dictionary = card.get("data", {})
 	var id := String(card.get("id", ""))
+	_replaying = true
 	match kind:
 		"perk":
 			if not bool(card.get("force", false)) and not DB.can_take_perk(data, taken, endless):
+				_replaying = false
 				push_warning("Заблокирована недоступная карточка перка: %s" % id)
 				return "blocked"
 			var mult := spec_mult if specialization_pending > 0 else 1.0
@@ -247,35 +258,116 @@ func take_card(card: Dictionary) -> String:
 			apply_mods(data.get("mods", {}), mult)
 			apply_flags(data.get("flags", {}))
 			log.append({"kind": kind, "id": id, "mult": mult})
+			_card_records.append(card.duplicate(true))
 		"char_upgrade":
 			taken_char_upgrades.append(id)
 			apply_mods(data.get("mods", {}))
 			apply_flags(data.get("flags", {}))
 			log.append({"kind": kind, "id": id})
+			_card_records.append(card.duplicate(true))
 		"synergy":
 			taken_synergies.append(id)
 			apply_mods(data.get("mods", {}))
 			apply_flags(data.get("flags", {}))
 			EventBus.synergy_unlocked.emit(id)
 			log.append({"kind": kind, "id": id})
+			_card_records.append(card.duplicate(true))
 		"specialization":
 			apply_mods(data.get("mods", {}))
 			apply_flags(data.get("flags", {}))
 			specialization_pending += 1
 			log.append({"kind": kind, "id": id, "perk_id": String(data.get("perk_id", ""))})
+			_card_records.append(card.duplicate(true))
 		"seal":
 			taken_seals.append(id)
 			apply_mods(data.get("mods", {}))
 			apply_flags(data.get("flags", {}))
 			log.append({"kind": kind, "id": id})
+			_card_records.append(card.duplicate(true))
 		"evolution":
 			weapon_evolution = data
 			evolution_done = true
 			apply_mods(data.get("mods", {}))
 			apply_flags(data.get("flags", {}))
 			log.append({"kind": kind, "id": id})
+			_card_records.append(card.duplicate(true))
+	_replaying = false
 	EventBus.upgrade_picked.emit(id, kind)
 	return kind
+
+## Убирает 1 стак приобретённого перка и точно пересчитывает все модификаторы/флаги.
+func remove_perk(perk_id: String) -> bool:
+	if int(taken.get(perk_id, 0)) <= 0:
+		return false
+	var remove_idx := -1
+	for i in range(_card_records.size() - 1, -1, -1):
+		var rec: Dictionary = _card_records[i]
+		if String(rec.get("kind", "")) == "perk" and String(rec.get("id", "")) == perk_id:
+			remove_idx = i
+			break
+	if remove_idx < 0:
+		return false
+	_card_records.remove_at(remove_idx)
+	var saved_extra := _extra_ops.duplicate(true)
+	var saved_cards := _card_records.duplicate(true)
+	reset()
+	_extra_ops = saved_extra
+	_replaying = true
+	for op in _extra_ops:
+		if String(op.get("op", "")) == "mods":
+			apply_mods(op.get("mods", {}), float(op.get("mult", 1.0)))
+		elif String(op.get("op", "")) == "flags":
+			apply_flags(op.get("flags", {}))
+	for rec in saved_cards:
+		var c: Dictionary = (rec as Dictionary).duplicate(true)
+		if String(c.get("kind", "")) == "perk":
+			c["force"] = true
+		var kind := String(c.get("kind", ""))
+		var data: Dictionary = c.get("data", {})
+		var id := String(c.get("id", ""))
+		match kind:
+			"perk":
+				var mult := spec_mult if specialization_pending > 0 else 1.0
+				if specialization_pending > 0:
+					specialization_pending -= 1
+				taken[id] = int(taken.get(id, 0)) + 1
+				apply_mods(data.get("mods", {}), mult)
+				apply_flags(data.get("flags", {}))
+				log.append({"kind": kind, "id": id, "mult": mult})
+				_card_records.append(c)
+			"char_upgrade":
+				taken_char_upgrades.append(id)
+				apply_mods(data.get("mods", {}))
+				apply_flags(data.get("flags", {}))
+				log.append({"kind": kind, "id": id})
+				_card_records.append(c)
+			"synergy":
+				taken_synergies.append(id)
+				apply_mods(data.get("mods", {}))
+				apply_flags(data.get("flags", {}))
+				log.append({"kind": kind, "id": id})
+				_card_records.append(c)
+			"specialization":
+				apply_mods(data.get("mods", {}))
+				apply_flags(data.get("flags", {}))
+				specialization_pending += 1
+				log.append({"kind": kind, "id": id, "perk_id": String(data.get("perk_id", ""))})
+				_card_records.append(c)
+			"seal":
+				taken_seals.append(id)
+				apply_mods(data.get("mods", {}))
+				apply_flags(data.get("flags", {}))
+				log.append({"kind": kind, "id": id})
+				_card_records.append(c)
+			"evolution":
+				weapon_evolution = data
+				evolution_done = true
+				apply_mods(data.get("mods", {}))
+				apply_flags(data.get("flags", {}))
+				log.append({"kind": kind, "id": id})
+				_card_records.append(c)
+	_replaying = false
+	return true
 
 func summary() -> Array:
 	return log.duplicate()

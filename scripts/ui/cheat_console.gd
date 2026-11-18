@@ -95,8 +95,6 @@ func _input(event: InputEvent) -> void:
 
 # ------------------------------------------------------------------ СТРОКА
 func open_line() -> void:
-	if get_tree().paused and not GameManager.cheat_open:
-		return
 	pause_for_cheats()
 	GameManager.cheat_open = true
 	_layout()
@@ -104,6 +102,8 @@ func open_line() -> void:
 	line.visible = true
 	hint.visible = true
 	line.grab_focus()
+	if game != null and game.has_method("sync_pause_state"):
+		game.sync_pause_state()
 
 func _submit(text: String) -> void:
 	var cmd := text.strip_edges().to_lower()
@@ -121,7 +121,10 @@ func pause_for_cheats() -> void:
 	get_tree().paused = true
 
 func unpause_after_cheats() -> void:
-	get_tree().paused = was_paused
+	if game != null and game.has_method("sync_pause_state"):
+		game.sync_pause_state()
+	else:
+		get_tree().paused = was_paused
 
 # ------------------------------------------------------------------ МЕНЮ
 func open_menu() -> void:
@@ -135,6 +138,8 @@ func open_menu() -> void:
 	_layout()
 	line.release_focus()
 	_rebuild()
+	if game != null and game.has_method("sync_pause_state"):
+		game.sync_pause_state()
 
 func close_all() -> void:
 	GameManager.cheat_open = false

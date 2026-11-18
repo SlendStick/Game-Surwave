@@ -27,10 +27,7 @@ func _ready() -> void:
 	if OS.get_environment("SURW_MENU_OVERLAY") != "":
 		call_deferred("_open_overlay", OS.get_environment("SURW_MENU_OVERLAY"))
 	_build()
-	AudioManager.set_boss_layer(false)
-	AudioManager.stop_ambience()
-	AudioManager.play_music({"root": 50, "scale": "minor", "tempo": 64, "wave": "lute"})
-	AudioManager.set_intensity(0.0)
+	AudioManager.play_menu_music()
 
 func _build() -> void:
 	UI.full_rect(self)

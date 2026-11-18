@@ -109,23 +109,53 @@ func _nearest() -> Node2D:
 		return null
 	return res[0]
 
+const SPEAR_MAX_RANGE := 215.0
+const SPEAR_ORBIT_RADIUS := 40.0
+
+func _spear_slot() -> int:
+	var idx := 0
+	for a in game.allies:
+		if a == self:
+			return idx
+		if a.active and a.kind == "holy_spear":
+			idx += 1
+	return idx
+
 func _spear_hunt(delta: float) -> void:
+	if game == null or game.player == null:
+		return
 	var speed_add := 1.0 + float(game.player.upg.mod("summon_speed"))
-	var tgt := _nearest()
-	if tgt != null:
+	var ppos: Vector2 = game.player.global_position
+	var dist_from_player := global_position.distance_to(ppos)
+	var cand: Array = game.nearest_enemy(ppos, SPEAR_MAX_RANGE)
+	var tgt: Node2D = null
+	if not cand.is_empty() and dist_from_player <= SPEAR_MAX_RANGE + 28.0:
+		var slot := _spear_slot()
+		tgt = cand[slot % cand.size()]
+	if tgt != null and is_instance_valid(tgt) and tgt.active:
 		var dir := (tgt.global_position - global_position)
-		if dir.length() > 1.0:
-			var move_dir := dir.normalized()
-			global_position += move_dir * speed * speed_add * delta
+		var dlen := dir.length()
+		var move_speed := speed * speed_add * (1.28 if dlen < 95.0 else 1.05)
+		if dlen > 1.0:
+			var move_dir := dir / dlen
+			global_position += move_dir * move_speed * delta
 			if sprite != null:
 				sprite.rotation = move_dir.angle() + PI * 0.25
+		# Ограничение дальности действия от игрока
+		var after_off := global_position - ppos
+		if after_off.length() > SPEAR_MAX_RANGE:
+			global_position = ppos + after_off.normalized() * SPEAR_MAX_RANGE
+		if attack_cd <= 0.0:
+			attack_cd = 0.08
+			game.spawn_fx(global_position, Color(1.0, 0.92, 0.45, 0.55), 7.0, 0.12)
 	else:
-		orbit_angle += delta * 2.4 * speed_add
-		var home: Vector2 = game.player.global_position + Vector2.RIGHT.rotated(orbit_angle) * 36.0
+		orbit_angle += delta * 2.8 * speed_add
+		var home: Vector2 = ppos + Vector2.RIGHT.rotated(orbit_angle) * SPEAR_ORBIT_RADIUS
 		var to_home: Vector2 = home - global_position
 		if to_home.length() > 2.0:
 			var mdir: Vector2 = to_home.normalized()
-			global_position += mdir * minf(to_home.length(), speed * speed_add * delta)
+			var ret_speed := speed * speed_add * (1.45 if dist_from_player > SPEAR_MAX_RANGE else 1.0)
+			global_position += mdir * minf(to_home.length(), ret_speed * delta)
 			if sprite != null:
 				sprite.rotation = mdir.angle() + PI * 0.25
 	for enemy in game.enemies_in_radius(global_position, radius + 12.0):

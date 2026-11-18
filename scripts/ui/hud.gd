@@ -27,6 +27,7 @@ var skill_ring: Control
 var combo_lbl: Label
 var weather_lbl: Label
 var dark_overlay: Control
+var target_arrows: Control
 var dark_badge: Panel
 var dark_icon: Control
 var dark_lbl: Label
@@ -39,10 +40,15 @@ var choice_layer: Control
 var choice_title: Label
 var choice_hint: Label
 var choice_box: HBoxContainer
+var choice_remove_btn: Button
+var choice_remove_panel: Control
+var choice_remove_list: VBoxContainer
 var pause_layer: Control
 var pause_confirm_layer: Control
 var pause_confirm_lbl: Label
 var pause_confirm_action := ""
+var pause_settings_layer: Control
+var pause_settings_list: VBoxContainer
 var pause_perk_list: VBoxContainer
 var pause_perks_count: Label
 var pause_stats: VBoxContainer
@@ -77,6 +83,13 @@ func _build() -> void:
 	dark_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dark_overlay.draw.connect(_draw_darkness_fx)
 	root.add_child(dark_overlay)
+
+	# --- стрелочки к сундукам, боссам и мини-боссам
+	target_arrows = Control.new()
+	target_arrows.set_anchors_preset(Control.PRESET_FULL_RECT)
+	target_arrows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target_arrows.draw.connect(_draw_target_arrows)
+	root.add_child(target_arrows)
 
 	# --- шкала опыта во всю ширину, поверх неё по центру уровень
 	xp_back = ColorRect.new()
@@ -266,18 +279,48 @@ func _build_choice_layer() -> void:
 	choice_layer.visible = false
 	root.add_child(choice_layer)
 	_dim(choice_layer)
-	choice_title = UI.label(choice_layer, "", 14, UI.GOLD, Vector2(0, 12))
+	choice_title = UI.label(choice_layer, "", 14, UI.GOLD, Vector2(0, 10))
 	choice_title.size = Vector2(640, 18)
 	choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	choice_hint = UI.label(choice_layer, "ЛКМ — выбрать · игра на паузе", 8, UI.MUTED, Vector2(0, 31))
+	choice_hint = UI.label(choice_layer, "ЛКМ — выбрать · игра на паузе", 8, UI.MUTED, Vector2(0, 29))
 	choice_hint.size = Vector2(640, 12)
 	choice_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	choice_box = HBoxContainer.new()
-	choice_box.position = Vector2(10, 46)
-	choice_box.size = Vector2(620, 302)
+	choice_box.position = Vector2(10, 44)
+	choice_box.size = Vector2(620, 282)
 	choice_box.add_theme_constant_override("separation", 6)
 	choice_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	choice_layer.add_child(choice_box)
+
+	choice_remove_btn = UI.button(choice_layer, "УБРАТЬ ПЕРК (ЗА УРОВЕНЬ)", 8, Vector2(210, 22))
+	choice_remove_btn.position = Vector2(215, 330)
+	choice_remove_btn.visible = false
+	choice_remove_btn.pressed.connect(_open_choice_remove_panel)
+
+	choice_remove_panel = Control.new()
+	choice_remove_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	choice_remove_panel.visible = false
+	choice_layer.add_child(choice_remove_panel)
+	_dim(choice_remove_panel)
+	var rpanel := UI.panel_striped(choice_remove_panel, Rect2(100, 32, 440, 296), UI.DANGER)
+	var rtitle := UI.title(rpanel, "УБРАТЬ ПРИОБРЕТЁННЫЙ ПЕРК", 12, Vector2(12, 8), UI.GOLD_BRIGHT)
+	rtitle.size = Vector2(416, 18)
+	rtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var rsub := UI.crisp_label(rpanel, "Убирает 1 уровень выбранного перка в счёт текущего повышения уровня", 8, UI.DIM, Vector2(12, 26))
+	rsub.size = Vector2(416, 12)
+	rsub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var rscroll := ScrollContainer.new()
+	rscroll.position = Vector2(12, 42)
+	rscroll.size = Vector2(416, 212)
+	rscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rpanel.add_child(rscroll)
+	choice_remove_list = VBoxContainer.new()
+	choice_remove_list.custom_minimum_size = Vector2(404, 0)
+	choice_remove_list.add_theme_constant_override("separation", 4)
+	rscroll.add_child(choice_remove_list)
+	var rcancel := UI.button(rpanel, "ОТМЕНА", 9, Vector2(120, 24))
+	rcancel.position = Vector2(160, 262)
+	rcancel.pressed.connect(func() -> void: choice_remove_panel.visible = false)
 
 ## Меню паузы: готическая сводка билда и характеристик забега.
 func _build_pause_layer() -> void:
@@ -304,14 +347,14 @@ func _build_pause_layer() -> void:
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	# --- левая колонка: хроника билда с иконками
-	var left := UI.panel_striped(pause_layer, Rect2(14, 50, 346, 260), UI.ACCENT)
+	var left := UI.panel_striped(pause_layer, Rect2(14, 48, 346, 268), UI.ACCENT)
 	UI.crisp_label(left, "ХРОНИКА БИЛДА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
 	pause_perks_count = UI.crisp_label(left, "", 8, UI.DIM, Vector2(190, 9))
 	pause_perks_count.size = Vector2(146, 12)
 	pause_perks_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(8, 26)
-	scroll.size = Vector2(330, 226)
+	scroll.position = Vector2(8, 25)
+	scroll.size = Vector2(330, 235)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	left.add_child(scroll)
 	pause_perk_list = VBoxContainer.new()
@@ -320,31 +363,51 @@ func _build_pause_layer() -> void:
 	scroll.add_child(pause_perk_list)
 
 	# --- правая колонка: сводка забега + кнопки
-	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 174), UI.GOLD_DEEP)
-	UI.crisp_label(right, "СВОДКА ЗАБЕГА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
+	var right := UI.panel_striped(pause_layer, Rect2(368, 48, 258, 174), UI.GOLD_DEEP)
+	UI.crisp_label(right, "СВОДКА ЗАБЕГА", 9, UI.GOLD_BRIGHT, Vector2(10, 6))
 	pause_stats = VBoxContainer.new()
-	pause_stats.position = Vector2(10, 24)
-	pause_stats.size = Vector2(238, 146)
-	pause_stats.add_theme_constant_override("separation", 1)
+	pause_stats.position = Vector2(10, 21)
+	pause_stats.size = Vector2(238, 148)
+	pause_stats.clip_contents = true
+	pause_stats.add_theme_constant_override("separation", 0)
 	right.add_child(pause_stats)
 
-	var buttons := UI.vbox(pause_layer, 3)
-	buttons.position = Vector2(368, 228)
-	buttons.size = Vector2(258, 90)
-	var resume := UI.primary_button(buttons, Loc.t("resume"), 10, Vector2(258, 21))
+	var buttons := UI.vbox(pause_layer, 2)
+	buttons.position = Vector2(368, 226)
+	buttons.size = Vector2(258, 92)
+	var resume := UI.primary_button(buttons, Loc.t("resume"), 9, Vector2(258, 18))
 	resume.pressed.connect(toggle_pause)
-	var restart := UI.button(buttons, Loc.t("restart"), 9, Vector2(258, 20))
+	var settings_btn := UI.button(buttons, Loc.t("settings"), 8, Vector2(258, 16))
+	settings_btn.pressed.connect(_open_pause_settings)
+	var restart := UI.button(buttons, Loc.t("restart"), 8, Vector2(258, 16))
 	restart.pressed.connect(func() -> void: _open_pause_confirm("restart", "Начать забег заново? Весь текущий прогресс раунда будет сброшен."))
-	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 20))
+	var to_menu := UI.button(buttons, Loc.t("main_menu"), 8, Vector2(258, 16))
 	to_menu.pressed.connect(func() -> void: _open_pause_confirm("menu", "Выйти в главное меню? Текущий забег не будет сохранён."))
-	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 20))
+	var quit := UI.button(buttons, Loc.t("quit"), 8, Vector2(258, 16))
 	quit.pressed.connect(func() -> void: _open_pause_confirm("quit", "Выйти из игры?"))
 
 	var foot := UI.crisp_label(pause_layer, "Пробел — автоприцел · R — перезарядка · ПКМ/Q — способность · 1–5 — выбор карты", 7, UI.MUTED, Vector2(0, 322))
 	foot.size = Vector2(640, 12)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# --- модальное подтверждение для "Заново" / "Главное меню" / "Выйти"
+	# --- модальное окно настроек в паузе
+	pause_settings_layer = Control.new()
+	pause_settings_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_settings_layer.visible = false
+	pause_layer.add_child(pause_settings_layer)
+	_dim(pause_settings_layer)
+	var spanel := UI.panel_striped(pause_settings_layer, Rect2(140, 44, 360, 272), UI.GOLD)
+	var stitle := UI.title(spanel, Loc.t("settings"), 14, Vector2(12, 8), UI.GOLD_BRIGHT)
+	stitle.size = Vector2(336, 20)
+	stitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_settings_list = UI.vbox(spanel, 6)
+	pause_settings_list.position = Vector2(18, 36)
+	pause_settings_list.size = Vector2(324, 196)
+	var sback := UI.primary_button(spanel, Loc.t("back"), 9, Vector2(120, 24))
+	sback.position = Vector2(120, 238)
+	sback.pressed.connect(func() -> void: pause_settings_layer.visible = false)
+
+	# --- модальное подтверждение для "Рестарт" / "Главное меню" / "Выйти"
 	pause_confirm_layer = Control.new()
 	pause_confirm_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pause_confirm_layer.visible = false
@@ -397,16 +460,23 @@ func _build_syn_layer() -> void:
 	close.pressed.connect(func() -> void: syn_layer.visible = false)
 
 # ------------------------------------------------------------------ ВЫБОР
-func open_choice(cards: Array, title: String, _kind: String) -> void:
+func open_choice(cards: Array, title: String, kind_name: String) -> void:
 	current_cards = cards
 	UI.clear(choice_box)
 	choice_title.text = title
+	if choice_remove_panel != null:
+		choice_remove_panel.visible = false
+	var can_remove := kind_name == "perk" and game != null and game.player != null and not game.player.upg.taken.is_empty()
+	if choice_remove_btn != null:
+		choice_remove_btn.visible = can_remove
+		choice_remove_btn.text = "УБРАТЬ ПЕРК (ЗА УРОВЕНЬ) · %d" % game.player.upg.taken.size() if can_remove else "УБРАТЬ ПЕРК (ЗА УРОВЕНЬ)"
 	var card_w := 118.0
 	if cards.size() <= 3:
 		card_w = 186.0
 	elif cards.size() == 4:
 		card_w = 148.0
-	var card_h := 296.0
+	var card_h := 278.0 if can_remove else 296.0
+	choice_box.size = Vector2(620, card_h + 4.0)
 	for i in cards.size():
 		var card: Dictionary = cards[i]
 		var kind := String(card.get("kind", "perk"))
@@ -739,6 +809,8 @@ func _process(delta: float) -> void:
 	if game == null or game.player == null:
 		return
 	_refresh(delta)
+	if target_arrows != null:
+		target_arrows.queue_redraw()
 
 func _refresh(delta: float) -> void:
 	var p: Player = game.player
@@ -841,15 +913,130 @@ func _sync_hearts(pl: Player) -> void:
 func toggle_pause() -> void:
 	if end_layer.visible:
 		return
+	if game != null and game.photo_mode:
+		game.set_photo_mode(false)
+		if not pause_layer.visible:
+			pause_layer.visible = true
+			game.sync_pause_state()
+			_refresh_pause_menu()
+			AudioManager.play_sfx("ui", 0.9)
+		return
 	if pause_confirm_layer != null and pause_confirm_layer.visible:
 		pause_confirm_layer.visible = false
 		return
+	if pause_settings_layer != null and pause_settings_layer.visible:
+		pause_settings_layer.visible = false
+		return
 	var now := not pause_layer.visible
 	pause_layer.visible = now
-	get_tree().paused = now
+	if game != null and game.has_method("sync_pause_state"):
+		game.sync_pause_state()
+	else:
+		get_tree().paused = now
 	if now:
 		_refresh_pause_menu()
 		AudioManager.play_sfx("ui", 0.9)
+
+func _open_choice_remove_panel() -> void:
+	if choice_remove_panel == null or choice_remove_list == null or game == null or game.player == null:
+		return
+	UI.clear(choice_remove_list)
+	var upg: UpgradeSystem = game.player.upg
+	for pid_v in upg.taken.keys():
+		var pid := String(pid_v)
+		var stacks := int(upg.taken.get(pid, 0))
+		if stacks <= 0:
+			continue
+		var data: Dictionary = DB.perk(pid)
+		var tier := int(data.get("tier", 1))
+		var row := UI.panel(choice_remove_list, Rect2(0, 0, 396, 36), Color("#101218"), UI.BORDER)
+		row.custom_minimum_size = Vector2(396, 36)
+		var ico := Assets.icon("icon_tree_" + String(data.get("tree", "")))
+		if ico != null:
+			var tr := TextureRect.new()
+			tr.texture = ico
+			tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.position = Vector2(6, 8)
+			tr.size = Vector2(20, 20)
+			row.add_child(tr)
+		var nm := UI.crisp_label(row, "%s (T%d · ×%d)" % [String(data.get("name", pid)), tier, stacks], 9, UI.GOLD_BRIGHT, Vector2(32, 3))
+		nm.size = Vector2(276, 13)
+		var ds := UI.crisp_label(row, String(data.get("desc", "")), 7, UI.DIM, Vector2(32, 17))
+		ds.size = Vector2(276, 15)
+		ds.clip_text = true
+		var rem_btn := UI.button(row, "УБРАТЬ", 8, Vector2(76, 22))
+		rem_btn.position = Vector2(314, 7)
+		rem_btn.pressed.connect(func() -> void:
+			choice_remove_panel.visible = false
+			AudioManager.play_sfx("ui", 0.75)
+			game.remove_perk_for_level(pid, false))
+	choice_remove_panel.visible = true
+	AudioManager.play_sfx("ui", 0.95)
+
+func _open_pause_settings() -> void:
+	if pause_settings_layer == null or pause_settings_list == null:
+		return
+	_rebuild_pause_settings()
+	pause_settings_layer.visible = true
+	AudioManager.play_sfx("ui", 0.95)
+
+func _rebuild_pause_settings() -> void:
+	UI.clear(pause_settings_list)
+	_ps_slider("Громкость музыки", float(GameManager.setting("music", 0.8)), func(v: float) -> void:
+		GameManager.set_setting("music", v)
+		AudioManager.apply_settings(v, float(GameManager.setting("sfx", 0.8))))
+	_ps_slider("Громкость эффектов", float(GameManager.setting("sfx", 0.8)), func(v: float) -> void:
+		GameManager.set_setting("sfx", v)
+		AudioManager.apply_settings(float(GameManager.setting("music", 0.8)), v))
+	_ps_toggle("Тряска экрана", bool(GameManager.setting("shake", true)), func() -> void:
+		GameManager.set_setting("shake", not bool(GameManager.setting("shake", true)))
+		_rebuild_pause_settings())
+	_ps_toggle("Пост-эффекты", bool(GameManager.setting("post_fx", true)), func() -> void:
+		GameManager.set_setting("post_fx", not bool(GameManager.setting("post_fx", true)))
+		_rebuild_pause_settings())
+	_ps_toggle("Слоу-мо боссов", bool(GameManager.setting("slowmo", true)), func() -> void:
+		GameManager.set_setting("slowmo", not bool(GameManager.setting("slowmo", true)))
+		_rebuild_pause_settings())
+	var cur_vitals := String(GameManager.setting("hud_vitals", "corner"))
+	_ps_choice("HP и патроны", "Слева сверху" if cur_vitals == "corner" else "Над героем", func() -> void:
+		GameManager.set_setting("hud_vitals", "player" if cur_vitals == "corner" else "corner")
+		_rebuild_pause_settings())
+	var cur_lang := String(GameManager.setting("lang", "ru"))
+	_ps_choice("Язык / Language", cur_lang.to_upper(), func() -> void:
+		GameManager.set_setting("lang", "en" if cur_lang == "ru" else "ru")
+		_rebuild_pause_settings())
+
+func _ps_slider(label_txt: String, val: float, cb: Callable) -> void:
+	var row := UI.hbox(pause_settings_list, 8)
+	row.custom_minimum_size = Vector2(324, 22)
+	var lbl := UI.crisp_label(row, label_txt, 8, UI.TEXT)
+	lbl.custom_minimum_size = Vector2(148, 18)
+	var sl := HSlider.new()
+	sl.min_value = 0.0
+	sl.max_value = 1.0
+	sl.step = 0.05
+	sl.value = val
+	sl.custom_minimum_size = Vector2(130, 18)
+	row.add_child(sl)
+	var pct := UI.crisp_label(row, "%d%%" % int(round(val * 100.0)), 8, UI.GOLD_BRIGHT)
+	pct.custom_minimum_size = Vector2(34, 18)
+	pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	sl.value_changed.connect(func(nv: float) -> void:
+		pct.text = "%d%%" % int(round(nv * 100.0))
+		cb.call(nv))
+
+func _ps_toggle(label_txt: String, on: bool, cb: Callable) -> void:
+	_ps_choice(label_txt, "ВКЛ" if on else "ВЫКЛ", cb)
+
+func _ps_choice(label_txt: String, val_txt: String, cb: Callable) -> void:
+	var row := UI.hbox(pause_settings_list, 8)
+	row.custom_minimum_size = Vector2(324, 22)
+	var lbl := UI.crisp_label(row, label_txt, 8, UI.TEXT)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var btn := UI.button(row, val_txt, 8, Vector2(116, 20))
+	btn.pressed.connect(cb)
 
 func _open_pause_confirm(action_id: String, msg: String) -> void:
 	pause_confirm_action = action_id
@@ -900,10 +1087,19 @@ func _refresh_pause_menu() -> void:
 			tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tr.position = Vector2(300, 1)
+			tr.position = Vector2(262 if kind == "perk" else 300, 1)
 			tr.size = Vector2(14, 14)
 			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			lbl.add_child(tr)
+		if kind == "perk" and int(game.player.upg.taken.get(id, 0)) > 0:
+			var rem := UI.button(lbl, "-1 ур.", 7, Vector2(38, 14))
+			rem.position = Vector2(280, 1)
+			rem.disabled = game.level <= 1
+			rem.tooltip_text = "Убрать перк за 1 уровень"
+			rem.pressed.connect(func() -> void:
+				if game.remove_perk_for_level(id, true):
+					_refresh_pause_menu()
+					AudioManager.play_sfx("ui", 0.75))
 	if log.is_empty():
 		UI.crisp_label(pause_perk_list, "Пока ничего не выбрано — повышайте уровень!", 8, UI.DIM)
 	var upg: UpgradeSystem = game.player.upg
@@ -935,11 +1131,11 @@ func _refresh_pause_menu() -> void:
 	for pair in rows:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
-		row.custom_minimum_size = Vector2(238, 10)
-		var a := UI.crisp_label(row, String(pair[0]), 8, UI.DIM)
-		a.custom_minimum_size = Vector2(96, 0)
-		var b := UI.crisp_label(row, String(pair[1]), 8, UI.TEXT)
-		b.custom_minimum_size = Vector2(138, 0)
+		row.custom_minimum_size = Vector2(238, 11)
+		var a := UI.crisp_label(row, String(pair[0]), 7, UI.DIM)
+		a.custom_minimum_size = Vector2(92, 0)
+		var b := UI.crisp_label(row, String(pair[1]), 7, UI.TEXT)
+		b.custom_minimum_size = Vector2(142, 0)
 		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		pause_stats.add_child(row)
 
@@ -1123,6 +1319,8 @@ func _continue_endless() -> void:
 func _toggle_synergies() -> void:
 	if syn_layer.visible:
 		syn_layer.visible = false
+		if game != null and game.has_method("sync_pause_state"):
+			game.sync_pause_state()
 		return
 	UI.clear(syn_list)
 	if game == null or game.player == null:
@@ -1154,6 +1352,8 @@ func _toggle_synergies() -> void:
 	if shown == 0:
 		UI.label(syn_list, Loc.t("no_synergies"), 9, UI.DIM)
 	syn_layer.visible = true
+	if game != null and game.has_method("sync_pause_state"):
+		game.sync_pause_state()
 
 # ------------------------------------------------------------------ СОБЫТИЯ
 ## Подтверждения о полученных перках не выводятся: по просьбе игрока
@@ -1202,13 +1402,22 @@ func _unhandled_input(_event: InputEvent) -> void:
 
 func _input(event: InputEvent) -> void:
 	if GameManager.cheat_open:
+		if event.is_action_pressed("pause"):
+			if cheat_console != null and cheat_console.has_method("close_all"):
+				cheat_console.close_all()
+			toggle_pause()
+			get_viewport().set_input_as_handled()
 		return
 	if _input_choice_hotkey(event):
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("pause"):
-		# Esc ставит бой на паузу в любой момент, кроме экранов выбора и конца забега
-		if not end_layer.visible and not choice_layer.visible:
+		if choice_remove_panel != null and choice_remove_panel.visible and not pause_layer.visible:
+			choice_remove_panel.visible = false
+			get_viewport().set_input_as_handled()
+			return
+		# Esc ставит игру на паузу при любом открытом окне (кроме экрана конца забега)
+		if not end_layer.visible:
 			toggle_pause()
 			get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("synergies"):
@@ -1350,3 +1559,76 @@ func _draw_darkness_fx() -> void:
 		dark_overlay.draw_rect(Rect2(0, h - float(i + 1) * band, w, band), vc)
 		dark_overlay.draw_rect(Rect2(float(i) * band, 0, band, h), vc)
 		dark_overlay.draw_rect(Rect2(w - float(i + 1) * band, 0, band, h), vc)
+
+## Стрелки-указатели на сундуки, боссов и мини-боссов (за экраном или в тумане).
+func _draw_target_arrows() -> void:
+	if target_arrows == null or game == null or game.player == null or game.ended or game.photo_mode:
+		return
+	var cam_center: Vector2 = game.camera.get_screen_center_position() if game.camera != null else game.player.global_position
+	var zoom_v: float = game.camera.zoom.x if game.camera != null else 1.35
+	var center_screen := Vector2(320.0, 180.0)
+	var p_screen: Vector2 = (game.player.global_position - cam_center) * zoom_v + center_screen
+	var safe := Rect2(22.0, 50.0, 596.0, 286.0)
+	var vis_r: float = game.current_vision_radius() if game.has_method("current_vision_radius") else 190.0
+	var font := UI.font()
+	var pulse := 0.72 + 0.28 * sin(float(Time.get_ticks_msec()) * 0.006)
+
+	var targets: Array = []
+	for e in game.enemies:
+		if e == null or not is_instance_valid(e) or not e.active or e.dead:
+			continue
+		if e.boss:
+			targets.append({"pos": e.global_position, "col": Color("#ff3a30"), "rim": Color("#ffd700"), "tag": "БОСС", "sz": 9.0})
+		elif String(e.role) == "miniboss":
+			targets.append({"pos": e.global_position, "col": Color("#c96bff"), "rim": Color("#ffe39a"), "tag": "М-БОСС", "sz": 7.5})
+	for p in game.pickups:
+		if p == null or not is_instance_valid(p) or not p.active:
+			continue
+		if String(p.kind) == "chest":
+			targets.append({"pos": p.global_position, "col": Color("#ffd24c", pulse), "rim": Color("#fff5c8"), "tag": "СУНДУК", "sz": 7.5})
+
+	for t in targets:
+		var wpos: Vector2 = t["pos"]
+		var spos: Vector2 = (wpos - cam_center) * zoom_v + center_screen
+		var offscreen := not Rect2(14.0, 40.0, 612.0, 304.0).has_point(spos)
+		var out_of_vision := wpos.distance_to(game.player.global_position) > vis_r * 0.94
+		if not offscreen and not out_of_vision:
+			continue
+		var origin := center_screen if offscreen else p_screen
+		var diff := spos - origin
+		if diff.length() < 4.0:
+			continue
+		var dir := diff.normalized()
+		var anchor := spos
+		if offscreen:
+			# Пересечение луча из центра экрана с безопасной рамкой HUD
+			var tx := 1e9
+			var ty := 1e9
+			if absf(dir.x) > 0.0001:
+				tx = ((safe.end.x if dir.x > 0.0 else safe.position.x) - origin.x) / dir.x
+			if absf(dir.y) > 0.0001:
+				ty = ((safe.end.y if dir.y > 0.0 else safe.position.y) - origin.y) / dir.y
+			anchor = origin + dir * minf(tx, ty)
+		else:
+			# Цель в пределах экрана, но скрыта в тумане — ставим стрелку на границе обзора
+			var edge_r := maxf(36.0, vis_r * zoom_v * 0.82)
+			anchor = origin + dir * minf(diff.length() - 10.0, edge_r)
+		anchor.x = clampf(anchor.x, safe.position.x, safe.end.x)
+		anchor.y = clampf(anchor.y, safe.position.y, safe.end.y)
+
+		var sz: float = float(t["sz"])
+		var perp := Vector2(-dir.y, dir.x)
+		var tip := anchor + dir * (sz * 1.15)
+		var left_pt := anchor - dir * (sz * 0.75) + perp * (sz * 0.78)
+		var right_pt := anchor - dir * (sz * 0.75) - perp * (sz * 0.78)
+		var notch := anchor - dir * (sz * 0.35)
+		var col: Color = t["col"]
+		var rim: Color = t["rim"]
+		target_arrows.draw_colored_polygon(PackedVector2Array([tip, left_pt, notch, right_pt]), col)
+		target_arrows.draw_polyline(PackedVector2Array([tip, left_pt, notch, right_pt, tip]), rim, 1.3)
+		if font != null:
+			var tag_pos := anchor - dir * (sz * 1.8) + Vector2(-18.0, 3.0)
+			tag_pos.x = clampf(tag_pos.x, 12.0, 588.0)
+			tag_pos.y = clampf(tag_pos.y, 44.0, 344.0)
+			target_arrows.draw_string(font, tag_pos + Vector2(1, 1), String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, Color(0, 0, 0, 0.85))
+			target_arrows.draw_string(font, tag_pos, String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, rim)

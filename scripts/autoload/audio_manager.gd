@@ -3,7 +3,7 @@ extends Node
 ## тематический эмбиент для каждой карты и адаптивная боевая/босс-музыка.
 
 const RATE := 22050
-const MUSIC_LEN := 4.0        # длина лупа музыкальных слоёв, сек
+const MUSIC_LEN := 8.0        # длина лупа музыкальных слоёв, сек (2-тактовая фраза)
 const AMB_LEN := 5.0          # длина лупа эмбиента карты, сек
 const MAX_SFX_VOICES := 16
 
@@ -11,6 +11,7 @@ var music_volume := 0.8
 var sfx_volume := 0.8
 var _sfx_cache: Dictionary = {}
 var _amb_cache: Dictionary = {}
+var _music_cache: Dictionary = {}
 var _layers: Array[AudioStreamPlayer] = []
 var _amb_player: AudioStreamPlayer = null
 var _mood_key: String = ""
@@ -21,6 +22,7 @@ var _boss_active := false
 var _cur_boss: float = 0.0
 var _music_players_ready := false
 var _active_sfx: int = 0
+var _menu_mode := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -193,6 +195,7 @@ func _release_audio() -> void:
 	_amb_player = null
 	_sfx_cache.clear()
 	_amb_cache.clear()
+	_music_cache.clear()
 
 func play_sfx(sfx_name: String, pitch: float = 1.0, bus: String = "SFX") -> void:
 	if not _sfx_cache.has(sfx_name):
@@ -329,108 +332,242 @@ var _scales := {
 	"lydian": [0, 2, 4, 6, 7, 9, 11],
 	"hijaz": [0, 1, 4, 5, 7, 8, 11],
 	"harmonic": [0, 2, 3, 5, 7, 8, 11],
+	"dorian": [0, 2, 3, 5, 7, 9, 10],
+	"locrian": [0, 1, 3, 5, 6, 8, 10],
+	"whole_tone": [0, 2, 4, 6, 8, 10],
 }
 
 func _midi_freq(note: int) -> float:
 	return 440.0 * pow(2.0, (note - 69) / 12.0)
 
+## Выделенная тема главного меню: тёплый тёмно-фэнтези лютневый/струнный мотив,
+## полностью глушит эмбиент и боевые слои карт, чтобы музыка никогда не накладывалась.
+func play_menu_music() -> void:
+	_ensure_players()
+	stop_ambience()
+	_intensity = 0.0
+	_cur_intensity = 0.0
+	_boss_active = false
+	_cur_boss = 0.0
+	_menu_mode = true
+	if _mood_key == "__menu__" and _layers[0].playing:
+		for i in range(1, 4):
+			if _layers[i].playing:
+				_layers[i].stop()
+		_apply_layer_volumes()
+		return
+	for p in _layers:
+		p.stop()
+	_mood_key = "__menu__"
+	if not _music_cache.has("__menu__"):
+		_music_cache["__menu__"] = [_make_menu_theme()]
+	var streams: Array = _music_cache["__menu__"]
+	_layers[0].stream = streams[0]
+	_layers[0].play()
+	_apply_layer_volumes()
+
+func _make_menu_theme() -> AudioStreamWAV:
+	var dur := 12.0
+	var n := int(dur * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(n)
+	# Аккордовая прогрессия в D minor (i -> VI -> III -> VII -> iv -> i -> V -> i)
+	var root := 50 # D3
+	var chords := [
+		[0, 3, 7, 12],    # Dm
+		[-4, 0, 3, 8],    # Bb
+		[-9, -5, -2, 3],  # F
+		[-2, 2, 5, 10],   # C
+		[5, 8, 12, 17],   # Gm
+		[0, 3, 7, 12],    # Dm
+		[7, 11, 14, 19],  # A
+		[0, 3, 7, 12],    # Dm
+	]
+	var bar := dur / float(chords.size()) # 1.5 сек на такт
+	var notes: Array = []
+	var melody_offsets := [12, 15, 14, 12, 10, 12, 19, 15, 17, 15, 14, 10, 12, 14, 11, 12]
+	for b in chords.size():
+		var t0 := float(b) * bar
+		var ch: Array = chords[b]
+		# Глубокий струнный бас + тёплая квинта
+		notes.append({"t": t0, "len": bar * 0.98, "note": root + int(ch[0]) - 12, "vol": 0.14, "shape": "tri", "env": "pad", "lp": 0.18})
+		notes.append({"t": t0, "len": bar * 0.98, "note": root + int(ch[2]), "vol": 0.08, "shape": "sine", "env": "pad", "lp": 0.25})
+		# Перебор лютни / арфы (6 нот на такт)
+		for step in 6:
+			var nt: int = ch[step % ch.size()]
+			var oct := 12 if step >= 4 else 0
+			notes.append({"t": t0 + float(step) * (bar / 6.0), "len": 0.72, "note": root + nt + oct, "vol": 0.11, "shape": "tri", "env": "pluck", "lp": 0.35})
+		# Выразительная ведущая мелодия (2 ноты на такт)
+		var m1: int = melody_offsets[(b * 2) % melody_offsets.size()]
+		var m2: int = melody_offsets[(b * 2 + 1) % melody_offsets.size()]
+		notes.append({"t": t0 + bar * 0.05, "len": bar * 0.55, "note": root + m1 + 12, "vol": 0.095, "shape": "organ", "env": "bow", "lp": 0.28})
+		notes.append({"t": t0 + bar * 0.55, "len": bar * 0.45, "note": root + m2 + 12, "vol": 0.085, "shape": "sine", "env": "bow", "lp": 0.32})
+		# Редкий хрустальный колокольчик в начале фраз
+		if b % 2 == 0:
+			notes.append({"t": t0, "len": 1.15, "note": root + int(ch[2]) + 24, "vol": 0.045, "shape": "sine", "env": "pluck", "lp": 0.45})
+	_render_notes(samples, n, notes, 7771)
+	var fade := int(0.05 * RATE)
+	for i in fade:
+		var a := float(i) / float(fade)
+		samples[i] *= a
+		samples[n - 1 - i] *= a
+	return _wav(samples, true)
+
 ## Генерирует 4 адаптивных музыкальных слоя для настроения карты: ambient / tension / combat / boss.
 func play_music(mood: Dictionary, boss_layer_only: bool = false) -> void:
 	_ensure_players()
+	if bool(mood.get("menu", false)):
+		play_menu_music()
+		return
 	var key := JSON.stringify(mood)
 	_boss_active = boss_layer_only
-	if key == _mood_key:
+	if key == _mood_key and not _menu_mode and _layers[0].playing:
 		_apply_layer_volumes()
 		return
+	_menu_mode = false
+	_cur_intensity = _intensity
+	_cur_boss = 1.0 if _boss_active else 0.0
+	for p in _layers:
+		p.stop()
 	_mood_key = key
-	var root := int(mood.get("root", 48))
-	var scale_name := String(mood.get("scale", "minor"))
-	var scale: Array = _scales.get(scale_name, _scales["minor"])
-	var tempo := float(mood.get("tempo", 80))
+	if not _music_cache.has(key):
+		var root := int(mood.get("root", 48))
+		var scale_name := String(mood.get("scale", "minor"))
+		var scale: Array = _scales.get(scale_name, _scales["minor"])
+		var tempo := float(mood.get("tempo", 80))
+		var wave := String(mood.get("wave", "organ"))
+		var arr: Array = []
+		for i in 4:
+			arr.append(_make_layer(i, root, scale, tempo, wave))
+		_music_cache[key] = arr
+	var cached: Array = _music_cache[key]
 	for i in 4:
-		_layers[i].stream = _make_layer(i, root, scale, tempo)
+		_layers[i].stream = cached[i]
 		_layers[i].play()
 	_apply_layer_volumes()
 
-func _make_layer(layer: int, root: int, scale: Array, tempo: float) -> AudioStreamWAV:
-	var n := int(MUSIC_LEN * RATE)
-	var samples := PackedFloat32Array()
-	samples.resize(n)
-	var beat := 60.0 / maxf(tempo, 36.0)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 12345 + layer * 771 + root * 31
-	var notes: Array = []
-	match layer:
-		0: # ambient — тёплый атмосферный пэд + квинта + суб-бас
-			for step in 2:
-				var deg: int = scale[(step * 2) % scale.size()]
-				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root + deg, "vol": 0.14, "shape": "organ"})
-				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root + deg + 7, "vol": 0.08, "shape": "sine"})
-				notes.append({"t": step * MUSIC_LEN * 0.5, "len": MUSIC_LEN * 0.5, "note": root - 12, "vol": 0.12, "shape": "sine"})
-		1: # tension — тревожный басовый пульс + минорные акценты
-			var steps := int(MUSIC_LEN / (beat * 0.5))
-			for s in steps:
-				var deg2: int = scale[(s / 2) % scale.size()]
-				notes.append({"t": s * beat * 0.5, "len": beat * 0.42, "note": root + 12 + deg2, "vol": 0.11, "shape": "tri"})
-				if s % 2 == 0:
-					notes.append({"t": s * beat * 0.5, "len": beat * 0.45, "note": root - 12 + (0 if s % 4 == 0 else scale[4]), "vol": 0.13, "shape": "sine"})
-				if s % 2 == 1:
-					notes.append({"t": s * beat * 0.5, "len": 0.05, "note": 76, "vol": 0.06, "shape": "sine", "noise": 0.9})
-		2: # combat — энергичное арпеджио + бочка + рабочий барабан
-			var steps2 := int(MUSIC_LEN / (beat * 0.25))
-			var arp := [0, 2, 4, 2, 5, 4, 2, 1]
-			for s in steps2:
-				var deg3: int = scale[arp[s % arp.size()] % scale.size()]
-				var oct := 12 if (s % 4 != 3) else 24
-				notes.append({"t": s * beat * 0.25, "len": beat * 0.22, "note": root + oct + deg3, "vol": 0.11, "shape": "saw"})
-				if s % 4 == 0:
-					notes.append({"t": s * beat * 0.25, "len": 0.12, "note": root - 24, "vol": 0.22, "shape": "sine", "noise": 0.35})
-				elif s % 4 == 2:
-					notes.append({"t": s * beat * 0.25, "len": 0.08, "note": 62, "vol": 0.12, "shape": "tri", "noise": 0.85})
-		3: # boss — эпичная напряжённая босс-тема: двойная бочка, хоровой аккорд, лид-рифф
-			var steps3 := int(MUSIC_LEN / (beat * 0.25))
-			var riff := [0, 0, 4, 3, 2, 4, 5, 4]
-			for s in steps3:
-				var deg4: int = scale[riff[(s / 2) % riff.size()] % scale.size()]
-				# Тяжёлые хоры / брасс каждые 4 шага
-				if s % 4 == 0:
-					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root - 12 + deg4, "vol": 0.14, "shape": "saw"})
-					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root + deg4 + 7, "vol": 0.10, "shape": "organ"})
-				# Срочный боевой лид
-				if s % 2 == 0:
-					notes.append({"t": s * beat * 0.25, "len": beat * 0.42, "note": root + 12 + scale[(s + 1) % scale.size()], "vol": 0.11, "shape": "square"})
-				# Двойная литавра / бочка + металлический снейр
-				if s % 2 == 0:
-					notes.append({"t": s * beat * 0.25, "len": 0.14, "note": 34, "vol": 0.24, "shape": "sine", "noise": 0.45})
-				if s % 8 == 4:
-					notes.append({"t": s * beat * 0.25, "len": 0.11, "note": 65, "vol": 0.16, "shape": "saw", "noise": 0.85})
+func _wave_profile(wave: String) -> Dictionary:
+	match wave:
+		"oud", "lute": return {"lead": "tri", "pad": "organ", "env": "pluck", "lp": 0.34}
+		"ice", "crystal": return {"lead": "sine", "pad": "sine", "env": "pluck", "lp": 0.48}
+		"flute": return {"lead": "sine", "pad": "tri", "env": "bow", "lp": 0.30}
+		"organ", "choir": return {"lead": "organ", "pad": "organ", "env": "pad", "lp": 0.24}
+		"lava", "brass": return {"lead": "saw", "pad": "organ", "env": "bow", "lp": 0.22}
+		"noise", "swarm", "glitch", "dissonant": return {"lead": "saw", "pad": "square", "env": "pluck", "lp": 0.26}
+		_: return {"lead": "tri", "pad": "organ", "env": "bow", "lp": 0.28}
 
+func _render_notes(samples: PackedFloat32Array, n: int, notes: Array, seed_val: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_val
 	for note in notes:
 		var start := int(float(note["t"]) * RATE)
 		var length := int(float(note["len"]) * RATE)
+		if length <= 8:
+			continue
 		var freq := _midi_freq(int(note["note"]))
 		var shape := String(note.get("shape", "sine"))
 		var vol := float(note.get("vol", 0.1))
 		var noise_mix := float(note.get("noise", 0.0))
+		var env_mode := String(note.get("env", "bow"))
+		var lp_cut := clampf(float(note.get("lp", 0.32)), 0.08, 0.95)
 		var phase := 0.0
 		var phase2 := 0.0
+		var lp := 0.0
 		for i in length:
 			var idx := start + i
 			if idx >= n:
 				break
 			var k := float(i) / maxf(float(length), 1.0)
-			var atk := minf(1.0, k * 14.0)
-			var env: float = atk * sin(PI * clampf(k, 0.0, 1.0)) if k < 1.0 else 0.0
+			var env := 1.0
+			match env_mode:
+				"pluck":
+					var atk := minf(1.0, k * 45.0)
+					env = atk * exp(-3.6 * k) * (1.0 - pow(k, 4.0))
+				"pad":
+					var atk_p := minf(1.0, k * 4.5)
+					var rel_p := minf(1.0, (1.0 - k) * 4.5)
+					env = atk_p * rel_p
+				_:
+					var atk_b := minf(1.0, k * 14.0)
+					var rel_b := minf(1.0, (1.0 - k) * 6.0)
+					env = atk_b * rel_b
 			phase += freq / RATE
-			phase2 += (freq * 1.004) / RATE
-			var s := (_osc(phase, shape) * 0.72 + _osc(phase2, shape) * 0.28) * env * vol
+			phase2 += (freq * 1.0035) / RATE
+			var raw := (_osc(phase, shape) * 0.72 + _osc(phase2, shape) * 0.28)
 			if noise_mix > 0.0:
-				s = lerpf(s, rng.randf_range(-1.0, 1.0) * env * vol, noise_mix)
-			samples[idx] += s
-
+				raw = lerpf(raw, rng.randf_range(-1.0, 1.0), noise_mix)
+			lp = lerpf(lp, raw, lp_cut)
+			samples[idx] += lp * env * vol
 	for i in n:
-		samples[i] = clampf(tanh(samples[i] * 1.1), -0.92, 0.92)
-	var fade := int(0.015 * RATE)
+		samples[i] = clampf(tanh(samples[i] * 1.05), -0.92, 0.92)
+
+func _make_layer(layer: int, root: int, scale: Array, tempo: float, wave: String = "organ") -> AudioStreamWAV:
+	var n := int(MUSIC_LEN * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(n)
+	var beat := 60.0 / maxf(tempo, 36.0)
+	var prof := _wave_profile(wave)
+	var lead_sh := String(prof["lead"])
+	var pad_sh := String(prof["pad"])
+	var lp_cut := float(prof["lp"])
+	var prog := [0, 5, 2, 4] # 4-тактная прогрессия (каждая по 2.0 сек)
+	var notes: Array = []
+	match layer:
+		0: # ambient — тёплая 4-аккордная подложка + спокойный перебор темы карты
+			for bar in 4:
+				var deg: int = scale[prog[bar] % scale.size()]
+				var third: int = scale[(prog[bar] + 2) % scale.size()]
+				var fifth: int = scale[(prog[bar] + 4) % scale.size()]
+				var t0 := float(bar) * 2.0
+				notes.append({"t": t0, "len": 1.98, "note": root + deg - 12, "vol": 0.13, "shape": "sine", "env": "pad", "lp": 0.20})
+				notes.append({"t": t0, "len": 1.98, "note": root + deg, "vol": 0.10, "shape": pad_sh, "env": "pad", "lp": lp_cut * 0.85})
+				notes.append({"t": t0, "len": 1.98, "note": root + fifth, "vol": 0.075, "shape": "sine", "env": "pad", "lp": 0.25})
+				# Тематический мотив карты на 4 шага в такте
+				var motif := [deg, third, fifth, third + 12]
+				for k in 4:
+					notes.append({"t": t0 + float(k) * 0.5, "len": 0.65, "note": root + 12 + int(motif[k]), "vol": 0.075, "shape": lead_sh, "env": String(prof["env"]), "lp": lp_cut})
+		1: # tension — ритмичный басовый пульс + минорные акценты и тихий хэт
+			var steps := int(MUSIC_LEN / (beat * 0.5))
+			for s in steps:
+				var bar := mini(3, int((float(s) * beat * 0.5) / 2.0))
+				var base_deg: int = scale[prog[bar] % scale.size()]
+				var deg2: int = scale[(prog[bar] + (s % 3) * 2) % scale.size()]
+				notes.append({"t": s * beat * 0.5, "len": beat * 0.44, "note": root + 12 + deg2, "vol": 0.095, "shape": lead_sh, "env": "pluck", "lp": lp_cut})
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.5, "len": beat * 0.50, "note": root - 12 + base_deg, "vol": 0.13, "shape": "tri", "env": "pluck", "lp": 0.22})
+				if s % 2 == 1:
+					notes.append({"t": s * beat * 0.5, "len": 0.045, "note": 76, "vol": 0.05, "shape": "sine", "noise": 0.9, "env": "pluck", "lp": 0.45})
+		2: # combat — энергичное арпеджио по прогрессии + чёткий грув
+			var steps2 := int(MUSIC_LEN / (beat * 0.25))
+			var arp := [0, 2, 4, 2, 5, 4, 2, 1]
+			for s in steps2:
+				var bar2 := mini(3, int((float(s) * beat * 0.25) / 2.0))
+				var root_deg: int = scale[prog[bar2] % scale.size()]
+				var deg3: int = scale[(prog[bar2] + arp[s % arp.size()]) % scale.size()]
+				var oct := 12 if (s % 4 != 3) else 24
+				notes.append({"t": s * beat * 0.25, "len": beat * 0.24, "note": root + oct + deg3, "vol": 0.10, "shape": lead_sh, "env": "pluck", "lp": lp_cut + 0.08})
+				if s % 4 == 0:
+					notes.append({"t": s * beat * 0.25, "len": 0.13, "note": root - 24 + (root_deg % 5), "vol": 0.21, "shape": "sine", "noise": 0.30, "env": "pluck", "lp": 0.35})
+				elif s % 4 == 2:
+					notes.append({"t": s * beat * 0.25, "len": 0.08, "note": 62, "vol": 0.10, "shape": "tri", "noise": 0.80, "env": "pluck", "lp": 0.45})
+		3: # boss — эпичная напряжённая босс-тема: двойная бочка, хоровой аккорд, лид-рифф
+			var steps3 := int(MUSIC_LEN / (beat * 0.25))
+			var riff := [0, 0, 4, 3, 2, 4, 5, 4]
+			for s in steps3:
+				var bar3 := mini(3, int((float(s) * beat * 0.25) / 2.0))
+				var deg4: int = scale[(prog[bar3] + riff[(s / 2) % riff.size()]) % scale.size()]
+				if s % 4 == 0:
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root - 12 + deg4, "vol": 0.13, "shape": "saw", "env": "bow", "lp": 0.24})
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.95, "note": root + deg4 + 7, "vol": 0.095, "shape": "organ", "env": "pad", "lp": 0.28})
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.25, "len": beat * 0.42, "note": root + 12 + scale[(prog[bar3] + s + 1) % scale.size()], "vol": 0.095, "shape": "saw", "env": "pluck", "lp": 0.32})
+				if s % 2 == 0:
+					notes.append({"t": s * beat * 0.25, "len": 0.14, "note": 34, "vol": 0.23, "shape": "sine", "noise": 0.40, "env": "pluck", "lp": 0.35})
+				if s % 8 == 4:
+					notes.append({"t": s * beat * 0.25, "len": 0.11, "note": 65, "vol": 0.14, "shape": "saw", "noise": 0.82, "env": "pluck", "lp": 0.40})
+
+	_render_notes(samples, n, notes, 12345 + layer * 771 + root * 31)
+	var fade := int(0.03 * RATE)
 	for i in fade:
 		var a := float(i) / float(fade)
 		samples[i] *= a
@@ -447,7 +584,12 @@ func set_boss_layer(active: bool) -> void:
 func _apply_layer_volumes() -> void:
 	if not _music_players_ready:
 		return
-	var pause_duck := -6.5 if (get_tree() != null and get_tree().paused) else 0.0
+	var pause_duck := -6.5 if (get_tree() != null and get_tree().paused and not _menu_mode) else 0.0
+	if _menu_mode:
+		_layers[0].volume_db = linear_to_db(0.32)
+		for i in range(1, 4):
+			_layers[i].volume_db = linear_to_db(0.0005)
+		return
 	var normal_mix := 1.0 - _cur_boss
 	var ambient_lin := lerpf(0.24, 0.09, _cur_intensity) * normal_mix
 	var tension_lin := clampf(_cur_intensity * 1.4, 0.0, 1.0) * 0.28 * normal_mix
@@ -466,6 +608,11 @@ func stop_music() -> void:
 		p.stop()
 	stop_ambience()
 	_mood_key = ""
+	_menu_mode = false
+	_intensity = 0.0
+	_cur_intensity = 0.0
+	_boss_active = false
+	_cur_boss = 0.0
 
 func apply_settings(music: float, sfx: float) -> void:
 	music_volume = clampf(music, 0.0, 1.0)

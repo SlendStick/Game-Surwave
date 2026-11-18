@@ -877,7 +877,8 @@ func _shoot() -> void:
 		"radius": 3.0 * float(S.size), "color": Gfx.hex(String(weapon.get("color", "#ffffff"))),
 		"crit": is_crit, "knockback": float(S.knockback)+(0.25 if upg.flag_on("unbending") and hp*2<=max_hp else 0.0), "behavior": behavior,
 		"weapon_id": String(weapon.get("id", "")),
-		"life": clampf(560.0 / maxf(60.0, float(S.proj_speed)), 1.0, 4.0),
+		"life": clampf(float(weapon.get("max_range", 560.0)) / maxf(60.0, float(S.proj_speed)), 0.45, 4.0) if weapon.has("max_range") else clampf(560.0 / maxf(60.0, float(S.proj_speed)), 1.0, 4.0),
+		"max_range": float(weapon.get("max_range", 0.0)),
 		"freeze_chance": float(S.freeze_chance), "burn_mult": float(S.burn_mult), "source": "weapon",
 		"full_hp_bonus": upg.flag_num("full_hp_bonus", 0.0),
 	}

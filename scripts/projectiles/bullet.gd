@@ -160,6 +160,12 @@ func tick(delta: float) -> void:
 	# столкновение с врагами (свип по отрезку пути — без «прошивания»)
 	var travel := prev.distance_to(global_position)
 	traveled += travel
+	var max_range := float(opts.get("max_range", 0.0))
+	if max_range > 0.0 and traveled >= max_range:
+		if String(opts.get("weapon_id", "")) == "holy_spears":
+			game.spawn_perk_fx("holy", global_position, 22.0, 0.18)
+		_expire()
+		return
 	# «Мясник»: топор летит обратно и наносит урон на возврате
 	if opts.has("boomerang") and not returned and traveled > 140.0:
 		returned = true

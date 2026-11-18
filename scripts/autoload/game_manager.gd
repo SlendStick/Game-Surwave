@@ -130,11 +130,11 @@ func goto(path: String) -> void:
 	get_tree().change_scene_to_file(path)
 
 func goto_menu() -> void:
-	AudioManager.set_boss_layer(false)
-	AudioManager.set_intensity(0.0)
+	AudioManager.stop_music()
 	goto(SCENE_MENU)
 
 func goto_select() -> void:
+	AudioManager.stop_ambience()
 	goto(SCENE_SELECT)
 
 # ------------------------------------------------------------------ ЗАБЕГ
