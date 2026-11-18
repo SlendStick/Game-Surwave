@@ -600,9 +600,9 @@ func _tick_periodic(delta: float) -> void:
 		timers["gaze"] = float(timers.get("gaze", 0.25)) - delta
 		if float(timers["gaze"]) <= 0.0:
 			timers["gaze"] = 0.25
-			var g_hits := game.aoe_damage(global_position, float(S.vision), gaze * 0.25, {"source": "gaze"})
+			var g_hits: int = game.aoe_damage(global_position, float(S.vision), gaze * 0.25, {"source": "gaze"})
 			if g_hits > 0:
-				var near_g := game.nearest_enemy(global_position, float(S.vision))
+				var near_g: Array = game.nearest_enemy(global_position, float(S.vision))
 				if not near_g.is_empty():
 					game.spawn_perk_fx("smite", near_g[0].global_position, 28.0, 0.22)
 	# Конвертация душ: каждая собранная душа по очереди становится +1 max HP.
