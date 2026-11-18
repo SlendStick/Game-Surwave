@@ -155,6 +155,17 @@ var revive_crystals: Array = []
 var revive_crystal_nodes: Array = []
 var net_taken_pickups: Dictionary = {}
 var _revive_req_cd := 0.0
+## «Вне боя»: игрок в меню/паузе/выборе перка — прозрачный, неуязвимый,
+## и ещё 2 секунды после возвращения в бой.
+var net_away := false
+var net_safe_left := 0.0
+## Выстрелы, которые надо показать напарникам (копятся между пакетами).
+var net_pending_shots: Array = []
+## Защита от эха: эффект, пришедший по сети, не рассылаем обратно.
+var net_fx_echo := false
+## Визуальные копии выстрелов напарников.
+var net_shot_ghosts: Array = []
+var net_fx_cd := 0.0
 ## Активные ивенты карты живут 30–60 секунд и бьют волнами.
 var active_events: Array = []
 var chat_log: Array = []
@@ -1515,6 +1526,7 @@ func _process(delta: float) -> void:
 	_tick_player(delta)
 	if coop_player != null: coop_player.tick(delta)
 	_net_tick(delta)
+	_tick_net_safety(delta)
 	_prof("player", _t0)
 	_t0 = Time.get_ticks_usec()
 	_tick_enemies(delta)
@@ -2219,6 +2231,16 @@ func spawn_bullet(pos: Vector2, dir: Vector2, dmg: float, opts: Dictionary) -> v
 		b = bullet_pool.pop_back()
 	b.spawn_bullet(pos, dir, dmg, opts)
 	bullets.append(b)
+	# Напарники должны видеть наши выстрелы — копим их для пакета состояния.
+	if net_active and net_pending_shots.size() < 40:
+		var scol := Color.WHITE
+		var sc = opts.get("color", Color.WHITE)
+		if sc is Color:
+			scol = sc
+		net_pending_shots.append([
+			int(pos.x), int(pos.y), dir.x, dir.y,
+			float(opts.get("speed", 400.0)), float(opts.get("radius", 3.0)),
+			float(scol.r), float(scol.g), float(scol.b)])
 
 func spawn_enemy_bullet(pos: Vector2, dir: Vector2, dmg: int, opts: Dictionary = {}) -> void:
 	if ebullets.size() > int(DB.balance.get("limits", {}).get("max_enemy_bullets", 300)):
@@ -2346,6 +2368,14 @@ func spawn_perk_fx(fx_kind: String, pos: Vector2, size_px: float = 48.0, dur: fl
 	var node: PerkFx = PERK_FX_SCRIPT.new()
 	world.add_child(node)
 	node.setup(fx_kind, pos, size_px, dur)
+	# Эффекты перков и способностей видят все: хост рассылает их напарникам
+	# (с ограничением частоты, чтобы не забивать канал).
+	if net_active and not net_fx_echo and net_fx_cd <= 0.0 and size_px >= 24.0:
+		net_fx_cd = 0.035
+		Net.send_event_any("pfx", {
+			"k": fx_kind, "x": int(pos.x), "y": int(pos.y),
+			"s": int(size_px), "d": dur,
+		})
 
 func spawn_hazard_zone(pos: Vector2, dps: float, dur: float, radius: float, color: Color, extra: Dictionary = {}) -> void:
 	var h: Hazard
@@ -2418,6 +2448,8 @@ func damage_enemy(enemy: Node2D, amount: float, opts: Dictionary = {}) -> void:
 
 func damage_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false, source_role: String = "") -> void:
 	if player == null or player.dead:
+		return
+	if local_player_safe():
 		return
 	if boss_enemy != null and boss_enemy.active:
 		boss_no_hit = false
@@ -3138,6 +3170,12 @@ func sync_pause_state() -> void:
 	if ended:
 		get_tree().paused = false
 		return
+	if net_active:
+		# Сетевой кооп: пауз нет вообще. Меню и выбор перка — личное состояние
+		# игрока (прозрачность + неуязвимость), мир продолжает жить.
+		get_tree().paused = false
+		_sync_cursor()
+		return
 	var should_pause := photo_mode or GameManager.cheat_open or paused_for_choice
 	if hud != null:
 		if hud.syn_layer != null and hud.syn_layer.visible:
@@ -3724,6 +3762,12 @@ func _pulse_map_event(kind: String, p: Dictionary) -> void:
 					run_later(tele, func() -> void:
 						_destroy_obstacles_in(p_copy, m_rad, 3))
 			notify("Метеоритный дождь!")
+		"pfx":
+			# Эффект перка/способности напарника — чистая визуализация.
+			net_fx_echo = true
+			spawn_perk_fx(String(data.get("k", "holy")), Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
+				float(data.get("s", 32)), float(data.get("d", 0.3)))
+			net_fx_echo = false
 		"weather":
 			var wcol := Color(0.7, 0.7, 0.7)
 			var ccode := String(p.get("color", "#c0c0c0"))
@@ -4094,6 +4138,8 @@ func _do_revive(owner_id: int, pos: Vector2) -> void:
 			if np != null and np.peer_id == owner_id:
 				np.dead = false
 				np.hp = maxi(1, int(float(np.max_hp) * 0.5))
+				np.safe_left = 2.0
+				np.touch_cd = 0.0
 				np.global_position = pos
 				np.target_pos = pos
 				np.visible = true
@@ -4108,6 +4154,7 @@ func _revive_local_player(pos: Vector2) -> void:
 	player.dead = false
 	player.hp = maxi(1, int(float(player.max_hp) * 0.5))
 	player.iframes = 2.0
+	net_safe_left = 2.0
 	player.global_position = pos
 	player.visible = true
 	EventBus.hp_changed.emit(player.hp, player.max_hp)
@@ -4495,13 +4542,51 @@ func _run_avalanche_test() -> void:
 
 # ------------------------------------------------------------------ КООП: ЦЕЛИ И УРОН
 ## Живые цели-игроки: хост-игрок и сетевые напарники.
+## Игрок в меню (пауза, выбор перка, синергии) считается «вне боя»:
+## его не выбирают враги, он не получает урон, а после возврата в бой
+## получает 2 секунды неуязвимости — чтобы не умереть в тот же кадр.
+func _tick_net_safety(delta: float) -> void:
+	if not net_active or player == null:
+		return
+	net_safe_left = maxf(0.0, net_safe_left - delta)
+	if net_fx_cd > 0.0:
+		net_fx_cd = maxf(0.0, net_fx_cd - delta)
+	var want := paused_for_choice or photo_mode or GameManager.cheat_open or ended
+	if hud != null:
+		if hud.pause_layer != null and hud.pause_layer.visible:
+			want = true
+		if hud.syn_layer != null and hud.syn_layer.visible:
+			want = true
+		if hud.choice_layer != null and hud.choice_layer.visible:
+			want = true
+	if want != net_away:
+		net_away = want
+		if not net_away:
+			net_safe_left = maxf(net_safe_left, 2.0)
+			player.iframes = maxf(player.iframes, 2.0)
+	player.modulate.a = 0.55 if net_away else 1.0
+
+## Снять локальное меню паузы (тест и кнопка «Продолжить»).
+func net_pause_off() -> void:
+	net_paused = false
+	if hud != null and hud.pause_layer != null:
+		hud.pause_layer.visible = false
+	get_tree().paused = false
+
+## Локальный игрок сейчас вне сети-боя (меню) — его нельзя бить.
+func local_player_safe() -> bool:
+	return net_active and (net_away or net_safe_left > 0.0)
+
 func player_targets() -> Array:
 	var out: Array = []
-	if player != null and not player.dead:
+	if player != null and not player.dead and not local_player_safe():
 		out.append(player)
 	for np in net_proxies:
-		if np != null and is_instance_valid(np) and not np.dead:
-			out.append(np)
+		if np == null or not is_instance_valid(np) or np.dead:
+			continue
+		if bool(np.get("away")) or float(np.get("safe_left")) > 0.0:
+			continue
+		out.append(np)
 	return out
 
 ## Ближайший живой игрок к точке (для врагов, ловушек и снарядов).
@@ -4513,7 +4598,7 @@ func nearest_target(pos: Vector2) -> Node2D:
 		if d < best_d:
 			best_d = d
 			best = t
-	if best == null and player != null:
+	if best == null and player != null and not player.dead and not local_player_safe():
 		return player
 	return best
 
@@ -4543,6 +4628,7 @@ func partner_info() -> Array:
 		out.append({
 			"name": np.display_name, "hp": np.hp, "max": np.max_hp,
 			"dead": np.dead, "char": np.char_id,
+			"away": np.away or np.safe_left > 0.0,
 		})
 	return out
 
@@ -4634,6 +4720,47 @@ func _run_coop_test() -> void:
 	# 8) чат и эмоции не ломаются без сети
 	send_chat("тест")
 	send_emote("ПРИВЕТ")
+	# 9) урон по напарнику не «шредит» его: кулдаун попаданий
+	np.dead = false
+	np.hp = np.max_hp
+	np.touch_cd = 0.0
+	net_hit_proxy(np, 2, player.global_position)
+	var hp_after_one: int = np.hp
+	net_hit_proxy(np, 2, player.global_position)
+	assert(np.hp == hp_after_one, "Второй удар в тот же миг снял HP — смерть от одного удара")
+	assert(np.touch_cd > 0.0, "Кулдаун попаданий не взвёлся")
+	np.touch_cd = 0.0
+	# 10) «вне боя»: игрок в меню прозрачен и неуязвим
+	net_away = true
+	assert(player_targets().is_empty(), "Враги всё ещё могут выбрать игрока в меню")
+	var hp_menu: int = player.hp
+	damage_player(3, player.global_position)
+	assert(player.hp == hp_menu, "Игрок в меню получил урон")
+	net_away = false
+	net_safe_left = 2.0
+	damage_player(3, player.global_position)
+	assert(player.hp == hp_menu, "Нет неуязвимости после возвращения в бой")
+	net_safe_left = 0.0
+	player.iframes = 0.0
+	assert(not local_player_safe(), "Игрок считается неуязвимым вне меню")
+	# 11) выстрелы напарника видны (визуальные копии, без урона)
+	var ghost_before := net_shot_ghosts.size()
+	_net_spawn_shot_ghost([int(player.global_position.x), int(player.global_position.y), 1.0, 0.0, 300.0, 3.0, 1.0, 1.0, 0.5])
+	assert(net_shot_ghosts.size() > ghost_before, "Выстрел напарника не появился")
+	var ghost: Bullet = net_shot_ghosts[net_shot_ghosts.size() - 1]
+	assert(ghost.net_remote and ghost.damage <= 0.0, "Копия выстрела наносит урон")
+	var gpos := ghost.global_position
+	_tick_net_shots(0.1)
+	assert(ghost.global_position != gpos, "Копия выстрела не летит")
+	# свои выстрелы копятся для напарников
+	net_pending_shots.clear()
+	spawn_bullet(player.global_position, Vector2.RIGHT, 1.0, {"speed": 300.0})
+	assert(net_pending_shots.size() == 1, "Свой выстрел не попал в пакет для напарника")
+	net_pending_shots.clear()
+	# 12) пауза в сети не морозит мир
+	net_toggle_pause()
+	assert(not get_tree().paused, "Сетевая пауза заморозила мир")
+	net_pause_off()
 	# уборка
 	for pk in net_pickup_ghosts:
 		if pk != null and is_instance_valid(pk):
@@ -4688,6 +4815,9 @@ func _net_tick(delta: float) -> void:
 		return
 	for np in net_proxies:
 		np.update_visual(delta)
+		np.touch_cd = maxf(0.0, np.touch_cd - delta)
+		np.safe_left = maxf(0.0, np.safe_left - delta)
+	_tick_net_shots(delta)
 	_net_state_cd -= delta
 	if net_host:
 		_net_snapshot_cd -= delta
@@ -4727,10 +4857,21 @@ func _net_player_payload(p: Node2D, ch: String, wp: String) -> Dictionary:
 		max_hp = np.max_hp
 		moving = np.moving
 		skill = np.skill_frac
+	var away := false
+	var shots: Array = []
+	if p is Player:
+		away = local_player_safe()
+		if not net_pending_shots.is_empty():
+			shots = net_pending_shots.duplicate()
+			net_pending_shots.clear()
+	elif p is NetPlayer:
+		away = bool((p as NetPlayer).away)
+		shots = (p as NetPlayer).take_shots()
 	return {
 		"x": int(p.global_position.x), "y": int(p.global_position.y),
 		"ax": aim.x, "ay": aim.y, "hp": hp, "max": max_hp,
 		"dead": dead, "mv": moving, "ch": ch, "wp": wp, "sk": skill,
+		"aw": away, "sh": shots,
 	}
 
 func _net_state_table() -> Dictionary:
@@ -4742,12 +4883,54 @@ func _net_state_table() -> Dictionary:
 		out[str(np.peer_id)] = _net_player_payload(np, np.char_id, np.weapon_id)
 	return out
 
+## Визуальная копия выстрела напарника по данным пакета состояния.
+func _net_spawn_shot_ghost(sh: Array) -> void:
+	if sh.size() < 6:
+		return
+	var pos := Vector2(float(sh[0]), float(sh[1]))
+	var dir := Vector2(float(sh[2]), float(sh[3]))
+	if dir.length() < 0.05:
+		return
+	var spd := clampf(float(sh[4]), 60.0, 900.0)
+	var rad := clampf(float(sh[5]), 1.5, 8.0)
+	var col := Color(1, 0.95, 0.8)
+	if sh.size() >= 9:
+		col = Color(float(sh[6]), float(sh[7]), float(sh[8]))
+	var g: Bullet
+	if net_shot_ghosts.size() < 90:
+		g = BULLET_SCENE.instantiate()
+		world.add_child(g)
+		g.setup(self)
+		net_shot_ghosts.append(g)
+	else:
+		g = net_shot_ghosts[0]
+		net_shot_ghosts.pop_front()
+		net_shot_ghosts.append(g)
+	g.spawn_bullet(pos, dir, 0.0, {"speed": spd, "radius": rad, "color": col, "life": 0.9})
+	g.net_remote = true
+	g.damage = 0.0
+
+func _tick_net_shots(delta: float) -> void:
+	for g in net_shot_ghosts:
+		if g != null and is_instance_valid(g) and g.active:
+			g.tick(delta)
+
 func _net_on_state(peer_id: int, state: Dictionary) -> void:
 	if not net_active or peer_id == Net.my_id():
 		return
+	var shots: Array = state.get("sh", [])
+	for sh in shots:
+		_net_spawn_shot_ghost(sh as Array)
 	for np in net_proxies:
 		if np.peer_id == peer_id:
+			var was_dead := np.dead
 			np.apply_state(state)
+			# Смерть напарника определяет его собственная машина (HP у него
+			# локально авторитетно): хост лишь реагирует на флаг и роняет душу.
+			if np.dead and not was_dead:
+				np.hp = 0
+				_spawn_revive_crystal(np.peer_id, np.global_position)
+				notify("%s выбыл из боя — подберите его кристалл-душу" % np.display_name)
 			return
 
 func _net_build_snapshot() -> Dictionary:
@@ -4797,13 +4980,9 @@ func _net_apply_snapshot(snap: Dictionary) -> void:
 			continue
 		var pid := int(arr[0])
 		if pid == Net.my_id():
-			var new_hp := int(arr[3])
-			if not GameManager.god_mode and new_hp != player.hp and not player.dead:
-				player.hp = clampi(new_hp, 0, player.max_hp)
-				EventBus.hp_changed.emit(player.hp, player.max_hp)
-				if player.hp <= 0:
-					player.dead = true
-					_on_player_died()
+			# Свои HP клиент считает сам (урон приходит адресно от хоста).
+			# Раньше снапшот перезаписывал HP значением «куклы», из-за чего
+			# игрок выглядел безжизненным и умирал от одного удара.
 			continue
 		for np in net_proxies:
 			if np.peer_id == pid:
@@ -4992,17 +5171,22 @@ func _net_client_damage(enemy: Node2D, amount: float, opts: Dictionary) -> void:
 func net_hit_proxy(np: NetPlayer, dmg: int, from_pos: Vector2) -> void:
 	if np == null or np.dead:
 		return
+	# Игрок в меню неуязвим, а после возрождения/выхода из меню — 2 секунды.
+	if np.away or np.safe_left > 0.0:
+		return
+	# Кулдаун попаданий как iframes у героя: иначе толпа врагов снимала
+	# весь запас HP за один кадр — «смерть от одного удара».
+	if np.touch_cd > 0.0:
+		return
+	np.touch_cd = 0.55
 	np.hp -= dmg
 	np.hit_flash = 0.3
 	spawn_dmg_number(np.global_position, float(dmg), false, "net")
 	spawn_fx(np.global_position, Color(0.7, 0.95, 1.0, 0.8), 18.0, 0.2)
 	Net.send_player_damage(np.peer_id, dmg, from_pos)
-	if np.hp <= 0:
+	if np.hp < 0:
 		np.hp = 0
-		np.dead = true
-		np.visible = false
-		_spawn_revive_crystal(np.peer_id, np.global_position)
-		notify("%s выбыл из боя — подберите его кристалл-душу" % np.display_name)
+	# Смерть придёт из состояния клиента (там HP авторитетно), см. _net_on_state.
 
 func _net_on_local_damage(amount: int, from_pos: Vector2) -> void:
 	if ended or player == null or player.dead:
@@ -5040,10 +5224,7 @@ func _net_on_event(kind: String, data: Dictionary) -> void:
 			if partner_perks.size() > 8:
 				partner_perks.pop_front()
 		"pause":
-			net_apply_pause(bool(data.get("on", false)))
-		"pause_req":
-			if net_host:
-				net_toggle_pause()
+			net_apply_pause(bool(data.get("on", false)), String(data.get("name", "")))
 		"pickup":
 			if not net_host:
 				return
@@ -5090,29 +5271,22 @@ func _net_on_session_ended(reason: String) -> void:
 func net_toggle_pause() -> void:
 	if not net_active:
 		return
-	if not net_host:
-		if hud != null and hud.pause_layer != null:
-			hud.pause_layer.visible = not hud.pause_layer.visible
-			if hud.pause_layer.visible:
-				hud._refresh_pause_menu()
-		Net.send_event_any("pause_req", {})
-		return
+	# Паузы в коопе нет: меню открывается только у этого игрока, мир живёт.
+	# Пока меню открыто, герой прозрачный и неуязвимый (см. _tick_net_safety).
 	net_paused = not net_paused
 	if hud != null and hud.pause_layer != null:
 		hud.pause_layer.visible = net_paused
 		if net_paused:
 			hud._refresh_pause_menu()
-	get_tree().paused = net_paused
-	Net.send_event("pause", {"on": net_paused})
+	get_tree().paused = false
+	Net.send_event_any("pause", {"on": net_paused, "name": String(Net.my_name)})
 
-func net_apply_pause(on: bool) -> void:
-	net_paused = on
-	if hud != null and hud.pause_layer != null:
-		hud.pause_layer.visible = on
-		if on:
-			hud._refresh_pause_menu()
-	get_tree().paused = on
-	_sync_cursor()
+## Напарник открыл/закрыл меню — нас это не останавливает, только сообщение.
+func net_apply_pause(on: bool, who: String = "") -> void:
+	if hud == null:
+		return
+	var nm := who if who != "" else "Напарник"
+	hud.push_chat("система", "%s %s" % [nm, "на паузе" if on else "вернулся в бой"], false)
 
 ## Чат: короткая строка внизу экрана у всех игроков.
 func send_chat(text: String) -> void:

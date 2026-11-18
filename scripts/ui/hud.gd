@@ -407,6 +407,10 @@ func _refresh_party() -> void:
 		var frac := clampf(float(info.get("hp", 0)) / maxf(1.0, float(info.get("max", 1))), 0.0, 1.0)
 		var nm: Label = holder.get_child(0)
 		nm.text = ("☠ " if bool(info.get("dead", false)) else "") + String(info.get("name", "Напарник"))
+		if game != null and bool(game.get("net_active")):
+			nm.text += "  %d/%d" % [int(info.get("hp", 0)), int(info.get("max", 1))]
+		if bool(info.get("away", false)):
+			nm.text += " · пауза"
 		var bar: ColorRect = holder.get_child(2)
 		bar.size = Vector2(72.0 * frac, 4)
 		bar.color = Color(0.45, 0.9, 1.0) if frac > 0.35 else Color(1.0, 0.5, 0.45)

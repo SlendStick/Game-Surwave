@@ -21,6 +21,8 @@ var traveled := 0.0
 var returned := false
 var spin_speed := 0.0
 var wave_phase := 0.0
+## Копия чужого выстрела: летит по прямой, никому не наносит урон.
+var net_remote := false
 
 func setup(g: Node) -> void:
 	game = g
@@ -29,6 +31,7 @@ func setup(g: Node) -> void:
 
 func spawn_bullet(pos: Vector2, dir: Vector2, dmg: float, o: Dictionary) -> void:
 	opts = o.duplicate()
+	net_remote = false
 	damage = dmg
 	global_position = pos
 	active = true
@@ -89,6 +92,15 @@ func deactivate() -> void:
 
 func tick(delta: float) -> void:
 	if not active:
+		return
+	if net_remote:
+		# Выстрел напарника: только визуал, столкновений и урона нет.
+		global_position += vel * delta
+		life -= delta
+		if spin_speed != 0.0:
+			rotation += spin_speed * delta
+		if life <= 0.0:
+			deactivate()
 		return
 	# самонаведение и уникальные траектории
 	if homing:

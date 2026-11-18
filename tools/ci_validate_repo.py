@@ -756,7 +756,36 @@ def check_network_v2(errors: list[str]) -> None:
     weather = (ROOT / "scripts/game/weather_fx.gd").read_text(encoding="utf-8")
     if "FADE_TIME" not in weather:
         fail("weather_fx.gd: нет плавного появления/исчезновения непогоды", errors)
-    ok("Кооп 2.0: цели/урон по всем игрокам, души, чат, эмоции, боссы, бесконечный мир")
+
+    # --- сетевой кооп 2.1: без паузы, неуязвимость вне боя, чужие выстрелы
+    for name in ("func _tick_net_safety(", "func local_player_safe(", "func net_pause_off(",
+                 "func _net_spawn_shot_ghost(", "func _tick_net_shots("):
+        if name not in game:
+            fail(f"game.gd: нет {name}", errors)
+    for key in ("net_away", "net_safe_left", "net_pending_shots", "net_fx_echo"):
+        if key not in game:
+            fail(f"game.gd: нет переменной {key}", errors)
+    for bad in ("get_tree().paused = net_paused", "get_tree().paused = on"):
+        if bad in game:
+            fail(f"game.gd: сетевой режим ставит общую паузу ({bad})", errors)
+    snap_at = game.find("func _net_apply_snapshot(")
+    snap_body = game[snap_at:snap_at + 4000] if snap_at >= 0 else ""
+    if "player.hp = clampi" in snap_body:
+        fail("game.gd: снапшот перезаписывает HP клиента — HP должен считать сам клиент", errors)
+
+    net_player = (ROOT / "scripts/game/net_player.gd").read_text(encoding="utf-8")
+    for key in ("var away", "var safe_left", "var touch_cd", "var pending_shots"):
+        if key not in net_player:
+            fail(f"net_player.gd: нет {key}", errors)
+    if "modulate.a = 0.5" not in net_player:
+        fail("net_player.gd: игрок в меню не становится прозрачным", errors)
+
+    bullet = (ROOT / "scripts/projectiles/bullet.gd").read_text(encoding="utf-8")
+    if "net_remote" not in bullet:
+        fail("bullet.gd: выстрелы напарников не поддерживаются (нет net_remote)", errors)
+
+    ok("Кооп 2.0: цели/урон по всем игрокам, души, чат, эмоции, боссы, бесконечный мир, "
+       "без паузы, неуязвимость вне боя, общие выстрелы и эффекты")
 
 
 def check_python_tools(errors: list[str]) -> None:

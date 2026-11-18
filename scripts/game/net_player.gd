@@ -5,8 +5,10 @@ extends Node2D
 ## idle/walk), поэтому напарник выглядит как живой герой, а не как квадрат.
 ## Над головой — имя, тонкая шкала HP, шкала навыка и облачко эмоции/чата.
 
-const BAR_W := 18.0
-const BAR_H := 1.5
+## Gfx.square рисует «белый» квадрат текстурой 2×2, поэтому значение scale
+## равно половине пикселей: 9 → 18 px ширины, 0.8 → 1.6 px высоты.
+const BAR_W := 9.0
+const BAR_H := 0.8
 
 var game: Node = null
 var peer_id := 0
@@ -23,6 +25,14 @@ var target_pos := Vector2.ZERO
 var moving := false
 var hit_flash := 0.0
 var revive_ready := false
+## Игрок «вне боя» (меню/пауза): прозрачный и неуязвимый.
+var away := false
+## Остаток неуязвимости после возрождения или выхода из меню, сек.
+var safe_left := 0.0
+## Кулдаун попаданий по этому напарнику (аналог iframes героя).
+var touch_cd := 0.0
+## Выстрелы, которые напарник сделал за последний пакет (для ретрансляции).
+var pending_shots: Array = []
 ## Эмоция/реплика над головой: {text, color, left}
 var bubble_left := 0.0
 var bubble_text := ""
@@ -76,6 +86,9 @@ func setup(g: Node, id: int, pname: String, ch: String, wp: String, pos: Vector2
 	soul.visible = false
 	soul.z_index = 2
 	add_child(soul)
+	# Стартуем с реальным запасом героя, иначе шкала напарника выглядела пустой.
+	max_hp = maxi(1, int(DB.character(char_id).get("hp", 3)))
+	hp = max_hp
 	name_label = Label.new()
 	name_label.text = display_name
 	name_label.add_theme_font_override("font", UI.crisp_font())
@@ -126,6 +139,11 @@ func apply_state(state: Dictionary) -> void:
 		_refresh_body()
 	skill_frac = clampf(float(state.get("sk", skill_frac)), 0.0, 1.0)
 	moving = bool(state.get("mv", false))
+	away = bool(state.get("aw", away))
+	var shots: Array = state.get("sh", [])
+	for sh in shots:
+		if pending_shots.size() < 48:
+			pending_shots.append(sh)
 	var new_char := String(state.get("ch", char_id))
 	var new_weapon := String(state.get("wp", weapon_id))
 	if new_char != char_id:
@@ -135,6 +153,14 @@ func apply_state(state: Dictionary) -> void:
 		weapon_id = new_weapon
 		if weapon_sprite != null:
 			weapon_sprite.texture = Assets.icon("weapon_" + weapon_id)
+
+## Выстрелы напарника, накопившиеся с прошлого пакета.
+func take_shots() -> Array:
+	if pending_shots.is_empty():
+		return []
+	var out := pending_shots.duplicate()
+	pending_shots.clear()
+	return out
 
 ## Класс персонажа (knight/rogue/…) — именно по нему лежат спрайты героев.
 func _char_cls() -> String:
@@ -229,9 +255,12 @@ func update_visual(delta: float) -> void:
 		if dead:
 			soul.position = Vector2(0, -4.0 + sin(float(Time.get_ticks_msec()) * 0.004) * 2.0)
 			soul.modulate = Color(0.8, 0.9, 1.0, 0.8)
+	modulate.a = 0.5 if away else 1.0
 	if name_label != null:
 		name_label.text = ("☠ " if dead else "") + display_name
 		name_label.visible = true
+	if away:
+		name_label.text += " · пауза"
 	var show_bars := not dead
 	if hp_bar_bg != null:
 		hp_bar_bg.visible = show_bars

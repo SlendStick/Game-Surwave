@@ -316,6 +316,11 @@ func tick(delta: float) -> void:
 	_tick_statuses(delta)
 	_tick_character(delta)
 	_tick_periodic(delta)
+	# В коопе, пока открыто меню/пауза, герой не бегает и не стреляет:
+	# мир продолжает жить, а игрок «вне боя» (прозрачный и неуязвимый).
+	if game != null and bool(game.get("net_away")):
+		_update_vitals()
+		return
 	if bot:
 		_bot_think(delta)
 	read_input()
@@ -329,8 +334,10 @@ func tick(delta: float) -> void:
 ## Патроны и здоровье над персонажем — режим включается в настройках
 ## (Настройки → «Патроны и HP»: «над игроком» / «слева сверху»).
 ## Над героем рисуются две тонкие шкалы: сверху здоровье, ниже патроны.
-const BAR_W := 18.0
-const BAR_H := 1.5
+## Gfx.square рисует текстуру 2×2, поэтому scale = половина пикселей:
+## 9 → 18 px ширины, 0.8 → 1.6 px высоты. Раньше шкалы были вдвое крупнее.
+const BAR_W := 9.0
+const BAR_H := 0.8
 var hp_bar_bg: Sprite2D = null
 var mag_bar_bg: Sprite2D = null
 var mag_bar: Sprite2D = null
