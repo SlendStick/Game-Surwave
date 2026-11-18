@@ -542,6 +542,33 @@ def check_gdscript_scopes(errors: list[str]) -> None:
         checked += 1
     ok(f"Проверено {checked} GDScript-файлов на области видимости локальных переменных")
 
+GD_UI_FACTORY_RE = re.compile(
+    r"var\s+([A-Za-z_]\w*)\s*:?=\s*UI\.\w+\(\s*([A-Za-z_]\w*)"
+)
+
+
+def check_gdscript_duplicate_children(errors: list[str]) -> None:
+    """`UI.button(parent, ...)` уже добавляет узел в parent — повторный add_child даёт
+    ошибку «Can't add child ... already has a parent»."""
+    checked = 0
+    for path in sorted((ROOT / "scripts").rglob("*.gd")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        created: dict[str, tuple[str, int]] = {}
+        for idx, line in enumerate(lines, 1):
+            if line.lstrip().startswith("#"):
+                continue
+            m = GD_UI_FACTORY_RE.search(line)
+            if m:
+                created[m.group(1)] = (m.group(2), idx)
+                continue
+            for name, (parent, decl) in created.items():
+                if re.search(r"\b%s\.add_child\(\s*%s\s*\)" % (re.escape(parent), re.escape(name)), line):
+                    fail(f"{path.relative_to(ROOT)}:{idx}: повторный add_child({name}) — "
+                         f"UI-фабрика уже добавила узел в «{parent}» (строка {decl}); "
+                         f"получится ошибка «already has a parent»", errors)
+        checked += 1
+    ok(f"Проверено {checked} GDScript-файлов на двойное добавление узлов")
+
 
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
@@ -563,6 +590,7 @@ def main() -> int:
     check_balance_and_net(errors)
     check_gdscript_typos(errors)
     check_gdscript_scopes(errors)
+    check_gdscript_duplicate_children(errors)
     check_python_tools(errors)
 
     if errors:

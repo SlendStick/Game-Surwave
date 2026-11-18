@@ -435,7 +435,6 @@ func _settings_toggle(parent: Control, key: String, text: String, def_value: boo
 		GameManager.set_setting(key, not bool(GameManager.setting(key, def_value)))
 		AudioManager.play_sfx("ui")
 		_open_overlay("settings"))
-	cell.add_child(b)
 
 func _settings_cycle(parent: Control, key: String, text: String, values: Array, names: Array, def_value: String = "") -> void:
 	var cell := _settings_cell(parent)
@@ -456,7 +455,6 @@ func _settings_cycle(parent: Control, key: String, text: String, values: Array, 
 		GameManager.set_setting(key, String(values[(i + 1) % values.size()]))
 		AudioManager.play_sfx("ui")
 		_open_overlay("settings"))
-	cell.add_child(b)
 
 func _settings_slider(parent: Control, key: String, text: String) -> void:
 	var cell := _settings_cell(parent)
