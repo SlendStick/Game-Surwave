@@ -126,6 +126,9 @@ const BASE_CAMERA_ZOOM := 1.28
 
 var combo20_hits := 0
 var boss_focus := 0.0
+var run_relics: Array = []          # реликвии, собранные в текущем забеге
+var boss_intro_left := 0.0          # кинематографичное появление босса
+var secret_altar_done := false      # алтарь САТАНАИЛА на 25:00 уже проверен
 var camera_zoom_target := BASE_CAMERA_ZOOM
 var photo_mode := false
 var _photo_was_paused := false
@@ -270,6 +273,7 @@ func _ready() -> void:
 	if OS.get_environment("SURW_MAP_DUMP") != "": call_deferred("_run_map_dump")
 	if OS.get_environment("SURW_VIS_TEST") != "": call_deferred("_run_vis_test")
 	if OS.get_environment("SURW_CHEAT_TEST") != "": call_deferred("_run_cheat_test")
+	if OS.get_environment("SURW_BOSS_TEST_ALL") != "": call_deferred("_run_bossfight_test")
 	if OS.get_environment("SURW_LIFETIME_TEST") != "": call_deferred("_run_lifetime_test")
 	if OS.get_environment("SURW_BOSS_TEST") != "": call_deferred("_dev_boss_test")
 	if OS.get_environment("SURW_PHOTO_TEST") != "": call_deferred("_dev_photo_test")
@@ -766,6 +770,73 @@ func _run_perk_effect_test() -> void:
 				a.deactivate()
 		player.upg.flags = saved_flags
 	print("[SURWAVE] perk_effects OK: %d perks, %d mod keys, %d flag keys" % [checked, mod_keys.size(), flag_keys.size()])
+
+## Боссфайты: полный прогон ростера — фазы, все типы атак, награды, реликвии.
+func _run_bossfight_test() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var bosses: Dictionary = DB.bosses
+	assert(bosses.size() >= 14, "В ростере меньше 14 боссов")
+	var soul_before := souls
+	var relic_before := relic_count()
+	var checked := 0
+	var phases_seen := 0
+	var patterns_run := {}
+	var kinds := {}
+	for key in bosses.keys():
+		var bd: Dictionary = bosses[key]
+		if not cheat_spawn_boss(String(key)):
+			assert(false, "Не удалось заспавнить босса " + String(key))
+		await get_tree().process_frame
+		var be: Enemy = boss_enemy
+		assert(be != null, "Босс %s не появился" % key)
+		assert(be.max_hp >= 3000.0, "У босса %s HP меньше 3000" % key)
+		var def_phases: Array = bd.get("phases", [])
+		assert(def_phases.size() >= 3, "У босса %s меньше 3 фаз" % key)
+		# каждый тип атаки каждой фазы должен отработать без ошибок
+		for ph in def_phases:
+			for pat in (ph.get("patterns", []) as Array):
+				kinds[String(pat.get("type", ""))] = true
+				var ebullets_before := ebullets.size()
+				var hazards_before := hazards.size()
+				be._exec_pattern(pat as Dictionary)
+				patterns_run[String(pat.get("type", ""))] = int(patterns_run.get(String(pat.get("type", "")), 0)) + 1
+				assert(ebullets.size() >= ebullets_before, "Атака %s не отработала" % String(pat.get("type", "")))
+				assert(hazards.size() >= hazards_before, "Атака %s сломала зоны" % String(pat.get("type", "")))
+		# прогон фаз: HP → 69% / 39% / 5%
+		for ratio in [0.69, 0.39, 0.05]:
+			be.hp = be.max_hp * float(ratio)
+			be.transition_left = 0.0
+			await get_tree().process_frame
+			await get_tree().process_frame
+		assert(be.phase >= mini(2, def_phases.size() - 1), "Босс %s не сменил фазы" % key)
+		phases_seen += be.phase + 1
+		# финальные боссы завершают забег — их только проверяем по фазам/атакам
+		if key == "shemhaz" or key == "satanail":
+			be.dead = true
+			be.active = false
+			be.queue_free()
+			boss_enemy = null
+			checked += 1
+			await get_tree().process_frame
+			continue
+		# смерть и награды
+		var souls_here := souls
+		_cheat_kill(be)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		# подбираемый лут убираем: экран выбора печатей заблокировал бы прогон
+		for p in pickups:
+			if p.active:
+				p.deactivate()
+		assert(boss_enemy == null, "Босс %s не умер" % key)
+		assert(souls > souls_here, "Босс %s не дал душ" % key)
+		checked += 1
+	assert(souls > soul_before, "Боссы не дали душ")
+	assert(relic_count() > relic_before or relic_before >= DB.relics.size(), "Боссы не дали реликвий")
+	assert(DB.relics.size() >= 10, "Мало реликвий в пуле")
+	assert(kinds.size() >= 12, "Прогнано слишком мало типов атак: %d" % kinds.size())
+	print("[SURWAVE] bossfight OK: bosses=%d phases=%d attack_types=%d relics=%d souls=%.0f" % [checked, phases_seen, kinds.size(), relic_count(), souls])
 
 ## Проверка времени жизни отложенных вызовов: события ставят таймеры,
 ## затем игра уходит в меню — в консоли не должно быть ошибок о freed-лямбдах.
@@ -1759,6 +1830,7 @@ func _tick_map(delta: float) -> void:
 	if secret_spawn_pending:
 		secret_spawn_pending = false
 		spawn_sathan()
+	_tick_secret_altar(delta)
 
 var low_fps_timer := 0.0
 
@@ -2154,12 +2226,158 @@ func cheat_clear_around() -> void:
 		_cheat_kill(e)
 	notify("чит: зона очищена")
 
+# ------------------------------------------------------------------ БОССФАЙТЫ (спека docs/ПРОМПТ_БОССФАЙТЫ.md)
+## Сколько игроков в забеге (кооп поднимает HP боссов).
+func boss_player_count() -> int:
+	if net_active:
+		return maxi(1, Net.peer_count())
+	return 1
+
+func boss_darkness() -> int:
+	return int(GameManager.run_config.get("darkness", 1))
+
+## HP босса: ×1.5 за каждого доп. игрока, ×1.5 на Тьме 4+, ещё ×2 на Тьме 14+.
+func boss_hp_scale() -> float:
+	var mult := 1.0
+	var players := boss_player_count()
+	if players > 1:
+		mult *= pow(1.5, float(players - 1))
+	var dark := boss_darkness()
+	if dark >= 14:
+		mult *= 2.0
+	elif dark >= 4:
+		mult *= 1.5
+	return mult
+
+## Урон атак босса: +20% за каждого доп. игрока, ×2 на Тьме 6+, ещё ×1.8 на Тьме 15.
+func boss_dmg_scale() -> float:
+	var mult := 1.0
+	var players := boss_player_count()
+	if players > 1:
+		mult *= 1.0 + 0.2 * float(players - 1)
+	var dark := boss_darkness()
+	if dark >= 15:
+		mult *= 1.8
+	elif dark >= 6:
+		mult *= 2.0
+	return mult
+
+## Ускорение таймеров атак босса (спека: Тьма 15+ → ×1.8 скорость атак).
+func boss_rate_scale() -> float:
+	return 0.8 if boss_darkness() >= 15 else 0.0
+
+## Кинематографичное появление босса: наплыв камеры, вспышка, тряска, звук.
+func boss_intro(boss_def: Dictionary, pos: Vector2, final_form: bool) -> void:
+	boss_intro_left = 1.6
+	if not bool(GameManager.setting("boss_fx", true)):
+		return
+	boss_focus = 2.0
+	camera_zoom_target = 1.55 if not final_form else 1.7
+	var accent := Gfx.hex(String(boss_def.get("color2", "#ff4500")))
+	spawn_fx(pos, accent, 320.0 if not final_form else 420.0, 1.4)
+	flash_screen(accent.lerp(Color.WHITE, 0.4))
+	shake(14.0 if not final_form else 24.0)
+	AudioManager.play_sfx("boss", 1.0 if not final_form else 0.7)
+	if final_form:
+		AudioManager.play_sfx("sathan", 0.6)
+	run_later(0.9, func() -> void:
+		if ended:
+			return
+		notify("%s — БОЙ НАЧИНАЕТСЯ" % String(boss_def.get("name", "БОСС")))
+		shake(6.0))
+
+## Реликвии: постоянные награды за боссов (спека §2).
+func relic_owned(id: String) -> bool:
+	return (GameManager.meta.get("relics", []) as Array).has(id)
+
+func relic_count() -> int:
+	return (GameManager.meta.get("relics", []) as Array).size()
+
+func owned_relic_ids() -> Array:
+	var ids: Array = (GameManager.meta.get("relics", []) as Array).duplicate()
+	for r in run_relics:
+		if not ids.has(String(r)):
+			ids.append(String(r))
+	return ids
+
+## Выдать реликвию: модификатор применяется сразу, id хранится в мета-прогрессе.
+func award_relic(pos: Vector2 = Vector2.INF) -> String:
+	var pick: Dictionary = DB.next_relic(owned_relic_ids())
+	if pick.is_empty():
+		return ""
+	var rid := String(pick.get("id", ""))
+	run_relics.append(rid)
+	var meta_relics: Array = GameManager.meta.get("relics", [])
+	if not meta_relics.has(rid):
+		meta_relics.append(rid)
+		GameManager.meta["relics"] = meta_relics
+		if not GameManager.cheat_used:
+			SaveManager.save_game()
+	if player != null:
+		player.upg.apply_mods(pick.get("mods", {}))
+		player.recalc()
+	var at: Vector2 = player.global_position if pos == Vector2.INF and player != null else pos
+	spawn_fx(at, Color("#ffd700"), 96.0, 0.8)
+	AudioManager.play_sfx("chest", 0.6)
+	notify("РЕЛИКВИЯ: %s (%s)" % [String(pick.get("name", rid)), String(pick.get("desc", ""))])
+	print("[SURWAVE] relic id=%s total=%d" % [rid, relic_count()])
+	return rid
+
+## Опыт за босса: рассыпается самоцветами, чтобы подбирался с арены.
+func award_boss_xp(pos: Vector2, amount: int) -> void:
+	if amount <= 0:
+		return
+	var chunks := clampi(int(round(amount / 100.0)), 1, 8)
+	var per := maxi(1, int(round(float(amount) / float(chunks))))
+	for i in chunks:
+		var off := Vector2.RIGHT.rotated(TAU * float(i) / float(chunks)) * randf_range(14.0, 46.0)
+		spawn_pickup("xp", pos + off, float(per))
+
+## Смерть босса: замедление, вспышка, салют искр и души.
+func boss_death_cinematic(pos: Vector2, boss_def: Dictionary) -> void:
+	var accent := Gfx.hex(String(boss_def.get("color2", "#ffd700")))
+	spawn_fx(pos, accent, 420.0, 1.6)
+	spawn_fx(pos, Color.WHITE, 240.0, 1.1)
+	if bool(GameManager.setting("slowmo", true)):
+		Engine.time_scale = 0.35
+		hitstop_left = 0.0
+		run_later(0.45, func() -> void:
+			if not ended:
+				Engine.time_scale = 1.0)
+	for i in 6:
+		spawn_pickup("soul", pos + Vector2.RIGHT.rotated(TAU * float(i) / 6.0) * randf_range(18.0, 52.0), 1.0)
+
+## Алтарь САТАНАИЛА на 25:00: 1000+ убийств без урона, либо 30 уровень +
+## все 4 стихии в перках с шансом 25%. Шемхаз-секрет — после победы над
+## САТАНАИЛОМ и 10+ уникальных реликвий (шанс 10%).
+func _tick_secret_altar(_delta: float) -> void:
+	if secret_altar_done or elapsed < 1500.0 or secret_entered:
+		return
+	secret_altar_done = true
+	var level := int(player.level) if player != null else 1
+	# 4 стихии: ветки flame (огонь), frost (лёд), thunder (молния), dark (тьма)
+	var elements := {}
+	if player != null:
+		for pid in player.upg.taken.keys():
+			var perk: Dictionary = DB.perk_by_id.get(String(pid), {})
+			var tree := String(perk.get("tree", ""))
+			if tree != "":
+				elements[tree] = true
+	var all_elements := elements.has("flame") and elements.has("frost") and elements.has("thunder") and elements.has("dark")
+	if level >= 30 and all_elements and randf() < 0.25 and pentagram_pos == Vector2.INF and not pentagram_spawned:
+		spawn_pentagram(player.global_position + Vector2.RIGHT.rotated(randf() * TAU) * 120.0)
+		notify("АЛТАРЬ САТАНАИЛА ОТКРЫТ: войдите в пентаграмму")
+		print("[SURWAVE] secret_altar opened level=%d t=%.0f" % [level, elapsed])
+	if relic_count() >= 10 and bool(GameManager.meta.get("sathan_defeated", false)) and boss_enemy == null and randf() < 0.10:
+		notify("ШЕМХАЗ ЧУВСТВУЕТ ВАШИ РЕЛИКВИИ")
+		spawn_map_boss("secret_final")
+
 func spawn_miniboss(tier: int) -> void:
 	var mb := DB.miniboss_of(String(map_data.get("id", "")))
 	if mb.is_empty():
 		return
 	# HP мини-босса берётся из данных карты (mb_*: 200…1000), тир даёт небольшой бонус
-	var hp := float(mb.get("hp", 300)) * (1.0 + 0.15 * minf(float(tier), 3.0)) * (1.0 + float(diff_mods.get("boss_hp", 0.0)) * 0.5)
+	var hp := float(mb.get("hp", 300)) * (1.0 + 0.15 * minf(float(tier), 3.0)) * (1.0 + float(diff_mods.get("boss_hp", 0.0)) * 0.5) * boss_hp_scale()
 	var enemy := spawn_enemy(String(mb.get("id", "")), _spawn_position(), {"hp_mult": hp / maxf(1.0, float(mb.get("hp", 1))), "dmg_mult": 1.0 + float(diff_mods.get("boss_dmg", 0.0))})
 	if enemy != null:
 		notify("%s: %s" % [Loc.t("miniboss"), String(mb.get("name", ""))])
@@ -2167,47 +2385,63 @@ func spawn_miniboss(tier: int) -> void:
 		AudioManager.play_sfx("boss", 1.3)
 
 func spawn_map_boss(kind: String) -> void:
-	# 15:00 — чемпион карты, 30:00 — финальный босс Шемхаз (BOSSES_COMPLETE_SPECIFICATION.md)
-	var boss_def: Dictionary = DB.bosses.get("shemhaz", {}) if kind == "final" else DB.boss(String(map_data.get("id", "")))
+	# 15:00 — босс карты, 30:00 — финальный Шемхаз, бесконечный режим — «Пустота».
+	var boss_def: Dictionary
+	match kind:
+		"final", "secret_final":
+			boss_def = DB.bosses.get("shemhaz", {})
+		_:
+			boss_def = DB.boss(String(map_data.get("id", "")))
+	if boss_def.is_empty() and mode == "endless":
+		boss_def = DB.bosses.get("void", {})
 	if boss_def.is_empty():
 		boss_def = DB.bosses.get("shemhaz", {})
 	if boss_def.is_empty():
 		return
+	# В бесконечном режиме пул боссов чередуется, чтобы забеги не повторялись.
+	if mode == "endless" and endless_cycle >= 1 and kind != "final":
+		var keys: Array = DB.bosses.keys()
+		keys.erase("satanail")
+		if not keys.is_empty():
+			boss_def = DB.bosses[String(keys[endless_cycle % keys.size()])]
 	var hp := float(boss_def.get("hp", 7500))
-	var hp_mult := 1.0 + float(diff_mods.get("boss_hp", 0.0))
+	var hp_mult := (1.0 + float(diff_mods.get("boss_hp", 0.0))) * boss_hp_scale()
 	if mode == "endless":
 		hp_mult += float(endless_cycle) * 1.0
+	var pos := _spawn_position()
 	boss_enemy = ENEMY_SCENE.instantiate()
 	world.add_child(boss_enemy)
 	boss_enemy.setup(self)
-	boss_enemy.init_boss(self, boss_def, _spawn_position(), hp * hp_mult, kind == "final")
+	boss_enemy.init_boss(self, boss_def, pos, hp * hp_mult, kind == "final" or kind == "secret_final")
 	enemies.append(boss_enemy)
 	boss_no_hit = true
-	print("[SURWAVE] boss_spawn kind=%s id=%s name=%s hp=%.0f t=%.0f" % [kind, String(boss_def.get("id", "")), String(boss_def.get("name", "")), hp * hp_mult, elapsed])
+	print("[SURWAVE] boss_spawn kind=%s id=%s name=%s hp=%.0f scale=%.2f t=%.0f" % [kind, String(boss_def.get("id", "")), String(boss_def.get("name", "")), hp * hp_mult, boss_hp_scale(), elapsed])
 	GameManager.add_album_boss(String(boss_def.get("id", "")))
-	AudioManager.play_sfx("boss", 0.8)
 	notify("%s: %s" % [Loc.t("boss"), String(boss_def.get("name", ""))])
+	boss_intro(boss_def, pos, kind == "final")
 
 ## Спавн секретного босса САТАНАИЛ (без немедленной мегафазы).
 func spawn_secret_boss() -> void:
 	var sd: Dictionary = DB.sathan
 	if sd.is_empty():
 		return
+	var pos := _spawn_position()
 	boss_enemy = ENEMY_SCENE.instantiate()
 	world.add_child(boss_enemy)
 	boss_enemy.setup(self)
-	boss_enemy.init_boss(self, sd, _spawn_position(), float(sd.get("hp", 10000)))
+	boss_enemy.init_boss(self, sd, pos, float(sd.get("hp", 10000)) * boss_hp_scale())
 	enemies.append(boss_enemy)
 	megaphase = false
+	boss_no_hit = true
 	GameManager.add_album_boss("boss_satanail")
-	AudioManager.play_sfx("sathan", 0.8)
 	notify("САТАНАИЛ пробудился")
+	boss_intro(sd, pos, true)
 
 func spawn_sathan() -> void:
 	var sathan_def: Dictionary = DB.sathan
 	if sathan_def.is_empty():
 		return
-	var hp := float(sathan_def.get("hp", 10000))
+	var hp := float(sathan_def.get("hp", 10000)) * boss_hp_scale()
 	boss_enemy = ENEMY_SCENE.instantiate()
 	world.add_child(boss_enemy)
 	boss_enemy.setup(self)
@@ -3114,12 +3348,17 @@ func _on_boss_death(enemy: Enemy) -> void:
 	boss_enemy = null
 	print("[SURWAVE] boss_down id=%s name=%s final=%s t=%.0f" % [String(enemy.boss_def.get("id", "")), String(enemy.boss_def.get("name", "")), str(enemy.is_final), elapsed])
 	var bid := String(enemy.boss_def.get("id", ""))
-	souls += 500.0 if bid == "boss_satanail" else 150.0
+	souls += float(enemy.boss_def.get("souls", 500.0 if bid == "boss_satanail" else 150.0))
+	award_boss_xp(enemy.global_position, int(enemy.boss_def.get("xp", 500)))
+	# реликвии: обычный босс 1, финальный 3, САТАНАИЛ 5 (спека §2)
+	var relic_reward := 5 if bid == "boss_satanail" else (3 if enemy.is_final else 1)
+	for i in relic_reward:
+		award_relic(enemy.global_position)
 	Progression.add_progress("boss",1)
 	if not GameManager.cheat_used:
 		GameManager.meta["throne_unlocked"] = true
 	shake(32.0); flash_screen(Color.WHITE)
-	spawn_fx(enemy.global_position,Color("#ffd700"),384.0,1.5)
+	boss_death_cinematic(enemy.global_position, enemy.boss_def)
 	# САТАНАИЛ — секретная победа (карта Пустота)
 	if bid == "boss_satanail":
 		Progression.add_progress("satanail",1)

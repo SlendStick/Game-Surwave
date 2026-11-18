@@ -12,6 +12,7 @@ var seals: Array = []
 var amulets: Array = []
 var amulet_costs: Array = []
 var darkness: Array = []
+var relics: Array = []
 var enemies: Array = []
 var bosses: Dictionary = {}
 var sathan: Dictionary = {}
@@ -25,6 +26,7 @@ var enemy_by_id: Dictionary = {}
 var map_by_id: Dictionary = {}
 var amulet_by_id: Dictionary = {}
 var seal_by_id: Dictionary = {}
+var relic_by_id: Dictionary = {}
 var tree_by_id: Dictionary = {}
 var specializations: Array = []          # сгенерированные специализации персонажей
 var spec_by_id: Dictionary = {}
@@ -64,6 +66,9 @@ func _load_all() -> void:
 	amulets = amu.get("amulets", [])
 	amulet_costs = amu.get("costs", [])
 	darkness = _load_json("res://data/darkness.json")
+	relics = _load_json("res://data/relics.json")
+	if not (relics is Array):
+		relics = []
 	enemies = _load_json("res://data/enemies.json")
 	var bd: Dictionary = _load_json("res://data/bosses.json")
 	bosses = bd.get("bosses", {})
@@ -78,6 +83,7 @@ func _load_all() -> void:
 	map_by_id = _index(maps)
 	amulet_by_id = _index(amulets)
 	seal_by_id = _index(seals)
+	relic_by_id = _index(relics)
 	tree_by_id = _index(perk_trees)
 	_build_specializations()
 
@@ -176,6 +182,18 @@ func map(id: String) -> Dictionary:
 func boss(map_id: String) -> Dictionary:
 	var bkey := String(map_by_id.get(map_id, {}).get("boss", ""))
 	return bosses.get(bkey, {})
+
+func relic(id: String) -> Dictionary:
+	return relic_by_id.get(id, {})
+
+## Случайная ещё не собранная реликвия (или {} если все собраны).
+func next_relic(owned: Array) -> Dictionary:
+	var pool: Array = relics.filter(func(r): return not owned.has(String(r.get("id", ""))))
+	if pool.is_empty():
+		pool = relics
+	if pool.is_empty():
+		return {}
+	return pool[randi() % pool.size()]
 
 func miniboss_of(map_id: String) -> Dictionary:
 	var m := map(map_id)

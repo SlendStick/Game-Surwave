@@ -1,0 +1,74 @@
+[
+ {
+  "id": "relic_ember",
+  "name": "Уголь Инферно",
+  "desc": "+8% урона",
+  "mods": {"dmg": 0.08}
+ },
+ {
+  "id": "relic_frost",
+  "name": "Сердце Льда",
+  "desc": "+6% шанс крита",
+  "mods": {"crit": 0.06}
+ },
+ {
+  "id": "relic_iron",
+  "name": "Железный Оберег",
+  "desc": "+6% сопротивление урону",
+  "mods": {"dr": 0.06}
+ },
+ {
+  "id": "relic_swift",
+  "name": "Перо Бури",
+  "desc": "+6% скорость передвижения",
+  "mods": {"move_speed": 0.06}
+ },
+ {
+  "id": "relic_vital",
+  "name": "Кровавый Камень",
+  "desc": "+1 сердце",
+  "mods": {"hp": 1}
+ },
+ {
+  "id": "relic_eye",
+  "name": "Око Бездны",
+  "desc": "+12% радиус обзора",
+  "mods": {"vision": 0.12}
+ },
+ {
+  "id": "relic_magnet",
+  "name": "Магнит Душ",
+  "desc": "+15% радиус подбора",
+  "mods": {"pickup": 0.15}
+ },
+ {
+  "id": "relic_leech",
+  "name": "Клык Вампира",
+  "desc": "+3% вампиризм",
+  "mods": {"lifesteal": 0.03}
+ },
+ {
+  "id": "relic_haste",
+  "name": "Печать Спешки",
+  "desc": "+7% скорострельность",
+  "mods": {"fire_rate": 0.07}
+ },
+ {
+  "id": "relic_luck",
+  "name": "Монета Судьбы",
+  "desc": "+10% получаемого опыта",
+  "mods": {"xp": 0.10}
+ },
+ {
+  "id": "relic_void",
+  "name": "Осколок Пустоты",
+  "desc": "+1 снаряд",
+  "mods": {"proj": 1}
+ },
+ {
+  "id": "relic_shade",
+  "name": "Тень",
+  "desc": "+5% уклонение",
+  "mods": {"dodge": 0.05}
+ }
+]

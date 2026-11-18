@@ -114,6 +114,13 @@ CORE_TESTS: list[TestCase] = [
         expect_re=r"\[SURWAVE\] boomerang OK:",
     ),
     TestCase(
+        name="boss_fights",
+        env={"SURW_BOSS_TEST_ALL": "1", "SURW_MAP": "sands"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] bossfight OK: bosses=",
+        timeout_s=90.0,
+    ),
+    TestCase(
         name="perk_clicks",
         env={"SURW_PERK_CLICK_TEST": "1", "SURW_MAP": "forest"},
         args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],

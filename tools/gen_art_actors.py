@@ -963,6 +963,7 @@ def _boss_frame(
             "boss_chaos": (c("arcane_dk"), c("scarlet"), c("violet_lt"), c("ice_glow"), c("crimson_dk"), c("violet_lt"), "chaos_titan"),
             "boss_temple": (c("bronze_dk"), c("gold"), c("parchment"), c("ice_glow"), c("stone"), c("gold_glow"), "hierophant"),
             "boss_throne": (c("slate_vd"), c("gold"), c("iron"), c("ember_red"), c("crimson_dk"), c("gold"), "usurper"),
+            "boss_void": (c("void"), c("violet"), c("ghost_violet"), c("violet_lt"), c("arcane_vd"), c("violet_lt"), "abyss_lord"),
             "boss_champion": (c("stone_dk"), c("crimson"), c("iron"), c("gold_glow"), c("maroon"), c("flame"), "usurper"),
         }
         body_c, sec_c, lt_c, eye_c, wing_c, aura_c, form = styles.get(boss_id, styles["boss_champion"])
@@ -1284,7 +1285,7 @@ def generate_bosses() -> int:
         "boss_shemhaz", "boss_satanail", "boss_satan",
         "boss_champion", "boss_sands", "boss_tundra", "boss_peak", "boss_abyss",
         "boss_forest", "boss_rift", "boss_graveyard", "boss_hive",
-        "boss_bloodmoon", "boss_chaos", "boss_temple", "boss_throne",
+        "boss_bloodmoon", "boss_chaos", "boss_temple", "boss_throne", "boss_void",
     ]
     for bid in boss_ids:
         idle = [_boss_frame(bid, "idle", i) for i in range(4)]

@@ -152,12 +152,18 @@ func init_boss(g: Node, gb: Dictionary, pos: Vector2, hp_override: float = -1.0,
 	flags = {}
 	max_hp = hp_override if hp_override > 0.0 else float(gb.get("hp", 1000))
 	hp = max_hp
-	speed = 46.0
-	damage = 3
+	speed = float(gb.get("speed", 46.0))
+	# урон босса из данных × масштаб Тьмы/коопа (спека боссфайтов §9)
+	var dmg_scale := 1.0
+	if g != null and g.has_method("boss_dmg_scale"):
+		dmg_scale = float(g.boss_dmg_scale())
+	# Спека меряет урон в шкале HP 0–100, в игре HP — сердца (3–6): пересчёт /2.5
+	damage = clampi(int(round(float(gb.get("damage", 3)) * dmg_scale / 2.5)), 1, 3)
 	radius = float(gb.get("radius", 26.0))
 	color = Gfx.gothic(Gfx.hex(String(gb.get("color", "#ff4040"))), 0.4)
 	phase = 0
-	transition_left = 0.0
+	# короткая пауза на кинематографичное появление босса
+	transition_left = 1.1 if bool(GameManager.setting("slowmo", true)) else 0.0
 	attack_anim = 0.0
 	hurt_anim = 0.0
 	pattern_timers.clear()
@@ -720,6 +726,8 @@ func _boss_tick(delta: float) -> void:
 	var to_player := (player_pos - global_position)
 	var dir := to_player.normalized() if to_player.length() > 0.1 else Vector2.RIGHT
 	var boss_rate_mult := float(game.diff_mods.get("boss_rate", 0.0))
+	if game.has_method("boss_rate_scale"):
+		boss_rate_mult += float(game.boss_rate_scale())
 	var phase_cfg: Dictionary = phases[mini(phase, phases.size() - 1)]
 	var spd := speed * slow_factor() * float(phase_cfg.get("speed_mult", 1.0)) * GameManager.cheat_enemy_speed
 	if float(phase_cfg.get("regen", 0.0)) > 0.0:
@@ -751,6 +759,14 @@ func _boss_tick(delta: float) -> void:
 func _update_boss_bar() -> void:
 	EventBus.boss_damaged.emit(maxf(hp, 0.0), max_hp)
 
+## Урон атаки босса с поправкой на Тьму и число игроков (спека §9).
+func _pdm(pr: Dictionary, def: float) -> int:
+	var mult := 1.0
+	if boss and game != null and game.has_method("boss_dmg_scale"):
+		mult = float(game.boss_dmg_scale())
+	# спека: урон атак 5–20 в шкале HP; в игре это сердца → /4 с потолком 3
+	return clampi(int(round(float(pr.get("damage", def)) * mult / 4.0)), 1, 3)
+
 func _exec_pattern(p: Dictionary) -> void:
 	attack_anim = 0.42
 	var kind := String(p.get("type", ""))
@@ -766,7 +782,7 @@ func _exec_pattern(p: Dictionary) -> void:
 			for i in cnt:
 				var off := 0.0 if cnt <= 1 else (float(i) / float(cnt - 1) - 0.5) * spread_total
 				var col := Color("#ff5522") if kind == "fireball" else Color("#ffe699")
-				game.spawn_enemy_bullet(global_position, dir.rotated(off), int(pr.get("damage", 5)), {
+				game.spawn_enemy_bullet(global_position, dir.rotated(off), _pdm(pr, 5), {
 					"speed": float(pr.get("speed", 200.0)), "color": col, "size": float(pr.get("size", 32.0)),
 					"life": float(pr.get("life", 4.0)), "burn": kind == "fireball"})
 			game.spawn_perk_fx("fireball" if kind == "fireball" else "smite", global_position + dir * (radius * 0.8), 36.0, 0.25)
@@ -774,7 +790,7 @@ func _exec_pattern(p: Dictionary) -> void:
 			# Телеграфированный Цепной Удар (0.35s предупреждение -> удар + замедление)
 			var r1 := float(pr.get("radius", 128.0))
 			game.spawn_fx(global_position, Color(0.85, 0.45, 0.35), r1, 0.4, false)
-			var slam_dmg := int(pr.get("damage", 5))
+			var slam_dmg := _pdm(pr, 5)
 			var slam_slow := float(pr.get("slow", 0.5))
 			var slam_dur := float(pr.get("slow_dur", 2.0))
 			game.run_later(0.35, func() -> void:
@@ -789,7 +805,7 @@ func _exec_pattern(p: Dictionary) -> void:
 			# Тёмные Цепи с чётким телеграфом
 			var r2 := float(pr.get("radius", 192.0))
 			game.spawn_fx(global_position, Color(0.75, 0.2, 0.65), r2, 0.45, false)
-			var dc_dmg := int(pr.get("damage", 7))
+			var dc_dmg := _pdm(pr, 7)
 			var dc_root := float(pr.get("root", 1.5))
 			game.run_later(0.4, func() -> void:
 				if not active or dead or game == null or game.player == null:
@@ -808,7 +824,7 @@ func _exec_pattern(p: Dictionary) -> void:
 			var count := int(pr.get("count", 12))
 			for i in count:
 				var a := TAU * float(i) / float(count)
-				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a), int(pr.get("damage", 8)), {
+				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a), _pdm(pr, 8), {
 					"speed": float(pr.get("speed", 160.0)), "color": vivid,
 					"burn": bool(pr.get("burn", false)), "poison": bool(pr.get("poison", false)),
 				})
@@ -816,20 +832,20 @@ func _exec_pattern(p: Dictionary) -> void:
 			var count2 := int(pr.get("count", 3))
 			for i in count2:
 				var spread := deg_to_rad(float(pr.get("spread", 20.0))) * (float(i) / maxf(1.0, float(count2 - 1)) - 0.5)
-				game.spawn_enemy_bullet(global_position, dir.rotated(spread), int(pr.get("damage", 8)), {"speed": float(pr.get("speed", 200.0)), "color": vivid})
+				game.spawn_enemy_bullet(global_position, dir.rotated(spread), _pdm(pr, 8), {"speed": float(pr.get("speed", 200.0)), "color": vivid})
 		"spiral":
 			var count3 := int(pr.get("count", 24))
 			var base_angle := float(pattern_angles.get("spiral", 0.0))
 			pattern_angles["spiral"] = base_angle + 0.7
 			for i in count3:
 				var a2 := base_angle + TAU * float(i) / float(count3)
-				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a2), int(pr.get("damage", 8)), {"speed": float(pr.get("speed", 150.0)), "color": vivid, "burn": bool(pr.get("burn", false))})
+				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a2), _pdm(pr, 8), {"speed": float(pr.get("speed", 150.0)), "color": vivid, "burn": bool(pr.get("burn", false))})
 		"summon":
 			for i in int(pr.get("count", 3)):
 				var off := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(36.0, 86.0)
 				game.spawn_enemy(String(pr.get("enemy", "")), global_position + off)
 		"aoe":
-			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 90.0)), float(pr.get("damage", 12)), float(pr.get("delay", 1.2)), vivid, float(pr.get("dot", 0.0)))
+			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 90.0)), float(_pdm(pr, 12)), float(pr.get("delay", 1.2)), vivid, float(pr.get("dot", 0.0)))
 		"dash":
 			# Телеграф рывка вместо мгновенного удара через весь экран
 			charge_dir = dir
@@ -837,16 +853,16 @@ func _exec_pattern(p: Dictionary) -> void:
 			behavior["dash_speed"] = float(pr.get("speed", 320.0))
 			game.spawn_fx(global_position + dir * 28.0, vivid, radius * 1.3, 0.42)
 		"lightning":
-			game.lightning_volley(player_pos, int(pr.get("count", 3)), float(pr.get("damage", 20)), float(pr.get("radius", 48.0)))
+			game.lightning_volley(player_pos, int(pr.get("count", 3)), float(_pdm(pr, 20)), float(pr.get("radius", 48.0)))
 		"meteor":
 			for i in int(pr.get("count", 5)):
 				var pos := player_pos + Vector2(randf_range(-140, 140), randf_range(-140, 140))
-				game.spawn_delayed_aoe(pos, float(pr.get("radius", 56.0)), float(pr.get("damage", 14)), 1.0, Color(1, 0.5, 0.2))
+				game.spawn_delayed_aoe(pos, float(pr.get("radius", 56.0)), float(_pdm(pr, 14)), 1.0, Color(1, 0.5, 0.2))
 				game.spawn_event_fx("meteor", pos, 1.0, 1.6, float(pr.get("radius", 56.0)))
 		"spikes":
 			for i in int(pr.get("count", 5)):
 				var pos2: Vector2 = player_pos + Vector2(randf_range(-90, 90), randf_range(-90, 90)) if i > 0 else player_pos
-				game.spawn_delayed_aoe(pos2, float(pr.get("radius", 40.0)), float(pr.get("damage", 10)), 1.2, Color(0.8, 0.5, 1.0))
+				game.spawn_delayed_aoe(pos2, float(pr.get("radius", 40.0)), float(_pdm(pr, 10)), 1.2, Color(0.8, 0.5, 1.0))
 				game.spawn_event_fx("ice_spikes", pos2, 1.2, 1.8, float(pr.get("radius", 40.0)))
 		"teleport":
 			game.spawn_fx(global_position, vivid, radius * 1.4, 0.25)
@@ -861,13 +877,13 @@ func _exec_pattern(p: Dictionary) -> void:
 		"pillar":
 			for i in int(pr.get("count", 4)):
 				var pos3 := player_pos + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				game.spawn_delayed_aoe(pos3, float(pr.get("radius", 48.0)), float(pr.get("damage", 5)), 0.9, Color(1, 0.6, 0.2))
+				game.spawn_delayed_aoe(pos3, float(pr.get("radius", 48.0)), float(_pdm(pr, 5)), 0.9, Color(1, 0.6, 0.2))
 				game.spawn_perk_fx("fireball", pos3, float(pr.get("radius", 48.0)), 0.35)
 		"cone":
 			game.spawn_fx(global_position + dir * 40.0, Color(1, 0.65, 0.25), float(pr.get("radius", 110.0)), 0.35)
 			var cone_r := float(pr.get("radius", 110.0))
 			var cone_ang := float(pr.get("angle", 70.0)) * 0.5
-			var cone_dmg := int(pr.get("damage", 15))
+			var cone_dmg := _pdm(pr, 15)
 			game.run_later(0.32, func() -> void:
 				if not active or dead or game == null or game.player == null:
 					return
@@ -878,24 +894,24 @@ func _exec_pattern(p: Dictionary) -> void:
 		"pentagram":
 			for i in int(pr.get("count", 3)):
 				var pos4: Vector2 = player_pos if bool(pr.get("under_player", false)) else player_pos + Vector2(randf_range(-100, 100), randf_range(-100, 100))
-				game.spawn_delayed_aoe(pos4, float(pr.get("radius", 48.0)), float(pr.get("damage", 8)), 1.0, Color(1, 0.2, 0.1))
+				game.spawn_delayed_aoe(pos4, float(pr.get("radius", 48.0)), float(_pdm(pr, 8)), 1.0, Color(1, 0.2, 0.1))
 		"scythe":
 			var count4 := int(pr.get("count", 5))
 			for i in count4:
 				var a3 := deg_to_rad(float(i) * 20.0 - 40.0)
-				game.spawn_enemy_bullet(global_position, dir.rotated(a3), int(pr.get("damage", 10)), {"speed": 190.0, "color": Color(1, 0.4, 0.2), "burn": true})
+				game.spawn_enemy_bullet(global_position, dir.rotated(a3), _pdm(pr, 10), {"speed": 190.0, "color": Color(1, 0.4, 0.2), "burn": true})
 		"wing":
 			for i in int(pr.get("count", 3)):
 				var a4 := TAU * float(i) / 3.0 + randf() * TAU
-				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a4), int(pr.get("damage", 12)), {"speed": 220.0, "color": Color(0.85, 0.35, 0.95), "homing": true})
+				game.spawn_enemy_bullet(global_position, Vector2.RIGHT.rotated(a4), _pdm(pr, 12), {"speed": 220.0, "color": Color(0.85, 0.35, 0.95), "homing": true})
 		"gaze":
 			if player_pos.distance_to(global_position) < float(pr.get("radius", 128.0)):
 				status_to_target("curse", float(pr.get("duration", 6.0)), {})
 				game.spawn_fx(global_position + dir * 40.0, Color(0.75, 0.25, 0.85), 60.0, 0.4)
 		"seal":
-			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 96.0)), float(pr.get("damage", 15)), 3.0, Color(0.7, 0.15, 0.45), float(pr.get("pool_dps", 6.0)))
+			game.spawn_delayed_aoe(player_pos, float(pr.get("radius", 96.0)), float(_pdm(pr, 15)), 3.0, Color(0.7, 0.15, 0.45), float(pr.get("pool_dps", 6.0)))
 		"apocalypse":
-			game.apocalypse(float(pr.get("damage", 12)))
+			game.apocalypse(float(_pdm(pr, 12)))
 		"heal":
 			hp = minf(max_hp, hp + float(pr.get("amount", 40.0)))
 		"mirror":
@@ -903,7 +919,7 @@ func _exec_pattern(p: Dictionary) -> void:
 				game.spawn_enemy("crystal_spider", global_position + Vector2.RIGHT.rotated(randf() * TAU) * 60.0)
 		"beam":
 			var b_len := float(pr.get("length", 260.0))
-			var b_dmg := int(pr.get("damage", 3))
+			var b_dmg := _pdm(pr, 3)
 			game.spawn_fx(global_position + dir * (b_len * 0.45), vivid, 28.0, 0.45)
 			game.run_later(0.45, func() -> void:
 				if active and not dead and game != null:

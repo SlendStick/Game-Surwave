@@ -793,6 +793,163 @@ def check_network_v2(errors: list[str]) -> None:
        "без паузы, неуязвимость вне боя, общие выстрелы и эффекты")
 
 
+BOSS_PATTERN_TYPES = {
+    "fireball", "holy_light", "chain_slam", "dark_chains", "storm_aura", "ring", "aim",
+    "spiral", "summon", "aoe", "dash", "lightning", "meteor", "spikes", "teleport",
+    "pull", "pillar", "cone", "pentagram", "scythe", "wing", "gaze", "seal",
+    "apocalypse", "heal", "mirror", "beam",
+}
+RELIC_MOD_KEYS = {
+    "dmg", "crit", "crit_mult", "fire_rate", "move_speed", "dr", "dodge", "vision",
+    "pickup", "lifesteal", "xp", "proj", "mag", "hp",
+}
+
+
+def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
+    """Боссфайты по docs/ПРОМПТ_БОССФАЙТЫ.md: ростер, фазы, атаки, реликвии, масштаб."""
+    bosses_doc = loaded.get("data/bosses.json")
+    if not isinstance(bosses_doc, dict):
+        fail("bosses.json: нет объекта", errors)
+        return
+    bosses: dict = bosses_doc.get("bosses", {}) or {}
+    sathan = bosses_doc.get("sathan", {}) or {}
+    enemies = loaded.get("data/enemies.json")
+    enemy_ids = {str(e.get("id", "")) for e in enemies} if isinstance(enemies, list) else set()
+    enemy_src = (ROOT / "scripts/enemies/enemy.gd").read_text(encoding="utf-8")
+    game_src = (ROOT / "scripts/game/game.gd").read_text(encoding="utf-8")
+    sprites = ROOT / "assets" / "sprites"
+
+    regular = {k: v for k, v in bosses.items() if k != "satanail"}
+    if len(regular) < 13:
+        fail(f"bosses.json: обычных боссов {len(regular)}, по спеке нужно 14", errors)
+    if "satanail" not in bosses:
+        fail("bosses.json: нет секретного босса satanail", errors)
+    if sathan.get("id") != "boss_satanail":
+        fail("bosses.json: sathan должен совпадать с секретным боссом satanail", errors)
+
+    names: set[str] = set()
+    for key, bd in bosses.items():
+        if not isinstance(bd, dict):
+            fail(f"bosses.json[{key}]: не объект", errors)
+            continue
+        name = str(bd.get("name", ""))
+        phases = bd.get("phases", [])
+        hp = int(bd.get("hp", 0))
+        if not name:
+            fail(f"bosses.json[{key}]: нет имени", errors)
+        elif name in names:
+            fail(f"bosses.json[{key}]: имя «{name}» дублируется", errors)
+        names.add(name)
+        if hp < 3000:
+            fail(f"bosses.json[{key}]: HP {hp} меньше 3000", errors)
+        if key == "satanail":
+            if hp < 10000:
+                fail("bosses.json[satanail]: HP секретного босса должен быть ≥ 10000", errors)
+            if int(bd.get("xp", 0)) < 2000:
+                fail("bosses.json[satanail]: опыт секретного босса должен быть ≥ 2000", errors)
+            if not any(bool(ph.get("mega", False)) for ph in phases):
+                fail("bosses.json[satanail]: нет мегафазы", errors)
+            if len(phases) < 5:
+                fail("bosses.json[satanail]: по спеке 5 фаз + мегафаза", errors)
+        else:
+            if hp > 10000:
+                fail(f"bosses.json[{key}]: HP {hp} выше лимита обычного босса (10000)", errors)
+            if len(phases) < 3:
+                fail(f"bosses.json[{key}]: фаз {len(phases)}, нужно ≥ 3", errors)
+            if int(bd.get("xp", 0)) < 500:
+                fail(f"bosses.json[{key}]: опыт меньше 500", errors)
+        attacks = sum(len(ph.get("patterns", [])) for ph in phases)
+        if attacks < 4:
+            fail(f"bosses.json[{key}]: атак {attacks}, по спеке 4–8", errors)
+        if float(bd.get("souls", 0)) <= 0:
+            fail(f"bosses.json[{key}]: нет награды душами", errors)
+        ats = [float(ph.get("at", 1.0)) for ph in phases]
+        if abs(ats[0] - 1.0) > 0.001:
+            fail(f"bosses.json[{key}]: первая фаза должна начинаться с 100% HP", errors)
+        if any(ats[i] <= ats[i + 1] for i in range(len(ats) - 1)):
+            fail(f"bosses.json[{key}]: пороги фаз должны убывать", errors)
+        if str(key) != "satanail" and not str(bd.get("map", "")):
+            fail(f"bosses.json[{key}]: нет поля map (спрайт boss_<map>)", errors)
+        for ph in phases:
+            for pat in ph.get("patterns", []):
+                kind = str(pat.get("type", ""))
+                if kind not in BOSS_PATTERN_TYPES:
+                    fail(f"bosses.json[{key}]: неизвестный тип атаки «{kind}»", errors)
+                elif f'"{kind}"' not in enemy_src:
+                    fail(f"enemy.gd: нет реализации атаки «{kind}»", errors)
+                interval = float(pat.get("interval", 0.0))
+                if interval < 0.8:
+                    fail(f"bosses.json[{key}]: интервал атаки {interval} слишком частый", errors)
+                params = pat.get("params", {}) or {}
+                if kind == "summon":
+                    target = str(params.get("enemy", ""))
+                    if target not in enemy_ids:
+                        fail(f"bosses.json[{key}]: summon несуществующего врага «{target}»", errors)
+        if not (sprites / f"portrait_boss_{key}.png").is_file():
+            fail(f"assets/sprites: нет портрета босса portrait_boss_{key}.png", errors)
+
+    # порядок порогов из спеки: обычные боссы 100/70/40/15%, САТАНАИЛ 100/80/60/40/20
+    for key, bd in regular.items():
+        ats = [round(float(ph.get("at", 1.0)), 2) for ph in bd.get("phases", [])]
+        for need in (0.7, 0.4):
+            if need not in ats:
+                fail(f"bosses.json[{key}]: нет порога {int(need * 100)}% (спека фаз)", errors)
+    if bosses.get("satanail"):
+        sats = [round(float(ph.get("at", 1.0)), 2) for ph in bosses["satanail"].get("phases", [])]
+        for need in (0.8, 0.6, 0.4, 0.2):
+            if need not in sats:
+                fail(f"bosses.json[satanail]: нет порога {int(need * 100)}% (спека фаз)", errors)
+
+    # реликвии
+    relics = loaded.get("data/relics.json")
+    if not isinstance(relics, list) or len(relics) < 10:
+        fail("relics.json: нужно ≥ 10 реликвий", errors)
+        relics = relics if isinstance(relics, list) else []
+    seen: set[str] = set()
+    for r in relics:
+        rid = str(r.get("id", ""))
+        if not rid.startswith("relic_"):
+            fail(f"relics.json: id «{rid}» должен начинаться с relic_", errors)
+        if rid in seen:
+            fail(f"relics.json: дубликат реликвии {rid}", errors)
+        seen.add(rid)
+        mods = r.get("mods", {})
+        if not isinstance(mods, dict) or not mods:
+            fail(f"relics.json[{rid}]: нет модификаторов", errors)
+        else:
+            for k in mods:
+                if k not in RELIC_MOD_KEYS:
+                    fail(f"relics.json[{rid}]: неизвестный модификатор «{k}»", errors)
+        if not str(r.get("name", "")) or not str(r.get("desc", "")):
+            fail(f"relics.json[{rid}]: нет имени/описани", errors)
+
+    # код боссфайта
+    for name in (
+        "func boss_hp_scale(", "func boss_dmg_scale(", "func boss_rate_scale(",
+        "func boss_intro(", "func award_relic(", "func award_boss_xp(",
+        "func boss_death_cinematic(", "func _tick_secret_altar(", "func relic_count(",
+    ):
+        if name not in game_src:
+            fail(f"game.gd: нет {name}", errors)
+    for snippet in (
+        "pow(1.5, float(players - 1))",   # кооп: ×1.5 HP за игрока
+        "if dark >= 14", "if dark >= 6",   # пороги Тьмы
+        'boss_def.get("souls"', 'boss_def.get("xp"', "award_relic(",
+        "boss_intro(boss_def", "award_boss_xp(enemy.global_position",
+    ):
+        if snippet not in game_src:
+            fail(f"game.gd: боссфайт не содержит «{snippet}»", errors)
+    for snippet in ("func _pdm(", "func init_boss(", "boss_rate_scale()"):
+        if snippet not in enemy_src:
+            fail(f"enemy.gd: нет «{snippet}»", errors)
+    if 'GameManager.meta["relics"]' not in game_src and 'meta.get("relics"' not in game_src:
+        fail("game.gd: реликвии не сохраняются в мета-прогресс", errors)
+    if 'data/relics.json' not in (ROOT / "scripts/autoload/db.gd").read_text(encoding="utf-8"):
+        fail("db.gd: реликвии не загружаются из data/relics.json", errors)
+    if not (sprites / "boss_void.png").is_file():
+        fail("assets/sprites: нет спрайта boss_void.png", errors)
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -818,11 +975,16 @@ def main() -> int:
     check_gdscript_statements(errors)
     check_gdscript_duplicate_funcs(errors)
     check_network_v2(errors)
+    check_boss_fights(loaded, errors)
     check_python_tools(errors)
 
     if errors:
         print(f"\nValidation FAILED with {len(errors)} error(s).")
         return 1
+    print(
+        f"[OK]   Боссфайты: {len((loaded.get('data/bosses.json') or {}).get('bosses', {}))} боссов "
+        f"(фазы 70/40/15%, атаки, реликвии, масштаб Тьмы и коопа)"
+    )
     print("\nAll static repository validations PASSED.")
     return 0
 
