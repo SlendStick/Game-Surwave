@@ -162,6 +162,7 @@ func _build_sfx() -> void:
 	_sfx_cache["fire"] = _sfx_layered(0.28, 260.0, 460.0, "saw", 3.8, 0.58, 0.28, 0.25, 0.12)
 	_sfx_cache["lightning"] = _sfx_layered(0.28, 2100.0, 260.0, "square", 3.2, 0.62, 0.30, 0.15, 0.45)
 	_sfx_cache["smite"] = _chord_sfx([523.25, 783.99, 1046.5], 0.40, "organ", 0.02, 0.34)
+	_sfx_cache["avalanche"] = _sfx_layered(0.95, 88.0, 34.0, "saw", 1.15, 0.62, 0.55, 0.6, 0.12)
 	# бумеранг: мягкий свист рассекаемого воздуха + металлический призвук на возврате
 	_sfx_cache["boomerang"] = _sfx_layered(0.30, 1180.0, 540.0, "sine", 3.4, 0.55, 0.22, 0.05, 0.30)
 	_sfx_cache["boomerang_return"] = _chord_sfx([587.33, 880.0], 0.24, "tri", 0.02, 0.24)

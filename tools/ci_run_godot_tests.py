@@ -114,6 +114,19 @@ CORE_TESTS: list[TestCase] = [
         expect_re=r"\[SURWAVE\] boomerang OK:",
     ),
     TestCase(
+        name="perk_clicks",
+        env={"SURW_PERK_CLICK_TEST": "1", "SURW_MAP": "forest"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] perk_click OK:",
+        timeout_s=90.0,
+    ),
+    TestCase(
+        name="avalanche_damage",
+        env={"SURW_AVALANCHE_TEST": "1"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] avalanche OK:",
+    ),
+    TestCase(
         name="abilities",
         env={"SURW_ABILITY_TEST": "1"},
         args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],

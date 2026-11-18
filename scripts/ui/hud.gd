@@ -1633,19 +1633,6 @@ func _draw_target_arrows() -> void:
 			target_arrows.draw_string(font, tag_pos + Vector2(1, 1), String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, Color(0, 0, 0, 0.85))
 			target_arrows.draw_string(font, tag_pos, String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, rim)
 
-	# --- линия огня от игрока к прицелу (тонкая, не мешает картинке)
-	if bool(GameManager.setting("aim_line", true)) and game.player != null and not game.player.dead:
-		var aim: Vector2 = game.player.aim_dir
-		var line_from := p_screen + aim * 12.0
-		var line_to := p_screen + aim * 92.0
-		var steps := 4
-		for i in steps:
-			if i % 2 != 0:
-				continue
-			var a := line_from.lerp(line_to, float(i) / float(steps))
-			var b := line_from.lerp(line_to, float(i + 1) / float(steps))
-			target_arrows.draw_line(a, b, Color(0.92, 0.86, 0.68, 0.22), 1.0, true)
-
 	# --- прицел: свой, пиксельный, в стиле игры
 	if bool(GameManager.setting("crosshair", true)) and not game.photo_mode:
 		var mp := get_viewport().get_mouse_position()

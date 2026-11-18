@@ -237,6 +237,8 @@ func _ready() -> void:
 	if OS.get_environment("SURW_UI_TEST") != "": call_deferred("_run_ui_test")
 	if OS.get_environment("SURW_NET_TEST") != "": call_deferred("_run_net_test")
 	if OS.get_environment("SURW_BOOM_TEST") != "": call_deferred("_run_boomerang_test")
+	if OS.get_environment("SURW_PERK_CLICK_TEST") != "": call_deferred("_run_perk_click_test")
+	if OS.get_environment("SURW_AVALANCHE_TEST") != "": call_deferred("_run_avalanche_test")
 	if OS.get_environment("SURW_HAZARD_TEST") != "": call_deferred("_run_hazard_test")
 	if OS.get_environment("SURW_MAP_DUMP") != "": call_deferred("_run_map_dump")
 	if OS.get_environment("SURW_VIS_TEST") != "": call_deferred("_run_vis_test")
@@ -467,7 +469,7 @@ func hit_obstacle(obstacle: Dictionary, amount: float) -> void:
 	if node != null and is_instance_valid(node):
 		node.queue_free()
 	_unregister_obstacle(obstacle)
-	if not player.has_meta("no_heal") and randf() < 0.035:
+	if not player.has_meta("no_heal") and randf() < 0.015:
 		spawn_pickup("heart", rect.get_center(), 1.0)
 
 func _unregister_obstacle(obstacle: Dictionary) -> void:
@@ -1357,8 +1359,12 @@ func _run_controls_test() -> void:
 	GameManager.set_setting("hud_vitals", "player")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(player.hp_marks.size() > 0, "В режиме «над игроком» не созданы сердца HP")
-	assert(player.ammo_pips.size() > 0, "В режиме «над игроком» не созданы патроны")
+	assert(player.hp_marks.size() > 0, "В режиме «над игроком» не созданы шкалы HP")
+	assert(player.hp_bar != null, "Шкала HP над героем не создана")
+	assert(player.hp_bar.scale.y <= 2.5, "Шкала HP над героем должна быть тонкой: %.1f" % player.hp_bar.scale.y)
+	assert(player.hp_bar.scale.x <= 34.0, "Шкала HP над героем слишком широкая: %.1f" % player.hp_bar.scale.x)
+	assert(player.ammo_pips.size() > 0, "В режиме «над игроком» не создана шкала патронов")
+	assert(player.mag_bar != null and player.mag_bar.scale.y <= 2.5, "Шкала патронов должна быть тонкой")
 	var visible_marks := 0
 	for m in player.hp_marks:
 		if m.visible:
@@ -1455,7 +1461,22 @@ var stress_done := false
 func _prof(name: String, t0: int) -> void:
 	prof[name] = float(prof.get(name, 0.0)) + float(Time.get_ticks_usec() - t0) / 1000.0
 
+## Курсор: в бою скрыт (свой прицел), но в паузе, выборе перков и на экране итогов
+## должен быть виден — иначе по меню нечем кликать.
+func _sync_cursor() -> void:
+	var overlay := photo_mode or ended or get_tree().paused
+	if hud != null:
+		overlay = overlay \
+			or (hud.choice_layer != null and hud.choice_layer.visible) \
+			or (hud.pause_layer != null and hud.pause_layer.visible) \
+			or (hud.end_layer != null and hud.end_layer.visible)
+	var hide := bool(GameManager.setting("crosshair", true)) and not overlay
+	var want := Input.MOUSE_MODE_HIDDEN if hide else Input.MOUSE_MODE_VISIBLE
+	if Input.get_mouse_mode() != want:
+		Input.set_mouse_mode(want)
+
 func _process(delta: float) -> void:
+	_sync_cursor()
 	_tick_flash(delta)
 	_tick_vision()
 	_tick_vignette(delta)
@@ -3503,17 +3524,26 @@ func run_map_event(ev: Dictionary) -> void:
 				spawn_event_fx("ice_spike", pos, sp_tele, sp_rad)
 		"avalanche":
 			notify("Лавина!")
-			shake(14.0)
+			shake(16.0)
 			flash_screen(Color(0.9, 0.95, 1.0))
-			var width := float(p.get("width", 140.0))
+			var width := float(p.get("width", 150.0))
 			var damage := float(p.get("damage", 3))
-			var av_pos := _event_map_pos(0.35)
-			spawn_event_fx("avalanche", av_pos, 0.8, width)
-			for i in 3:
-				var pos := Vector2(av_pos.x + randf_range(-60, 60), av_pos.y - 190.0 + float(i) * 70.0)
-				spawn_delayed_aoe(pos, width * 0.5, damage, 0.8 + float(i) * 0.25, Color(0.92, 0.96, 1.0))
-			var m_pos := av_pos + Vector2(0, -160)
-			_destroy_obstacles_in(m_pos, width, 6)
+			# Лавина идёт по герою: сходит сверху вниз широкой полосой, поэтому
+			# уклоняться нужно в сторону, а не «нигде не стоять».
+			var anchor := player.global_position + Vector2(randf_range(-70.0, 70.0), -20.0)
+			anchor = anchor.clamp(map_rect.position + Vector2(90, 90), map_rect.end - Vector2(90, 90))
+			spawn_event_fx("avalanche", anchor, 0.8, width)
+			AudioManager.play_sfx("avalanche", 0.9)
+			var waves := 4
+			for i in waves:
+				var step := float(i) / float(waves - 1)
+				var pos := anchor + Vector2(randf_range(-14.0, 14.0), lerpf(-150.0, 160.0, step))
+				spawn_delayed_aoe(pos, width * 0.55, damage, 0.75 + step * 0.75, Color(0.92, 0.96, 1.0))
+				var p_copy := pos
+				run_later(0.75 + step * 0.75, func() -> void:
+					_destroy_obstacles_in(p_copy, width * 0.5, 3)
+					aoe_damage(p_copy, width * 0.5, damage * 2.0, {"source": "avalanche"})
+					spawn_fx(p_copy, Color(0.92, 0.96, 1.0, 0.8), width * 0.5, 0.4, true))
 		"rockfall":
 			notify("Камнепад!")
 			var r_dmg := float(p.get("damage", 2))
@@ -3975,6 +4005,68 @@ func _run_boomerang_test() -> void:
 		if a.perk_summon:
 			a.deactivate()
 	print("[SURWAVE] boomerang OK: state=%s dist=%.1f speed=%.0f" % [boom.boom_state, home_dist, boom.speed])
+
+
+## Перебирает ВСЕ перки и нажимает карточку так же, как игрок (через HUD).
+## Ловит подвисания при выборе конкретного перка и скриптовые ошибки в этом пути.
+func _run_perk_click_test() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var total := 0
+	var slow: Array = []
+	var stuck: Array = []
+	var slowest := 0
+	for perk in DB.perks:
+		var pid := String(perk.get("id", ""))
+		if pid == "":
+			continue
+		var card := {"kind": "perk", "id": pid, "data": perk, "weight": 1.0}
+		choice_queue.clear()
+		choice_queue.append({"kind": "perk", "cards": [card], "title": "ТЕСТ"})
+		_open_next_choice()
+		await get_tree().process_frame
+		if hud.choice_layer == null or not hud.choice_layer.visible:
+			stuck.append(pid + " (меню не открылось)")
+			continue
+		var t0 := Time.get_ticks_msec()
+		hud._on_card_pressed(card)
+		await get_tree().process_frame
+		var dt := Time.get_ticks_msec() - t0
+		slowest = maxi(slowest, dt)
+		if dt > 500:
+			slow.append("%s=%d мс" % [pid, dt])
+		if paused_for_choice or (hud.choice_layer != null and hud.choice_layer.visible):
+			stuck.append(pid + " (меню не закрылось)")
+			hud.choice_layer.visible = false
+			paused_for_choice = false
+			choice_queue.clear()
+			sync_pause_state()
+		total += 1
+	assert(total >= 80, "Перебрано слишком мало перков: %d" % total)
+	assert(stuck.is_empty(), "Зависание при выборе перков: " + ", ".join(stuck))
+	assert(slow.is_empty(), "Медленный выбор перка: " + ", ".join(slow))
+	print("[SURWAVE] perk_click OK: perks=%d slowest=%dms taken=%d" % [
+		total, slowest, player.upg.taken.size()])
+
+## Лавина должна реально наносить урон, а не просто рисоваться.
+func _run_avalanche_test() -> void:
+	await get_tree().process_frame
+	var was_god := GameManager.god_mode
+	GameManager.god_mode = false
+	player.dead = false
+	player.iframes = 0.0
+	player.global_position = map_rect.get_center()
+	await get_tree().process_frame
+	var hp0 := player.hp
+	run_map_event({"kind": "avalanche", "params": {"width": 160, "damage": 2}})
+	var waited := 0.0
+	while waited < 6.0 and player.hp >= hp0:
+		await get_tree().process_frame
+		waited += get_process_delta_time()
+	var taken := hp0 - player.hp
+	GameManager.god_mode = was_god
+	assert(taken > 0, "Лавина не нанесла урон за %.1f с" % waited)
+	print("[SURWAVE] avalanche OK: dmg=%d wait=%.2f" % [taken, waited])
 
 # ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
 ## Хост считает мир и рассылает снапшоты (10 Гц) + состояния игроков (20 Гц).

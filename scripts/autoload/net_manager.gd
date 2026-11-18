@@ -133,6 +133,10 @@ func loadout_table() -> Dictionary:
 		out[String(key)] = [String(entry.get("character", "aldar")), String(entry.get("weapon", "revolver"))]
 	return out
 
+## Адрес для друзей: «ip:порт» (то, что нужно ввести в поле «IP хоста»).
+func address_text() -> String:
+	return "%s:%d" % [local_ip, default_port()]
+
 ## Порт по умолчанию из настроек.
 func default_port() -> int:
 	return int(GameManager.setting("net_port", DEFAULT_PORT))

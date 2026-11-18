@@ -328,65 +328,61 @@ func tick(delta: float) -> void:
 
 ## Патроны и здоровье над персонажем — режим включается в настройках
 ## (Настройки → «Патроны и HP»: «над игроком» / «слева сверху»).
+## Над героем рисуются две тонкие шкалы: сверху здоровье, ниже патроны.
+const BAR_W := 30.0
+const BAR_H := 2.0
+var hp_bar_bg: Sprite2D = null
+var mag_bar_bg: Sprite2D = null
+var mag_bar: Sprite2D = null
+
+func _bar_sprite(existing: Sprite2D, size: Vector2, y: float) -> Sprite2D:
+	var sp := existing
+	if sp == null:
+		sp = Gfx.square(self, size, Color.WHITE, Vector2(0.0, y))
+		sp.z_index = 3
+	return sp
+
 func _update_vitals() -> void:
 	var above := String(GameManager.setting("hud_vitals", "corner")) == "player"
-	for mark in hp_marks:
-		mark.visible = above
-	for pip in ammo_pips:
-		pip.visible = above
+	if hp_bar_bg == null:
+		hp_bar_bg = _bar_sprite(null, Vector2(BAR_W + 2.0, BAR_H * 2.0 + 4.0), -22.0)
+		hp_bar_bg.modulate = Color(0.04, 0.04, 0.055, 0.85)
+		hp_bar_bg.z_index = 2
+		hp_marks.append(_bar_sprite(null, Vector2(BAR_W, BAR_H), -24.5))
+		hp_bar = hp_marks[0]
+		mag_bar = _bar_sprite(null, Vector2(BAR_W, BAR_H), -19.5)
+		ammo_pips.append(mag_bar)
+		for sp in [hp_bar, mag_bar]:
+			sp.z_index = 3
+	for sp in [hp_bar_bg, hp_bar, mag_bar]:
+		if sp != null:
+			sp.visible = above
 	if not above:
 		return
-	var total_hp := clampi(max_hp, 1, 12)
-	var h_full := Assets.icon("ui_heart_full")
-	var h_empty := Assets.icon("ui_heart_empty")
-	while hp_marks.size() < total_hp:
-		var mark := Sprite2D.new()
-		mark.centered = true
-		mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		mark.z_index = 3
-		if h_full != null:
-			mark.texture = h_full
-			mark.scale = Vector2(0.5, 0.5)
-		else:
-			mark.texture = Gfx.white()
-			mark.scale = Vector2(3.0, 3.0)
-		add_child(mark)
-		hp_marks.append(mark)
-	var hp_now := clampi(hp, 0, total_hp)
-	for i in hp_marks.size():
-		var mark: Sprite2D = hp_marks[i]
-		mark.visible = i < total_hp
-		if i >= total_hp:
-			continue
-		mark.position = Vector2((float(i) - (float(total_hp) - 1.0) * 0.5) * 9.5, -26.0)
-		if h_full != null and h_empty != null:
-			mark.texture = h_full if i < hp_now else h_empty
-			mark.modulate = Color.WHITE
-		else:
-			mark.modulate = Color("#e0524a") if i < hp_now else Color("#3a3a46")
-	var total := clampi(int(S.mag), 0, 16)
-	while ammo_pips.size() < total:
-		var pip: Sprite2D = Gfx.square(self, Vector2(2.0, 3.0), Color(1.0, 0.86, 0.32))
-		pip.z_index = 3
-		ammo_pips.append(pip)
-	# при перезарядке индикатор становится белым и заполняется по мере восстановления
-	var frac_reload := 0.0
+	var hp_frac := clampf(float(hp) / float(maxi(1, max_hp)), 0.0, 1.0)
+	var hp_col := Color("#e0524a") if hp_frac > 0.34 else Color("#ff7a5c")
+	if hp_frac <= 0.0:
+		hp_col = Color("#4a2a2c")
+	_bar_fill(hp_bar, hp_frac, hp_col)
+	var total_mag := maxi(1, int(S.mag))
+	var mag_frac := clampf(float(mag) / float(total_mag), 0.0, 1.0)
+	var mag_col := Color("#f0d363")
 	if reloading:
 		var full := maxf(0.01, reload_total)
-		frac_reload = clampf(1.0 - reload_left / full, 0.0, 1.0)
-	var filled := clampi(mag, 0, total)
-	if reloading:
-		filled = int(round(frac_reload * float(total)))
-	for i in ammo_pips.size():
-		var pip: Sprite2D = ammo_pips[i]
-		pip.visible = i < total
-		if i >= total:
-			continue
-		pip.position = Vector2((float(i) - (float(total) - 1.0) * 0.5) * 3.4, -17.0)
-		if reloading:
-			pip.modulate = Color(1, 1, 1) if i < filled else Color(0.55, 0.55, 0.6, 0.85)
-		else:
-			pip.modulate = Color(1.0, 0.86, 0.32) if i < filled else Color(0.42, 0.42, 0.5, 0.9)
+		mag_frac = clampf(1.0 - reload_left / full, 0.0, 1.0)
+		mag_col = Color(1.0, 1.0, 1.0)
+	elif mag <= 0:
+		mag_col = Color("#7a5a2a")
+	_bar_fill(mag_bar, mag_frac, mag_col)
+
+## Шкала заполняется слева направо: спрайт центрирован, поэтому сдвигаем его.
+func _bar_fill(bar: Sprite2D, frac: float, color: Color) -> void:
+	if bar == null:
+		return
+	var w := maxf(0.0, BAR_W * clampf(frac, 0.0, 1.0))
+	bar.scale = Vector2(w, BAR_H)
+	bar.position.x = -(BAR_W - w) * 0.5
+	bar.modulate = color
 
 func _tick_timers(delta: float) -> void:
 	fire_cd = maxf(0.0, fire_cd - delta)
@@ -1077,11 +1073,24 @@ func _fire_special(kind: String, dmg: float, extra: Dictionary) -> void:
 func _on_last_shot() -> void:
 	var retribution := upg.flag_num("last_shot_retribution")
 	if retribution > 0.0:
+		# Небесная кара: последний патрон в магазине бьёт по 3–4 ближайшим врагам.
+		var r_cfg: Dictionary = DB.balance.get("player", {})
+		var hits_max := int(r_cfg.get("retribution_targets", 4))
+		var r_radius := float(r_cfg.get("retribution_radius", 150.0))
 		var dmg := retribution + upg.flag_num("retribution_per_hp") * float(hp)
-		game.aoe_damage(global_position, 96.0, dmg, {"holy": true, "source": "retribution"})
-		game.spawn_fx(global_position, Color(1, 0.95, 0.7), 96.0, 0.3)
-		game.spawn_perk_fx("smite", global_position, 72.0, 0.36)
-		AudioManager.play_sfx("lightning", 1.2)
+		var struck := 0
+		for e in game.nearest_enemy(global_position, r_radius):
+			if struck >= hits_max:
+				break
+			if e == null or not is_instance_valid(e) or not e.active:
+				continue
+			game.damage_enemy(e, dmg * dmg_multiplier(), {"source": "retribution", "holy": true})
+			game.spawn_perk_fx("smite", e.global_position, 70.0, 0.38)
+			game.spawn_fx(e.global_position, Color(1.0, 0.96, 0.78), 26.0, 0.24, true)
+			struck += 1
+		game.spawn_fx(global_position, Color(1, 0.95, 0.7), 54.0, 0.26)
+		game.spawn_perk_fx("holy", global_position, 60.0, 0.3)
+		AudioManager.play_sfx("smite", 1.05)
 	if upg.flag_num("smite") > 0.0:
 		var p_cfg: Dictionary = DB.balance.get("player", {})
 		var targets: int = int(p_cfg.get("smite_targets", 3))

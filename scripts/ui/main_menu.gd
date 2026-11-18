@@ -543,7 +543,7 @@ func _build_settings(body: Control) -> void:
 	_settings_cycle(r5, "lang", "Язык", ["ru", "en"], ["RU", "EN"], "ru")
 	_settings_toggle(r5, "damage_numbers", "Цифры урона", true)
 	var r6 := UI.hbox(v, 8)
-	_settings_toggle(r6, "crosshair", "Прицел и линия огня", true)
+	_settings_toggle(r6, "crosshair", "Свой прицел в бою", true)
 	_settings_cycle(r6, "hud_vitals", "Патроны и HP", ["corner", "player"],
 		["СЛЕВА СВЕРХУ", "НАД ИГРОКОМ"], "corner")
 	var r7 := UI.hbox(v, 8)
@@ -664,12 +664,20 @@ func _build_network(body: Control) -> void:
 		var idx := maxi(0, ids.find(Net.local_weapon))
 		Net.set_loadout(Net.local_character, String(ids[(idx + 1) % ids.size()]))
 		_open_overlay("network"))
-	var local_ip := Net.local_ip
-	var info := "Мой IP: %s · порт %d" % [local_ip, int(GameManager.setting("net_port", 7777))]
-	UI.label(body, info, 8, UI.PURPLE, Vector2(0, 216))
+	UI.label(body, "МОЙ АДРЕС ДЛЯ ДРУЗЕЙ", 8, UI.GOLD, Vector2(0, 212))
+	var addr_lbl := UI.label(body, Net.address_text(), 9, UI.PURPLE, Vector2(0, 224))
+	addr_lbl.size = Vector2(254, 16)
+	addr_lbl.clip_text = true
+	var copy_btn := UI.button(body, "КОПИРОВАТЬ IP И ПОРТ", 8, Vector2(254, 20))
+	copy_btn.position = Vector2(0, 242)
+	copy_btn.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(Net.address_text())
+		AudioManager.play_sfx("ui")
+		status = "Скопировано: %s" % Net.address_text()
+		_open_overlay("network", true))
 	if Net.enabled:
-		var disc := UI.button(body, "ОТКЛЮЧИТЬСЯ", 8, Vector2(254, 22))
-		disc.position = Vector2(0, 236)
+		var disc := UI.button(body, "ОТКЛЮЧИТЬСЯ", 8, Vector2(254, 20))
+		disc.position = Vector2(0, 264)
 		disc.add_theme_color_override("font_color", UI.DANGER)
 		disc.pressed.connect(func() -> void:
 			Net.leave_session("Вы отключились")

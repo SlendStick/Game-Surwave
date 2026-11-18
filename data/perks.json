@@ -1023,7 +1023,7 @@
    "tree": "light",
    "tier": 1,
    "branch": "",
-   "desc": "Последний патрон обрушивает небесную кару (20 урона).",
+   "desc": "Последний патрон обрушивает небесную кару на 3–4 врагов рядом (20 урона).",
    "mods": {},
    "flags": {
     "last_shot_retribution": 20.0
@@ -1864,10 +1864,11 @@
    "tree": "boomerang",
    "tier": 2,
    "branch": "a",
-   "desc": "+15 урона бумеранга за каждую собранную душу. Требует перк «Душа».",
+   "desc": "+15 урона бумеранга за каждую собранную душу и +1 рикошет. Требует перк «Душа».",
    "mods": {},
    "flags": {
-    "boomerang_soul": 15.0
+    "boomerang_soul": 15.0,
+    "boomerang_ricochet": 1
    },
    "req": [
     "boomerang_t1",
@@ -1882,11 +1883,13 @@
    "tree": "boomerang",
    "tier": 2,
    "branch": "b",
-   "desc": "Урон бумеранга +40%.",
+   "desc": "Урон бумеранга +40% и +2 рикошета к другим врагам.",
    "mods": {
     "summon_dmg": 0.4
    },
-   "flags": {},
+   "flags": {
+    "boomerang_ricochet": 2
+   },
    "req": [
     "boomerang_t1"
    ],
@@ -1899,11 +1902,13 @@
    "tree": "boomerang",
    "tier": 3,
    "branch": "",
-   "desc": "+3 бумеранга кружат у героя.",
+   "desc": "+3 бумеранга кружат у героя и +3 рикошета.",
    "mods": {
     "summon_count": 3
    },
-   "flags": {},
+   "flags": {
+    "boomerang_ricochet": 3
+   },
    "req": [],
    "req_any": [
     "boomerang_t2a",

@@ -30,6 +30,8 @@ const MAP_ORDER := ["sands", "tundra", "peak", "abyss", "forest", "rift", "grave
 	"bloodmoon", "chaos", "temple", "throne"]
 
 func _ready() -> void:
+	# F11 и настройки должны работать и на паузе/в экране выбора перков
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	meta = SaveManager.data
 	god_mode = bool(meta.get("settings", {}).get("god_mode", false))
 	_setup_input()
@@ -425,6 +427,8 @@ func cycle_window_mode() -> String:
 	return next_mode
 
 ## Применяет режим окна. В headless-режиме (CI) ничего не трогает.
+## Используется API окна (а не DisplayServer напрямую): оно само следит за порядком
+## переключения, поэтому режимы реально срабатывают и на Windows, и на Linux.
 func apply_window_mode(mode: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -433,20 +437,32 @@ func apply_window_mode(mode: String) -> void:
 		return
 	match mode:
 		"fullscreen":
-			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			win.borderless = false
+			win.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
 		"borderless":
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
-			DisplayServer.window_set_position(Vector2i.ZERO)
-			DisplayServer.window_set_size(DisplayServer.screen_get_size(DisplayServer.window_get_current_screen()))
+			win.mode = Window.MODE_WINDOWED
+			win.borderless = true
+			call_deferred("_fit_window", "borderless")
 		_:
-			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-			var scr := DisplayServer.screen_get_size(DisplayServer.window_get_current_screen())
-			var target := Vector2i(mini(1280, scr.x), mini(720, scr.y))
-			DisplayServer.window_set_size(target)
-			DisplayServer.window_set_position((scr - target) / 2)
+			win.mode = Window.MODE_WINDOWED
+			win.borderless = false
+			call_deferred("_fit_window", "windowed")
+
+## Размер и позиция окна — отдельным кадром, иначе оконный менеджер их игнорирует.
+func _fit_window(mode: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var win := get_window()
+	if win == null:
+		return
+	var usable := DisplayServer.screen_get_usable_rect(win.current_screen)
+	if mode == "borderless":
+		win.size = usable.size
+		win.position = usable.position
+		return
+	var target := Vector2i(mini(1280, usable.size.x), mini(720, usable.size.y))
+	win.size = target
+	win.position = usable.position + (usable.size - target) / 2
 
 func apply_vsync() -> void:
 	var enabled := bool(setting("vsync", true))

@@ -28,6 +28,9 @@ var boom_target := Vector2.ZERO
 var boom_timer := 0.0
 var boom_arc := 1.0
 var boom_spin := 0.0
+## Рикошеты: каждое улучшение дерева бумеранга добавляет 1–3 отскока к другому врагу.
+var boom_bounce_left := 0
+var boom_last_target := 0
 
 func setup(g: Node) -> void:
 	game = g
@@ -51,6 +54,11 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 	dragon_breath = bool(opts.get("dragon_breath", false))
 	perk_summon = bool(opts.get("perk_summon", false))
 	orbit_angle = float(opts.get("orbit_angle", randf() * TAU))
+	boom_state = "idle"
+	boom_target = Vector2.ZERO
+	boom_timer = randf_range(0.15, 0.5)
+	boom_bounce_left = 0
+	boom_last_target = 0
 	orbit_radius = float(opts.get("radius", 40.0))
 	global_position = opts.get("pos", game.player.global_position)
 	match kind:
@@ -151,7 +159,9 @@ func _boomerang_tick(delta: float) -> void:
 					var tgt: Node2D = cand[slot % cand.size()]
 					if tgt != null and is_instance_valid(tgt) and tgt.active:
 						boom_target = tgt.global_position
+						boom_last_target = int(tgt.get_instance_id())
 						boom_arc = 1.0 if slot % 2 == 0 else -1.0
+						boom_bounce_left = int(game.player.upg.flag_num("boomerang_ricochet"))
 						boom_state = "out"
 						boom_timer = 0.0
 						attack_cd = 0.0
@@ -163,14 +173,24 @@ func _boomerang_tick(delta: float) -> void:
 			var step := speed * speed_add * delta
 			global_position += dir * step + Vector2(-dir.y, dir.x) * boom_arc * 34.0 * delta
 			if dist <= step + 12.0 or boom_timer <= -1.5:
-				boom_state = "back"
-				boom_timer = 0.0
-				hit_cd.clear()
-				if attack_cd <= 0.0:
-					attack_cd = 0.2
-					game.spawn_fx(global_position, color, 16.0, 0.18)
-					game.spawn_perk_fx("boomerang", global_position, 26.0, 0.2)
-					AudioManager.play_sfx("boomerang", randf_range(0.94, 1.08))
+				if boom_bounce_left > 0 and _boomerang_retarget():
+					# Рикошет: бумеранг уходит к следующему врагу, не возвращаясь к герою
+					boom_bounce_left -= 1
+					boom_timer = 0.0
+					attack_cd = 0.25
+					hit_cd.clear()
+					game.spawn_fx(global_position, color, 20.0, 0.2)
+					game.spawn_perk_fx("boomerang", global_position, 34.0, 0.24)
+					AudioManager.play_sfx("boomerang", randf_range(1.06, 1.22))
+				else:
+					boom_state = "back"
+					boom_timer = 0.0
+					hit_cd.clear()
+					if attack_cd <= 0.0:
+						attack_cd = 0.2
+						game.spawn_fx(global_position, color, 16.0, 0.18)
+						game.spawn_perk_fx("boomerang", global_position, 26.0, 0.2)
+						AudioManager.play_sfx("boomerang", randf_range(0.94, 1.08))
 		"back":
 			var to_player: Vector2 = ppos - global_position
 			var back_dist := to_player.length()
@@ -194,6 +214,28 @@ func _boomerang_tick(delta: float) -> void:
 		hit_cd[key] = float(hit_cd[key]) - delta
 		if float(hit_cd[key]) <= 0.0:
 			hit_cd.erase(key)
+
+## Выбирает следующего врага для рикошета рядом с бумерангом (не того же самого).
+func _boomerang_retarget() -> bool:
+	if game == null:
+		return false
+	var best: Node2D = null
+	var best_d := 1e20
+	for e in game.enemies_in_radius(global_position, 230.0):
+		if e == null or not is_instance_valid(e) or not e.active:
+			continue
+		if int(e.get_instance_id()) == boom_last_target:
+			continue
+		var d: float = global_position.distance_squared_to(e.global_position)
+		if d < best_d:
+			best_d = d
+			best = e
+	if best == null:
+		return false
+	boom_last_target = int(best.get_instance_id())
+	boom_target = best.global_position
+	boom_arc = -boom_arc
+	return true
 
 func _chase_and_touch(delta: float, die_on_hit: bool) -> void:
 	var tgt := _nearest()
