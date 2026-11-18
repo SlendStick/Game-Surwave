@@ -668,6 +668,25 @@ def check_playtest_fixes(loaded: dict[str, object], errors: list[str]) -> None:
             fail(f"{path.relative_to(ROOT)}: nearest_enemy() возвращает [враг, дистанция], "
                  f"его нельзя перебирать циклом — используйте nearest_enemies()", errors)
 
+GD_BAD_STATEMENTS = [
+    (re.compile(r"^\t_ = "), "выражение `_ = x` не является оператором GDScript"),
+    (re.compile(r"^\s*[\w.]+\[?[\w\]\.]*\([^)]*\)\s*[+-]=\s"), "присваивание результату вызова"),
+]
+
+
+def check_gdscript_statements(errors: list[str]) -> None:
+    """Ловит конструкции, на которых Godot падает с Parse Error."""
+    checked = 0
+    for path in (ROOT / "scripts").rglob("*.gd"):
+        src = path.read_text(encoding="utf-8")
+        checked += 1
+        for i, line in enumerate(src.splitlines(), 1):
+            for rx, why in GD_BAD_STATEMENTS:
+                if rx.search(line):
+                    fail(f"{path.relative_to(ROOT)}:{i}: {why} — {line.strip()[:60]}", errors)
+    ok(f"Проверено {checked} GDScript-файлов на недопустимые операторы")
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -690,6 +709,7 @@ def main() -> int:
     check_gdscript_typos(errors)
     check_gdscript_scopes(errors)
     check_gdscript_duplicate_children(errors)
+    check_gdscript_statements(errors)
     check_python_tools(errors)
 
     if errors:

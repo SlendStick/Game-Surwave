@@ -4519,7 +4519,7 @@ func partner_info() -> Array:
 	return out
 
 ## Столкновение игроков между собой: не проходим друг сквозь друга.
-func _resolve_player_collision(delta: float) -> void:
+func _resolve_player_collision(_delta: float) -> void:
 	if not net_active:
 		return
 	var bodies: Array = []
@@ -4547,7 +4547,6 @@ func _resolve_player_collision(delta: float) -> void:
 				a.global_position -= dir * push
 			if net_host or b == player:
 				b.global_position += dir * push
-	_ = delta
 
 ## Кооп-тест без второго окна: поднимаем «фантомного» напарника и проверяем
 ## визуал героя, приоритет целей, кристалл-душу, бесконечный мир и ивенты.
@@ -4576,9 +4575,9 @@ func _run_coop_test() -> void:
 	np.dead = true
 	np.hp = 0
 	np.visible = false
-	_spawn_revive_crystal(np.peer_id, player.global_position + Vector2(40, 0))
+	_spawn_revive_crystal(np.peer_id, player.global_position + Vector2(10, 0))
 	assert(revive_crystals.size() == 1, "Кристалл-душа не появился")
-	np.global_position = Vector2(float(revive_crystals[0]["x"]), float(revive_crystals[0]["y"]))
+	# кристалл лежит рядом с живым игроком — он и возрождает павшего
 	_tick_revive_crystals(0.05)
 	assert(not np.dead and np.hp > 0, "Напарник не возродился от кристалла")
 	assert(revive_crystals.is_empty(), "Кристалл не исчез после возрождения")
