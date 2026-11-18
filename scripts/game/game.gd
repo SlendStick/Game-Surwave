@@ -4734,7 +4734,8 @@ func _run_coop_test() -> void:
 	np.touch_cd = 0.0
 	# 10) «вне боя»: игрок в меню прозрачен и неуязвим
 	net_away = true
-	assert(player_targets().is_empty(), "Враги всё ещё могут выбрать игрока в меню")
+	assert(not player_targets().has(player), "Враги всё ещё могут выбрать игрока в меню")
+	assert(players_in_radius(player.global_position, 40.0).has(player) == false, "Игрок в меню попадает под зоны")
 	var hp_menu: int = player.hp
 	damage_player(3, player.global_position)
 	assert(player.hp == hp_menu, "Игрок в меню получил урон")
