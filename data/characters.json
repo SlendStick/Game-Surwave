@@ -62,7 +62,8 @@
     }
    }
   ],
-  "cls": "mage"
+  "cls": "mage",
+  "xp_bonus": 0.15
  },
  {
   "id": "gavan",
@@ -125,7 +126,8 @@
     }
    }
   ],
-  "cls": "paladin"
+  "cls": "paladin",
+  "xp_bonus": 0.15
  },
  {
   "id": "morkana",
@@ -193,7 +195,8 @@
     }
    }
   ],
-  "cls": "necromancer"
+  "cls": "necromancer",
+  "xp_bonus": 0.15
  },
  {
   "id": "korgash",
@@ -253,7 +256,8 @@
     }
    }
   ],
-  "cls": "orc"
+  "cls": "orc",
+  "xp_bonus": 0.15
  },
  {
   "id": "liel",
@@ -315,7 +319,8 @@
     }
    }
   ],
-  "cls": "elf"
+  "cls": "elf",
+  "xp_bonus": 0.15
  },
  {
   "id": "ten",
@@ -376,7 +381,8 @@
     }
    }
   ],
-  "cls": "rogue"
+  "cls": "rogue",
+  "xp_bonus": 0.2
  },
  {
   "id": "voltra",
@@ -438,7 +444,8 @@
     }
    }
   ],
-  "cls": "inventor"
+  "cls": "inventor",
+  "xp_bonus": 0.2
  },
  {
   "id": "rain",
@@ -498,7 +505,8 @@
     }
    }
   ],
-  "cls": "sniper"
+  "cls": "sniper",
+  "xp_bonus": 0.15
  },
  {
   "id": "ignis",
@@ -558,7 +566,8 @@
     }
    }
   ],
-  "cls": "pyromancer"
+  "cls": "pyromancer",
+  "xp_bonus": 0.15
  },
  {
   "id": "nox",
@@ -616,6 +625,7 @@
     }
    }
   ],
-  "cls": "star"
+  "cls": "star",
+  "xp_bonus": 0.2
  }
 ]

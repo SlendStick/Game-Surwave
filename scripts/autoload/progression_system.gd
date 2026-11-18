@@ -143,7 +143,7 @@ func run_mods() -> Dictionary:
 	var heal_steps := [0.05,0.05,0.10,0.0,0.0,0.10,0.0,0.0,0.10,0.0]
 	var heal := 0.0
 	for i in mini(fort, heal_steps.size()): heal += float(heal_steps[i])
-	return {"dmg":power*0.03,"crit": (1 if power>=5 else 0)+(1 if power>=9 else 0)+(2 if power>=10 else 0),
+	return {"dmg":power*0.03,"xp":power*0.04,"crit": (1 if power>=5 else 0)+(1 if power>=9 else 0)+(2 if power>=10 else 0),
 		"max_hp":(1 if fort>=4 else 0)+(1 if fort>=8 else 0)+(1 if fort>=10 else 0),"heal":heal,
 		"defense":(0.05 if fort>=5 else 0.0)+(0.05 if fort>=7 else 0.0)+(0.10 if fort>=9 else 0.0),"slow_immune":fort>=10,
 		"move":speed*0.025,"attack":minf(0.15, speed*0.015),"gold":luck*0.03,"rare":luck*0.035,"event":luck*0.02}

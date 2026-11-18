@@ -19,8 +19,14 @@ func setup(g: Node, map_data: Dictionary) -> void:
 		timers.append(randf_range(base * 0.38, base * 1.05))
 
 func tick(delta: float) -> void:
+	var rate := 1.0
+	if game != null:
+		var ev_per := float(Progression.cfg.get("combo", {}).get("event_per", 0.005))
+		rate += float(game.combo) * ev_per
+		if game.player != null and game.player.upg != null:
+			rate += game.player.upg.flag_num("meta_event")
 	for i in events.size():
-		timers[i] = float(timers[i]) - delta
+		timers[i] = float(timers[i]) - delta * rate
 		if float(timers[i]) <= 0.0:
 			var ev: Dictionary = events[i]
 			var base := clampf(float(ev.get("interval", 60.0)), 45.0, 75.0)

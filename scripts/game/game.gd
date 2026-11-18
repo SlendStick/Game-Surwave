@@ -64,7 +64,9 @@ var mode := "standard"
 var diff_mods: Dictionary = {}
 var level := 1
 var xp := 0
-var xp_need := 8
+var xp_need := 10
+var trial_xp_mult := 1.0
+var xp_boost_left := 0.0
 var gold := 0
 var souls := 0.0
 var kills := 0
@@ -252,13 +254,15 @@ func _map_intro() -> String:
 ## Испытания и благословения, выбранные перед раундом.
 func _apply_meta_progression() -> void:
 	var m: Dictionary = Progression.run_mods()
-	upg.apply_mods({"dmg":float(m.dmg), "crit":float(m.crit)/100.0, "hp":int(m.max_hp), "dr":float(m.defense), "move_speed":float(m.move), "fire_rate":float(m.attack)})
+	upg.apply_mods({"dmg":float(m.dmg), "xp":float(m.get("xp", 0.0)), "crit":float(m.crit)/100.0, "hp":int(m.max_hp), "dr":float(m.defense), "move_speed":float(m.move), "fire_rate":float(m.attack)})
 	upg.apply_flags({"meta_heal":float(m.heal), "meta_gold":float(m.gold), "meta_rare":float(m.rare), "meta_event":float(m.event), "slow_immune":1 if bool(m.slow_immune) else 0})
 	player.recalc()
 	player.hp = player.max_hp
 
 func _apply_trials() -> void:
-	for t in GameManager.run_config.get("trials", []):
+	var trials: Array = GameManager.run_config.get("trials", [])
+	trial_xp_mult = Progression.challenge_multiplier(trials) if not trials.is_empty() else 1.0
+	for t in trials:
 		match String(t):
 			"glass":
 				player.set_meta("glass", true)
@@ -278,7 +282,6 @@ func _apply_trials() -> void:
 				wave_mgr.duration = 900.0
 				wave_mgr.spawn_scale *= 1.5
 				diff_mods["fodder_speed"] = float(diff_mods.get("fodder_speed",0.0)) + 0.2
-				diff_mods["xp"] = float(diff_mods.get("xp",0.0)) + 0.5
 			"no_heal": player.set_meta("no_heal", true)
 			"berserk":
 				upg.apply_mods({"dmg":0.25,"hp":2})
@@ -1168,6 +1171,8 @@ func _run_ui_test() -> void:
 	var bg := mm.get_node_or_null("MenuGameplayBg") as Control
 	assert(bg != null and bg.size.x >= 600.0 and bg.size.y >= 340.0, "MenuGameplayBg не заполнил экран")
 	assert(not (bg.get("scene_data") as Dictionary).is_empty(), "MenuGameplayBg не создал сцену")
+	assert(bg.get("floor_rect") != null and bg.get("bg_rect") != null, "MenuGameplayBg слои фона не созданы")
+	assert(_xp_for_level(1) == 10 and _xp_for_level(41) > _xp_for_level(40), "Кривая XP некорректна")
 	mm.queue_free()
 	print("[SURWAVE] ui OK: cards=%d hotkey=2 end_rows=%d out_of_bounds=%d" % [cards.size(), end_panel.get_child_count(), problems])
 
@@ -1377,6 +1382,8 @@ func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
 	elapsed += delta
+	if xp_boost_left > 0.0:
+		xp_boost_left = maxf(0.0, xp_boost_left - delta)
 	_tick_director(delta)
 	_tick_qte(delta)
 	_tick_combo(delta)
@@ -2604,13 +2611,24 @@ func explode_orbs(dmg: float) -> void:
 			b.deactivate()
 
 # ------------------------------------------------------------------ XP / РЕСУРСЫ
-## Опыт для следующего уровня: int(10 * pow(1.15, level)) по техспеке.
+## Опыт для следующего уровня: xp_base * xp_growth^(lvl-1), замедление роста после 40 уровня.
 func _xp_for_level(lvl: int) -> int:
-	var curve: Dictionary = DB.balance["run"].get("xp_curve", {"base": 10.0, "growth": 1.15})
-	return maxi(3, int(float(curve.get("base", 10.0)) * pow(float(curve.get("growth", 1.15)), float(lvl))))
+	var run_cfg: Dictionary = DB.balance.get("run", {})
+	var curve: Dictionary = run_cfg.get("xp_curve", {})
+	var base := float(curve.get("base", run_cfg.get("xp_base", 10.0)))
+	var growth := float(curve.get("growth", run_cfg.get("xp_growth", 1.14)))
+	var late_lvl := int(curve.get("late_level", run_cfg.get("xp_late_level", 40)))
+	var late_growth := float(curve.get("late_growth", run_cfg.get("xp_growth_late", 1.12)))
+	var n := maxi(1, lvl)
+	var req := base * pow(growth, float(mini(n, late_lvl) - 1))
+	if n > late_lvl:
+		req *= pow(late_growth, float(n - late_lvl))
+	return maxi(3, int(round(req)))
 
 func add_xp(amount: float) -> void:
-	var gain := amount * float(player.S.xp_mult) * (1.0 + float(diff_mods.get("xp", 0.0)))
+	var dark_xp := maxf(0.1, 1.0 + float(diff_mods.get("xp", 0.0)))
+	var ev_xp := 1.5 if xp_boost_left > 0.0 else 1.0
+	var gain := amount * float(player.S.xp_mult) * dark_xp * trial_xp_mult * ev_xp
 	var gained := maxi(1, int(round(gain))) if amount > 0.0 else 0
 	xp += gained
 	while xp >= xp_need and level < int(DB.balance["run"].get("max_level", 60)):
@@ -2627,9 +2645,11 @@ func add_xp(amount: float) -> void:
 
 func collect_pickup(pickup: Pickup) -> void:
 	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
+	var combo_cfg: Dictionary = Progression.cfg.get("combo", {})
 	match pickup.kind:
 		"xp":
-			add_xp(pickup.value * (1.0 + float(combo) * 0.015))
+			var xp_per := float(combo_cfg.get("xp_per", 0.015))
+			add_xp(pickup.value * (1.0 + float(combo) * xp_per))
 			AudioManager.play_sfx("xp", clampf(1.0 + float(level) * 0.02, 1.0, 2.0))
 			if player.upg.flag_num("recharge_ammo") > 0.0 and randf() < player.upg.flag_num("recharge_ammo"):
 				player.mag = mini(int(player.S.mag), player.mag + 1)
@@ -2644,7 +2664,8 @@ func collect_pickup(pickup: Pickup) -> void:
 					spawn_perk_fx("holy", player.global_position, 32.0, 0.22)
 		"gold":
 			var dark_gold_mult := 1.0 + float(dark_lvl) * 0.15
-			gold += int(round(pickup.value * dark_gold_mult * (1.0 + float(combo)*0.01 + player.upg.flag_num("meta_gold"))))
+			var gold_per := float(combo_cfg.get("gold_per", 0.01))
+			gold += int(round(pickup.value * dark_gold_mult * (1.0 + float(combo) * gold_per + player.upg.flag_num("meta_gold"))))
 			AudioManager.play_sfx("gold")
 			EventBus.gold_changed.emit(gold)
 		"heart":
@@ -2664,20 +2685,28 @@ func collect_pickup(pickup: Pickup) -> void:
 func on_enemy_death(enemy: Enemy) -> void:
 	kills += 1
 	kills_without_damage += 1
+	var combo_cfg: Dictionary = Progression.cfg.get("combo", {})
+	var combo_max := int(combo_cfg.get("max", 20))
+	var combo_timeout := float(combo_cfg.get("timeout", 3.0))
 	var combo_before := combo
-	combo = mini(20, combo + 1)
+	combo = mini(combo_max, combo + 1)
 	combo_peak = maxi(combo_peak, combo)
-	combo_left = 3.0
-	if combo == 20 and combo_before < 20:
+	combo_left = combo_timeout
+	if combo == combo_max and combo_before < combo_max:
 		combo20_hits += 1
 		Progression.add_progress("combo20", 1)
 	Progression.record_combo(combo)
 	if hud != null: hud.update_combo(combo)
 	GameManager.add_album_enemy(enemy.id)
 	var role: String = String(enemy.role)
-	var dark_drop := 1.0 + float(int(GameManager.run_config.get("darkness", 1))) * 0.05
+	var dark_drop := (1.0 + float(int(GameManager.run_config.get("darkness", 1))) * 0.05) * (1.0 + float(combo) * float(combo_cfg.get("drop_per", 0.0075)))
 	var xp_table: Dictionary = DB.balance["run"].get("pickup_xp", {})
 	var xp_val := float(enemy.data.get("xp", xp_table.get(role, 1)))
+	# Поздняя игра и догоняющий (catch-up) бонус опыта за усиленных врагов
+	if elapsed > 600.0:
+		xp_val *= 1.0 + minf(0.75, ((elapsed - 600.0) / 60.0) * 0.025)
+	if level < int(elapsed / 45.0):
+		xp_val *= 1.20
 	spawn_pickup("xp", enemy.global_position, xp_val)
 	if randf() < float(DB.balance["run"].get("gold_chance", 0.05)) * dark_drop:
 		spawn_pickup("gold", enemy.global_position, float(rng.randi_range(1, 3)))
@@ -2985,6 +3014,7 @@ func run_map_event(ev: Dictionary) -> void:
 	var kind := String(ev.get("kind", ""))
 	var p: Dictionary = ev.get("params", {})
 	var map_id := String(map_data.get("id", ""))
+	xp_boost_left = maxf(xp_boost_left, 15.0)
 	match kind:
 		"aoe_zone":
 			var count := int(p.get("count", 1)) + 3

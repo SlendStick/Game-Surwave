@@ -186,7 +186,7 @@ func recalc() -> void:
 	S.summon_dmg = 1.0 + float(add.get("summon_dmg", 0.0))
 	S.summon_speed = 1.0 + float(add.get("summon_speed", 0.0))
 	S.summon_count = int(add.get("summon_count", 0))
-	S.xp_mult = maxf(0.1, 1.0 + float(add.get("xp", 0.0)))
+	S.xp_mult = maxf(0.1, 1.0 + float(add.get("xp", 0.0)) + float(char_data.get("xp_bonus", 0.0)))
 	S.freeze_chance = clampf(float(add.get("freeze_chance", 0.0)), 0.0, 1.0)
 	S.freeze_dur = maxf(0.2, 1.0 + float(add.get("freeze_dur", 0.0)))
 	S.burn_mult = maxf(0.0, 1.0 + float(add.get("burn_mult", 0.0)))
@@ -695,6 +695,9 @@ func dmg_multiplier() -> float:
 		m += float(char_data.get("skill", {}).get("params", {}).get("damage", 0.25))
 	if dash_buff_double:
 		m *= 2.0
+	if game != null and int(game.combo) > 0:
+		var combo_dmg := float(Progression.cfg.get("combo", {}).get("damage_per", 0.005))
+		m += float(game.combo) * combo_dmg
 	if has_status("curse"):
 		m *= 0.7
 	return m

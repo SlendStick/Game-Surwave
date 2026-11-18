@@ -398,15 +398,21 @@ func _build_maps() -> void:
 		bprev.size = Vector2(38, 38)
 		bprev.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		details.add_child(bprev)
-	var text := "%s\n\n%s\n\nВраги: %d типов\nБосс: %s (HP %d)\n\nИвенты:\n" % [
-		String(m2.get("name", "")), String(m2.get("desc", "")),
+	var title_lbl := UI.label(details, String(m2.get("name", "")), 12, UI.GOLD, Vector2(8, 8))
+	title_lbl.custom_minimum_size = Vector2(214, 18)
+	title_lbl.size = Vector2(214, 18)
+	title_lbl.clip_text = true
+	var info_text := "Враги: %d типов\nБосс: %s (HP %d)" % [
 		int(m2.get("roster", {}).get("fodder", []).size()) + 3,
 		String(boss.get("name", "—")), int(boss.get("hp", 0))]
-	for e in m2.get("events", []):
-		text += "› %s (каждые %.0f сек)\n" % [EVENT_NAMES.get(String(e.get("kind", "")), String(e.get("kind", ""))), float(e.get("interval", 60.0))]
-	var l := UI.label(details, text, 9, UI.TEXT, Vector2(8, 6))
-	l.size = Vector2(216, 180 if not m_unlocked else 212)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var info_lbl := UI.label(details, info_text, 9, UI.DIM, Vector2(8, 28))
+	info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_lbl.custom_minimum_size = Vector2(214, 26)
+	info_lbl.size = Vector2(214, 26)
+	var desc_lbl := UI.label(details, String(m2.get("desc", "")), 9, UI.TEXT, Vector2(8, 58))
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.custom_minimum_size = Vector2(300, 0)
+	desc_lbl.size = Vector2(300, 126 if not m_unlocked else 156)
 	if not m_unlocked:
 		var mprice2 := int(m2.get("price", 0))
 		if mprice2 > 0:
@@ -435,15 +441,6 @@ func _build_maps() -> void:
 	plus.pressed.connect(func() -> void:
 		sel["darkness"] = mini(int(GameManager.meta.get("max_darkness", 1)), int(sel["darkness"]) + 1)
 		_rebuild())
-	var d_desc := "Без модификаторов Тьмы"
-	for entry in DB.darkness:
-		if int(entry.get("level", 0)) == dlvl:
-			d_desc = String(entry.get("desc", d_desc))
-			break
-	var d_bonus := "Бонусы: +%d%% душ/XP · +%d%% золота · +%d%% дропа" % [dlvl * 10, dlvl * 15, dlvl * 5]
-	var dlbl := UI.crisp_label(dk, "%s  |  %s" % [d_desc, d_bonus], 8, UI.GOLD if dlvl > 0 else UI.DIM)
-	dlbl.custom_minimum_size = Vector2(380, 18)
-	dlbl.clip_text = true
 
 # ------------------------------------------------------------------ АМУЛЕТЫ
 func _build_amulets() -> void:

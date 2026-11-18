@@ -51,23 +51,23 @@ func _build() -> void:
 
 	# --- правая часть: меню на полупрозрачной готической раме поверх живого геймплея
 	var menu_frame := Panel.new()
-	menu_frame.position = Vector2(342, 20)
-	menu_frame.size = Vector2(272, 246)
+	menu_frame.position = Vector2(342, 18)
+	menu_frame.size = Vector2(276, 324)
 	menu_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_frame.add_theme_stylebox_override("panel", UI.style(Color(0.045, 0.048, 0.062, 0.76), UI.GOLD_DEEP, 1, 0))
+	menu_frame.add_theme_stylebox_override("panel", UI.style(Color(0.045, 0.048, 0.062, 0.78), UI.GOLD_DEEP, 1, 0))
 	add_child(menu_frame)
 
 	var menu := Control.new()
-	menu.position = Vector2(352, 30)
-	menu.size = Vector2(252, 230)
+	menu.position = Vector2(354, 28)
+	menu.size = Vector2(252, 304)
 	menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu)
-	var play := UI.primary_button(menu, Loc.t("play"), 14, Vector2(252, 34))
+	var play := UI.primary_button(menu, Loc.t("play"), 16, Vector2(252, 42))
 	play.position = Vector2(0, 0)
 	play.pressed.connect(func() -> void:
 		AudioManager.play_sfx("ui")
 		GameManager.goto_select())
-	var y := 44
+	var y := 50
 	for item in [
 		[Loc.t("album"), "album"],
 		["ДРЕВО ПРОГРЕССИИ", "progression"],
@@ -76,12 +76,12 @@ func _build() -> void:
 		[Loc.t("achievements"), "achievements"],
 		[Loc.t("settings"), "settings"],
 	]:
-		var btn := UI.button(menu, String(item[0]), 10, Vector2(252, 24))
+		var btn := UI.button(menu, String(item[0]), 11, Vector2(252, 32))
 		btn.position = Vector2(0, y)
 		var key := String(item[1])
 		btn.pressed.connect(func() -> void: _open_overlay(key))
-		y += 27
-	var quit := UI.button(menu, Loc.t("quit"), 10, Vector2(252, 24))
+		y += 36
+	var quit := UI.button(menu, Loc.t("quit"), 11, Vector2(252, 32))
 	quit.position = Vector2(0, y + 4)
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
@@ -245,7 +245,7 @@ func _build_progression(body: Control) -> void:
 	UI.label(body, "Осколки Душ: %d   ·   Рейтинг навыка: %d/1000" % [int(GameManager.meta.get("souls",0)), int(GameManager.meta.get("skill_rating",300))], 10, UI.GOLD, Vector2(0,0))
 	UI.label(body, "Постоянные улучшения применяются в начале каждого забега.", 8, UI.DIM, Vector2(0,18))
 	var branches := ["power","fortitude","speed","luck","mastery"]
-	var names := {"power":"СИЛА · +3% урона/ур.","fortitude":"СТОЙКОСТЬ · HP/защита/лечение","speed":"СКОРОСТЬ · движение/темп","luck":"УДАЧА · золото/редкость/события","mastery":"МАСТЕРСТВО · персонажи/карты/режимы"}
+	var names := {"power":"СИЛА · +3% урона, +4% XP/ур.","fortitude":"СТОЙКОСТЬ · HP/защита/лечение","speed":"СКОРОСТЬ · движение/темп","luck":"УДАЧА · золото/редкость/события","mastery":"МАСТЕРСТВО · персонажи/карты/режимы"}
 	var v := UI.vbox(body, 7); v.position = Vector2(0,42); v.size = Vector2(560,230)
 	for branch in branches:
 		var h := UI.hbox(v,8)

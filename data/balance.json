@@ -2,7 +2,7 @@
  "version": "1.0.0",
  "player": {
   "move_speed": 140.0,
-    "pickup_range": 64.0,
+  "pickup_range": 64.0,
   "iframes": 0.6,
   "vision_radius": 190.0,
   "dodge_cap": 0.75,
@@ -30,8 +30,8 @@
   ],
   "max_enemies": 1500,
   "max_level": 60,
-  "xp_base": 8,
-  "xp_growth": 1.16,
+  "xp_base": 10,
+  "xp_growth": 1.14,
   "spawn_interval_start": 2.8,
   "spawn_interval_end": 0.45,
   "spawn_batch_start": 1,
@@ -52,7 +52,9 @@
   "max_enemies_start": 16,
   "xp_curve": {
    "base": 10,
-   "growth": 1.15
+   "growth": 1.14,
+   "late_level": 40,
+   "late_growth": 1.12
   },
   "secret": {
    "kills_without_damage": 1000,
@@ -62,7 +64,9 @@
   "max_enemies_cap_ease": 2.0,
   "spawn_ramp_ease": 1.25,
   "spawn_grace": 3.0,
-  "start_enemy_pressure": 0.5
+  "start_enemy_pressure": 0.5,
+  "xp_growth_late": 1.12,
+  "xp_late_level": 40
  },
  "difficulty_base": {
   "fodder_hp": 1.0,
