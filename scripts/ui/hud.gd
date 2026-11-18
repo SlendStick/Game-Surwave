@@ -466,7 +466,7 @@ func open_choice(cards: Array, title: String, kind_name: String) -> void:
 	choice_title.text = title
 	if choice_remove_panel != null:
 		choice_remove_panel.visible = false
-	var can_remove := kind_name == "perk" and game != null and game.player != null and not game.player.upg.taken.is_empty()
+	var can_remove: bool = kind_name == "perk" and game != null and game.player != null and not game.player.upg.taken.is_empty()
 	if choice_remove_btn != null:
 		choice_remove_btn.visible = can_remove
 		choice_remove_btn.text = "УБРАТЬ ПЕРК (ЗА УРОВЕНЬ) · %d" % game.player.upg.taken.size() if can_remove else "УБРАТЬ ПЕРК (ЗА УРОВЕНЬ)"
