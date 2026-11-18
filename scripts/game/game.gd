@@ -915,8 +915,18 @@ func _run_cheat_test() -> void:
 	if not enemies.filter(func(x): return x.active).is_empty():
 		problems += 1
 		print("[SURWAVE] cheat_fail: «убить всех» оставил живых")
-	# 11) закрытие
+	# 11) закрытие + плашка о читах и блокировка сохранения прогресса
 	console.open_menu()
+	if not GameManager.cheat_used or hud.cheat_banner == null or not hud.cheat_banner.visible:
+		problems += 1
+		print("[SURWAVE] cheat_fail: плашка предупреждения о читах не появилась")
+	var souls_before_end: int = int(GameManager.meta.get("souls", 0))
+	var gold_before_end: int = int(GameManager.meta.get("gold", 0))
+	var wins_before_end: int = int(GameManager.meta.get("stats", {}).get("wins", 0))
+	var end_res: Dictionary = GameManager.end_run({"kills": 99, "damage_dealt": 999, "damage_taken": 0, "time": 900.0, "gold": 500, "souls": 500, "level": 20}, true)
+	if int(end_res.get("souls", -1)) != 0 or int(GameManager.meta.get("souls", 0)) != souls_before_end or int(GameManager.meta.get("gold", 0)) != gold_before_end or int(GameManager.meta.get("stats", {}).get("wins", 0)) != wins_before_end:
+		problems += 1
+		print("[SURWAVE] cheat_fail: прогресс сохранился несмотря на читы")
 	console.close_all()
 	if get_tree().paused or GameManager.cheat_open:
 		problems += 1
@@ -1189,6 +1199,13 @@ func _run_pause_test() -> void:
 		if r.end.x > 641.0 or r.end.y > 361.0 or r.position.x < -1.0:
 			print("[SURWAVE] pause_out %s %s" % [String(it["name"]), str(r)])
 			bad += 1
+	assert(hud.pause_confirm_layer != null and not hud.pause_confirm_layer.visible, "Окно подтверждения паузы отсутствует")
+	hud._open_pause_confirm("restart", "Тест подтверждения")
+	await get_tree().process_frame
+	assert(hud.pause_confirm_layer.visible, "Подтверждение «Заново» не открылось")
+	hud.toggle_pause()
+	await get_tree().process_frame
+	assert(pause_layer_visible() and not hud.pause_confirm_layer.visible, "Esc должен сначала закрыть подтверждение")
 	hud.toggle_pause()
 	await get_tree().process_frame
 	assert(not get_tree().paused, "Пауза не снялась повторным Esc")
@@ -1958,8 +1975,6 @@ func spawn_map_boss(kind: String) -> void:
 		return
 	var hp := float(boss_def.get("hp", 7500))
 	var hp_mult := 1.0 + float(diff_mods.get("boss_hp", 0.0))
-	if kind == "final":
-		hp_mult += float(diff_mods.get("boss_hp", 0.0))
 	if mode == "endless":
 		hp_mult += float(endless_cycle) * 1.0
 	boss_enemy = ENEMY_SCENE.instantiate()
@@ -2206,7 +2221,7 @@ func damage_enemy(enemy: Node2D, amount: float, opts: Dictionary = {}) -> void:
 				if other != enemy and not other.has_status("curse"):
 					apply_status(other, "curse", 3.0, {"dps": 4.0})
 
-func damage_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false) -> void:
+func damage_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false, source_role: String = "") -> void:
 	if player == null or player.dead:
 		return
 	if boss_enemy != null and boss_enemy.active:
@@ -2214,7 +2229,7 @@ func damage_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false)
 	var mult := 1.0
 	if bool(map_data.get("mods", {}).get("poison_on_hit", false)):
 		player.add_status("poison", 5.0, {"dps": 2.0})
-	if float(diff_mods.get("fodder_late_dmg", 0.0)) > 0.0 and elapsed > wave_mgr.duration - 300.0:
+	if float(diff_mods.get("fodder_late_dmg", 0.0)) > 0.0 and source_role in ["fodder", "shooter"] and elapsed >= wave_mgr.duration - 300.0:
 		mult *= 1.0 + float(diff_mods.get("fodder_late_dmg", 0.0))
 	if player.has_meta("glass"):
 		mult *= 2.0
@@ -2311,8 +2326,8 @@ func aoe_damage(pos: Vector2, radius: float, amount: float, opts: Dictionary = {
 	return hits
 
 func lightning_strike_at(pos: Vector2, radius: float, dmg: float) -> bool:
-	radius*=1.0+float(player.upg.add.get("shock_radius",0.0))
-	var hit := aoe_damage(pos, radius + float(player.S.shock_dmg) * 3.0, dmg, {"source": "lightning"})
+	radius *= 1.0 + float(player.upg.add.get("shock_radius", 0.0))
+	var hit := aoe_damage(pos, radius, dmg, {"source": "lightning"})
 	spawn_fx(pos, Color(0.8, 0.9, 1.0), radius * 1.6, 0.2)
 	spawn_perk_fx("lightning", pos, radius * 2.1, 0.30)
 	if hit > 0:
@@ -2596,7 +2611,8 @@ func _xp_for_level(lvl: int) -> int:
 
 func add_xp(amount: float) -> void:
 	var gain := amount * float(player.S.xp_mult) * (1.0 + float(diff_mods.get("xp", 0.0)))
-	xp += int(round(gain))
+	var gained := maxi(1, int(round(gain))) if amount > 0.0 else 0
+	xp += gained
 	while xp >= xp_need and level < int(DB.balance["run"].get("max_level", 60)):
 		xp -= xp_need
 		level += 1
@@ -2610,6 +2626,7 @@ func add_xp(amount: float) -> void:
 	EventBus.xp_changed.emit(xp, xp_need, level)
 
 func collect_pickup(pickup: Pickup) -> void:
+	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
 	match pickup.kind:
 		"xp":
 			add_xp(pickup.value * (1.0 + float(combo) * 0.015))
@@ -2617,15 +2634,17 @@ func collect_pickup(pickup: Pickup) -> void:
 			if player.upg.flag_num("recharge_ammo") > 0.0 and randf() < player.upg.flag_num("recharge_ammo"):
 				player.mag = mini(int(player.S.mag), player.mag + 1)
 				EventBus.ammo_changed.emit(player.mag, int(player.S.mag), player.reloading)
+				if player.upg.flag_num("resonance") > 0.0:
+					player.set_timer("resonance", 2.0)
 				if randf() < 0.35:
 					spawn_perk_fx("smite", player.global_position, 28.0, 0.22)
 			if player.upg.flag_num("xp_rush") > 0.0:
-				player.set_timer("buff_fire_rate", 1.0)
-				player.stacks["buff_fire_rate"] = player.upg.flag_num("xp_rush")
+				player.set_timer("xp_rush", 1.0)
 				if randf() < 0.25:
 					spawn_perk_fx("holy", player.global_position, 32.0, 0.22)
 		"gold":
-			gold += int(round(pickup.value * (1.0 + float(combo)*0.01 + player.upg.flag_num("meta_gold"))))
+			var dark_gold_mult := 1.0 + float(dark_lvl) * 0.15
+			gold += int(round(pickup.value * dark_gold_mult * (1.0 + float(combo)*0.01 + player.upg.flag_num("meta_gold"))))
 			AudioManager.play_sfx("gold")
 			EventBus.gold_changed.emit(gold)
 		"heart":
@@ -2656,16 +2675,22 @@ func on_enemy_death(enemy: Enemy) -> void:
 	if hud != null: hud.update_combo(combo)
 	GameManager.add_album_enemy(enemy.id)
 	var role: String = String(enemy.role)
+	var dark_drop := 1.0 + float(int(GameManager.run_config.get("darkness", 1))) * 0.05
 	var xp_table: Dictionary = DB.balance["run"].get("pickup_xp", {})
 	var xp_val := float(enemy.data.get("xp", xp_table.get(role, 1)))
 	spawn_pickup("xp", enemy.global_position, xp_val)
-	if randf() < float(DB.balance["run"].get("gold_chance", 0.05)):
+	if randf() < float(DB.balance["run"].get("gold_chance", 0.05)) * dark_drop:
 		spawn_pickup("gold", enemy.global_position, float(rng.randi_range(1, 3)))
-	if not player.has_meta("no_heal") and randf() < float(DB.balance["run"].get("heart_chance", 0.005)) * float(director_mods.get("heal",1.0)):
+	if not player.has_meta("no_heal") and randf() < float(DB.balance["run"].get("heart_chance", 0.005)) * float(director_mods.get("heal",1.0)) * dark_drop:
 		spawn_pickup("heart", enemy.global_position, 1.0)
-	var soul_chance := float(DB.balance["run"].get("souls_per_kill", 0.02)) + player.upg.flag_num("soul_drop") + player.upg.flag_num("soul_drop_bonus")
+	var soul_chance := (float(DB.balance["run"].get("souls_per_kill", 0.02)) + player.upg.flag_num("soul_drop") + player.upg.flag_num("soul_drop_bonus")) * dark_drop
 	if randf() < soul_chance:
 		spawn_pickup("soul", enemy.global_position, 1.0)
+	if player != null and player.upg.flag_on("plague") and (enemy.has_status("curse") or String(enemy.last_source) in ["curse", "curse_dot"]):
+		for other in enemies_in_radius(enemy.global_position, 64.0):
+			if other != enemy and other.active and not other.dead and not other.has_status("curse"):
+				apply_status(other, "curse", 3.0, {"dps": 4.0})
+		queue_aoe(enemy.global_position, 64.0, 20.0, {"source": "curse"})
 	souls += float(DB.balance["run"].get("souls_per_kill", 0.02))
 	if role == "elite":
 		souls += 2.0
@@ -2689,15 +2714,17 @@ func _on_boss_death(enemy: Enemy) -> void:
 	var bid := String(enemy.boss_def.get("id", ""))
 	souls += 500.0 if bid == "boss_satanail" else 150.0
 	Progression.add_progress("boss",1)
-	GameManager.meta["throne_unlocked"] = true
+	if not GameManager.cheat_used:
+		GameManager.meta["throne_unlocked"] = true
 	shake(32.0); flash_screen(Color.WHITE)
 	spawn_fx(enemy.global_position,Color("#ffd700"),384.0,1.5)
 	# САТАНАИЛ — секретная победа (карта Пустота)
 	if bid == "boss_satanail":
 		Progression.add_progress("satanail",1)
 		satanail_defeated = true
-		GameManager.meta["sathan_defeated"] = true
-		GameManager.add_achievement("sathan_slayer")
+		if not GameManager.cheat_used:
+			GameManager.meta["sathan_defeated"] = true
+			GameManager.add_achievement("sathan_slayer")
 		notify("САТАНАИЛ повержен! Пустота закрыта.")
 		_finish_run(true, true)
 		return
@@ -3359,22 +3386,27 @@ func _finish_run(win: bool, secret_win: bool) -> void:
 	victory = win
 	get_tree().paused = false
 	AudioManager.set_boss_layer(false)
+	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
 	var souls_gain := int(souls)
 	if win:
 		souls_gain += int(DB.balance["run"].get("souls_win", 250))
+	souls_gain = int(round(float(souls_gain) * (1.0 + float(dark_lvl) * 0.10)))
+	if GameManager.cheat_used:
+		souls_gain = 0
 	var results := {
 		"kills": kills,
 		"damage_dealt": int(damage_dealt),
 		"damage_taken": int(damage_taken),
 		"time": elapsed,
-		"gold": gold,
+		"gold": 0 if GameManager.cheat_used else gold,
 		"souls": souls_gain,
 		"level": level,
 		"combo_peak": combo_peak,
 		"map": String(map_data.get("id", "")),
 		"secret_win": secret_win,
+		"cheats_used": GameManager.cheat_used,
 	}
-	if win and String(map_data.get("id", "")) == "throne":
+	if win and String(map_data.get("id", "")) == "throne" and not GameManager.cheat_used:
 		GameManager.meta["endless_unlocked"] = true
 	GameManager.end_run(results, win)
 	print("[SURWAVE] run_end win=%s secret=%s time=%.0f kills=%d dmg=%.0f taken=%.0f level=%d souls=%d map=%s" % [win, secret_win, elapsed, kills, damage_dealt, damage_taken, level, souls_gain, String(map_data.get("id", ""))])

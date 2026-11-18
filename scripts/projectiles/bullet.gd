@@ -120,6 +120,15 @@ func tick(delta: float) -> void:
 		return
 	# границы карты
 	if not game.map_rect.has_point(global_position):
+		if bounce > 0:
+			bounce -= 1
+			if global_position.x < game.map_rect.position.x or global_position.x > game.map_rect.end.x:
+				vel.x = -vel.x
+			if global_position.y < game.map_rect.position.y or global_position.y > game.map_rect.end.y:
+				vel.y = -vel.y
+			global_position = game.clamp_to_map(global_position)
+			hit_list.clear()
+			return
 		deactivate()
 		return
 	# столкновение с препятствием
@@ -137,6 +146,13 @@ func tick(delta: float) -> void:
 				deactivate()
 				return
 		if String(obs.get("kind", "")) != "glyph":
+			if bounce > 0:
+				bounce -= 1
+				var normal2: Vector2 = obs.get("normal", Vector2.UP)
+				vel = vel.bounce(normal2)
+				global_position = prev
+				hit_list.clear()
+				return
 			if opts.has("explode"):
 				_explode()
 			deactivate()
@@ -238,7 +254,6 @@ func _hit(enemy: Node2D) -> void:
 		return
 	if bounce > 0:
 		bounce -= 1
-		damage *= 0.9  # -10% урона за каждый отскок (техспека 4.4)
 		game.spawn_fx(global_position, Color(1.0, 0.9, 0.45), 16.0, 0.16)
 		var near: Array = game.nearest_enemy_excluding(global_position, 200.0, hit_list)
 		if not near.is_empty():
@@ -252,6 +267,9 @@ func _explode() -> void:
 		return
 	var r := float(opts.get("explode_radius", 64.0))
 	game.aoe_damage(global_position, r, power, {"source": "explosion", "holy": bool(opts.get("holy", false))})
+	if opts.has("burn") and opts["burn"] is Dictionary:
+		var b: Dictionary = opts["burn"]
+		game.apply_status_radius(global_position, r, "burn", float(b.get("dur", 3.0)), {"dps": float(b.get("dps", 3.0))})
 	game.spawn_fx(global_position, color, r, 0.28)
 	if opts.has("burn") or String(opts.get("behavior", "")) == "fireball" or bool(opts.get("napalm", false)):
 		game.spawn_perk_fx("fireball", global_position, r * 1.1, 0.30)

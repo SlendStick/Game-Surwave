@@ -2,7 +2,7 @@
  "version": "1.0.0",
  "player": {
   "move_speed": 140.0,
-    "pickup_range": 54.0,
+    "pickup_range": 64.0,
   "iframes": 0.6,
   "vision_radius": 190.0,
   "dodge_cap": 0.75,

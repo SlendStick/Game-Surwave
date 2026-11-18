@@ -171,7 +171,13 @@ func _chase_and_shoot(delta: float) -> void:
 		attack_cd = interval
 		match kind:
 			"thunder_beetle":
-				game.lightning_strike_at(tgt.global_position, 28.0, damage)
+				var targets: Array = game.nearest_enemy(global_position, 260.0)
+				var struck := 0
+				for b_tgt in targets:
+					if struck >= 2:
+						break
+					game.lightning_strike_at(b_tgt.global_position, 28.0, damage)
+					struck += 1
 			_:
 				if kind=="dragonling" and dragon_breath:
 					game.aoe_damage(tgt.global_position,48.0,damage,{"source":"dragon_breath"}); game.apply_status_radius(tgt.global_position,48.0,"burn",3.0,{"dps":4.0}); game.spawn_fx(tgt.global_position,Color("#ff6a20"),48.0,0.3); game.spawn_perk_fx("fireball", tgt.global_position, 52.0, 0.30)

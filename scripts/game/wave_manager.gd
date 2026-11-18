@@ -114,10 +114,10 @@ func spawn_interval() -> float:
 	var run_cfg: Dictionary = DB.balance["run"]
 	var t := ramp_t()
 	var base: float = lerpf(float(run_cfg.get("spawn_interval_start", 3.2)), float(run_cfg.get("spawn_interval_end", 0.45)), t)
-	var rate_mult := 1.0 + float(diff.get("fodder_spawn", 0.0))
+	var rate_scale := maxf(0.35, 1.0 - float(diff.get("fodder_spawn", 0.0)))
 	var director := float(game.director_mods.get("spawn", 1.0)) if game != null else 1.0
 	var pressure := float(run_cfg.get("start_enemy_pressure", 1.0))
-	return maxf(0.08, base / (rate_mult * (pressure + spawn_scale) * director))
+	return maxf(0.08, (base * rate_scale) / ((pressure + spawn_scale) * director))
 
 func spawn_batch() -> int:
 	var run_cfg: Dictionary = DB.balance["run"]

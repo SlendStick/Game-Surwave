@@ -330,10 +330,10 @@ static func fmt_time(seconds: float) -> String:
 ## Живой фон меню: тёмный камень со светом факелов и редкими искрами.
 static func backdrop(parent: Node, tint: Color = Color("#120d08")) -> Node:
 	var layer := Control.new()
-	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	parent.add_child(layer)
 	var script := load("res://scripts/utils/menu_backdrop.gd")
 	layer.set_script(script)
 	layer.set("tint", tint)
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	parent.add_child(layer)
 	return layer

@@ -107,6 +107,9 @@ func open_line() -> void:
 
 func _submit(text: String) -> void:
 	var cmd := text.strip_edges().to_lower()
+	if cmd == "":
+		return
+	GameManager.mark_cheat_used()
 	if cmd == COMMAND or cmd == "wussmenu" or cmd == "wuss":
 		open_menu()
 		return
@@ -123,6 +126,7 @@ func unpause_after_cheats() -> void:
 # ------------------------------------------------------------------ МЕНЮ
 func open_menu() -> void:
 	GameManager.cheat_open = true
+	GameManager.mark_cheat_used()
 	pause_for_cheats()
 	line.visible = false
 	hint.visible = true
@@ -148,8 +152,8 @@ func _rebuild() -> void:
 	# --- ИГРОК
 	_section("ИГРОК")
 	_row_toggle("Бессмертие", GameManager.god_mode, func() -> void:
+		GameManager.mark_cheat_used()
 		GameManager.god_mode = not GameManager.god_mode
-		GameManager.set_setting("god_mode", GameManager.god_mode)
 		_rebuild())
 	_row_buttons("Здоровье %d/%d" % [p.hp, p.max_hp], [
 		["лечить", func() -> void: p.heal(p.max_hp); _rebuild()],

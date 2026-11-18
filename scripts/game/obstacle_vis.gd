@@ -28,9 +28,9 @@ static func build(parent: Node, shape: String, size: Vector2, color: Color, acce
 			sp.scale = Vector2(sc, sc)
 		sp.modulate = Color.WHITE.lerp(color, 0.08)
 		n.add_child(sp)
-		if shape in ["crystal", "lava", "obelisk", "mushroom", "pumpkin"]:
-			var g_col := accent if shape in ["crystal", "obelisk"] else (Color(1.0, 0.45, 0.14) if shape in ["lava", "pumpkin"] else Color(0.5, 0.9, 0.55))
-			_glow(n, maxf(size.x, size.y) * 1.85, Color(g_col.r, g_col.g, g_col.b, 0.16))
+		if shape in ["crystal", "lava", "obelisk", "mushroom"]:
+			var g_col := accent if shape in ["crystal", "obelisk"] else (Color(1.0, 0.45, 0.14) if shape == "lava" else Color(0.5, 0.9, 0.55))
+			_glow(n, maxf(size.x, size.y) * 1.35, Color(g_col.r, g_col.g, g_col.b, 0.10))
 		return n
 	var w := size.x
 	var h := size.y
@@ -166,7 +166,19 @@ static func _shadow(parent: Node2D, size: Vector2, color: Color) -> Sprite2D:
 	s.z_index = -1
 	return s
 
-static func _glow(parent: Node2D, size: float, color: Color) -> Sprite2D:
-	var s := Gfx.square(parent, Vector2(size, size), color)
-	s.z_index = -2
-	return s
+static func _glow(parent: Node2D, size: float, color: Color) -> Node2D:
+	var holder := Node2D.new()
+	holder.z_index = -2
+	parent.add_child(holder)
+	var r := size * 0.5
+	for ring in [[1.0, 0.45], [0.65, 0.7]]:
+		var p := Polygon2D.new()
+		var pts := PackedVector2Array()
+		var rad := r * float(ring[0])
+		for i in 16:
+			var ang := TAU * float(i) / 16.0
+			pts.append(Vector2(cos(ang) * rad, sin(ang) * rad))
+		p.polygon = pts
+		p.color = Color(color.r, color.g, color.b, color.a * float(ring[1]))
+		holder.add_child(p)
+	return holder

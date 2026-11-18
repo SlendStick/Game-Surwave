@@ -107,6 +107,8 @@ func _next_slide() -> void:
 	scene_data = {
 		"map_id": mid,
 		"map_name": String(m.get("name", mid)),
+		"bg_color": Gfx.hex(String(m.get("palette", {}).get("bg", "#14161e"))).darkened(0.15),
+		"accent_color": Gfx.hex(String(m.get("palette", {}).get("accent", "#9c834c"))),
 		"hero_name": String(ch.get("name", hero_cls)),
 		"hero_cls": hero_cls,
 		"hero_pos": hero_pos,
@@ -235,7 +237,10 @@ func _draw() -> void:
 	elif slide_t > SLIDE_DUR - FADE_DUR:
 		fade = (SLIDE_DUR - slide_t) / FADE_DUR
 	fade = clampf(fade, 0.0, 1.0)
-	var tile_mod := Color(1.28, 1.28, 1.34, 0.98 * fade)
+	var bg_col: Color = scene_data.get("bg_color", Color(0.07, 0.075, 0.10, 1.0))
+	bg_col.a = 1.0
+	draw_rect(Rect2(0, 0, w, h), bg_col)
+	var tile_mod := Color(1.0, 1.0, 1.0, 0.96 * fade)
 	var mod := Color(1.0, 1.0, 1.0, 0.96 * fade)
 
 	var pan := Vector2(sin(slide_t * 0.45) * 14.0, cos(slide_t * 0.35) * 8.0)
@@ -244,8 +249,9 @@ func _draw() -> void:
 		for tx in range(-64, int(w) + 64, 64):
 			for ty in range(-64, int(h) + 64, 64):
 				draw_texture_rect(tile_tex, Rect2(Vector2(float(tx), float(ty)) + pan, Vector2(64, 64)), false, tile_mod)
-	else:
-		draw_rect(Rect2(0, 0, w, h), Color(0.09, 0.09, 0.12, fade))
+	var h_glow_p: Vector2 = Vector2(scene_data.get("hero_pos", Vector2(200, 180))) + pan
+	var acc_c: Color = scene_data.get("accent_color", Color(0.6, 0.5, 0.3))
+	draw_circle(h_glow_p, 84.0, Color(acc_c.r, acc_c.g, acc_c.b, 0.06 * fade))
 
 	for ob in scene_data.get("obs", []):
 		var otex := Assets.icon(String(ob["shape"]))
@@ -350,9 +356,8 @@ func _draw() -> void:
 		var pcol := Color(1.0, 0.85, 0.30, (1.0 - pk) * fade) if bool(pop["crit"]) else Color(0.95, 0.90, 0.82, (1.0 - pk) * fade)
 		draw_string(font, Vector2(pop["pos"]) + pan, String(pop["txt"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10 if bool(pop["crit"]) else 8, pcol)
 
-	# Лёгкая подложка только под блоками интерфейса для читаемости текста
-	draw_rect(Rect2(0, 0, w, h), Color(0.015, 0.018, 0.025, 0.16))
-	draw_rect(Rect2(28, 44, 286, 82), Color(0.02, 0.022, 0.03, 0.34))
-	draw_rect(Rect2(342, 46, 272, 246), Color(0.02, 0.025, 0.035, 0.32))
+	# Лёгкая подложка только под правой рамой меню для читаемости текста
+	draw_rect(Rect2(0, 0, w, h), Color(0.015, 0.018, 0.025, 0.12))
+	draw_rect(Rect2(342, 20, 272, 246), Color(0.02, 0.025, 0.035, 0.30))
 	var tag := "%s · %s" % [String(scene_data.get("map_name", "")), String(scene_data.get("hero_name", ""))]
-	draw_string(font, Vector2(32, 294), tag, HORIZONTAL_ALIGNMENT_LEFT, 260, 8, Color(0.92, 0.85, 0.68, 0.88 * fade))
+	draw_string(font, Vector2(20, 344), tag, HORIZONTAL_ALIGNMENT_LEFT, 300, 8, Color(0.92, 0.85, 0.68, 0.88 * fade))

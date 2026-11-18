@@ -26,6 +26,11 @@ var skill_tex: TextureRect
 var skill_ring: Control
 var combo_lbl: Label
 var weather_lbl: Label
+var dark_overlay: Control
+var dark_badge: Panel
+var dark_icon: Control
+var dark_lbl: Label
+var cheat_banner: Panel
 var boss_box: Control
 var boss_fill: ColorRect
 var boss_name: Label
@@ -35,6 +40,9 @@ var choice_title: Label
 var choice_hint: Label
 var choice_box: HBoxContainer
 var pause_layer: Control
+var pause_confirm_layer: Control
+var pause_confirm_lbl: Label
+var pause_confirm_action := ""
 var pause_perk_list: VBoxContainer
 var pause_perks_count: Label
 var pause_stats: VBoxContainer
@@ -62,6 +70,13 @@ func _build() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+
+	# --- экранный слой Тьмы и виньетки (под всем HUD)
+	dark_overlay = Control.new()
+	dark_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dark_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dark_overlay.draw.connect(_draw_darkness_fx)
+	root.add_child(dark_overlay)
 
 	# --- шкала опыта во всю ширину, поверх неё по центру уровень
 	xp_back = ColorRect.new()
@@ -144,7 +159,25 @@ func _build() -> void:
 	weather_lbl.size = Vector2(220, 11)
 	weather_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	weather_lbl.visible = false
-	combo_lbl = UI.label(root, "", 12, Color("#cbc6ba"), Vector2(564, 40))
+
+	# --- индикатор уровня Тьмы (справа под таймером)
+	dark_badge = Panel.new()
+	dark_badge.position = Vector2(582, 36)
+	dark_badge.size = Vector2(52, 14)
+	dark_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dark_badge.visible = false
+	root.add_child(dark_badge)
+	dark_icon = Control.new()
+	dark_icon.position = Vector2(3, 2)
+	dark_icon.size = Vector2(10, 10)
+	dark_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dark_icon.draw.connect(_draw_dark_icon)
+	dark_badge.add_child(dark_icon)
+	dark_lbl = UI.label(dark_badge, "", 8, UI.TEXT, Vector2(14, 1))
+	dark_lbl.size = Vector2(35, 12)
+	dark_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+
+	combo_lbl = UI.label(root, "", 12, Color("#cbc6ba"), Vector2(564, 52))
 	combo_lbl.size = Vector2(70, 16)
 	combo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	combo_lbl.visible = false
@@ -172,7 +205,18 @@ func _build() -> void:
 	boss_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	boss_box.add_child(boss_fill)
 
-	# --- низ: только FPS и мелкие служебные надписи
+	# --- низ: плашка предупреждения о читах + FPS
+	cheat_banner = Panel.new()
+	cheat_banner.position = Vector2(100, 338)
+	cheat_banner.size = Vector2(440, 17)
+	cheat_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cheat_banner.add_theme_stylebox_override("panel", UI.style(Color(0.22, 0.04, 0.04, 0.92), UI.DANGER, 1, 0))
+	cheat_banner.visible = GameManager.cheat_used
+	root.add_child(cheat_banner)
+	var cheat_lbl := UI.crisp_label(cheat_banner, "⚠ ИСПОЛЬЗОВАНЫ ЧИТЫ — ПРОГРЕСС НЕ БУДЕТ СОХРАНЁН", 8, Color("#ffd4c8"), Vector2(4, 2))
+	cheat_lbl.size = Vector2(432, 13)
+	cheat_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
 	fps_lbl = UI.label(root, "", 7, UI.DIM, Vector2(586, 350))
 	fps_lbl.size = Vector2(48, 10)
 	fps_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -196,10 +240,15 @@ func _build() -> void:
 	EventBus.chest_opened.connect(_on_chest)
 	EventBus.boss_damaged.connect(update_boss_bar)
 	EventBus.upgrade_picked.connect(_on_upgrade_picked)
+	GameManager.cheat_state_changed.connect(_on_cheat_state_changed)
+	_sync_darkness_badge()
 
 func setup(g: Node) -> void:
 	game = g
 	_setup_cheat_console()
+	_sync_darkness_badge()
+	if dark_overlay != null:
+		dark_overlay.queue_redraw()
 
 # ------------------------------------------------------------------ ОВЕРЛЕИ
 func _dim(parent: Control) -> ColorRect:
@@ -271,27 +320,53 @@ func _build_pause_layer() -> void:
 	scroll.add_child(pause_perk_list)
 
 	# --- правая колонка: сводка забега + кнопки
-	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 184), UI.GOLD_DEEP)
+	var right := UI.panel_striped(pause_layer, Rect2(368, 50, 258, 174), UI.GOLD_DEEP)
 	UI.crisp_label(right, "СВОДКА ЗАБЕГА", 9, UI.GOLD_BRIGHT, Vector2(10, 8))
 	pause_stats = VBoxContainer.new()
 	pause_stats.position = Vector2(10, 24)
-	pause_stats.size = Vector2(238, 154)
+	pause_stats.size = Vector2(238, 146)
 	pause_stats.add_theme_constant_override("separation", 1)
 	right.add_child(pause_stats)
 
-	var buttons := UI.vbox(pause_layer, 4)
-	buttons.position = Vector2(368, 238)
-	buttons.size = Vector2(258, 76)
-	var resume := UI.primary_button(buttons, Loc.t("resume"), 10, Vector2(258, 24))
+	var buttons := UI.vbox(pause_layer, 3)
+	buttons.position = Vector2(368, 228)
+	buttons.size = Vector2(258, 90)
+	var resume := UI.primary_button(buttons, Loc.t("resume"), 10, Vector2(258, 21))
 	resume.pressed.connect(toggle_pause)
-	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 22))
-	to_menu.pressed.connect(_pause_to_menu)
-	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 22))
-	quit.pressed.connect(func() -> void: get_tree().quit())
+	var restart := UI.button(buttons, Loc.t("restart"), 9, Vector2(258, 20))
+	restart.pressed.connect(func() -> void: _open_pause_confirm("restart", "Начать забег заново? Весь текущий прогресс раунда будет сброшен."))
+	var to_menu := UI.button(buttons, Loc.t("main_menu"), 9, Vector2(258, 20))
+	to_menu.pressed.connect(func() -> void: _open_pause_confirm("menu", "Выйти в главное меню? Текущий забег не будет сохранён."))
+	var quit := UI.button(buttons, Loc.t("quit"), 9, Vector2(258, 20))
+	quit.pressed.connect(func() -> void: _open_pause_confirm("quit", "Выйти из игры?"))
 
-	var foot := UI.crisp_label(pause_layer, "Пробел — автоприцел · R — перезарядка · ПКМ/Q — способность · 1–5 — выбор карты", 7, UI.MUTED, Vector2(0, 316))
+	var foot := UI.crisp_label(pause_layer, "Пробел — автоприцел · R — перезарядка · ПКМ/Q — способность · 1–5 — выбор карты", 7, UI.MUTED, Vector2(0, 322))
 	foot.size = Vector2(640, 12)
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# --- модальное подтверждение для "Заново" / "Главное меню" / "Выйти"
+	pause_confirm_layer = Control.new()
+	pause_confirm_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_confirm_layer.visible = false
+	pause_layer.add_child(pause_confirm_layer)
+	_dim(pause_confirm_layer)
+	var cpanel := UI.panel_striped(pause_confirm_layer, Rect2(170, 118, 300, 124), UI.GOLD)
+	var ctitle := UI.title(cpanel, "ПОДТВЕРЖДЕНИЕ", 13, Vector2(12, 10), UI.GOLD_BRIGHT)
+	ctitle.size = Vector2(276, 18)
+	ctitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_confirm_lbl = UI.crisp_label(cpanel, "", 9, UI.TEXT, Vector2(16, 36))
+	pause_confirm_lbl.size = Vector2(268, 44)
+	pause_confirm_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pause_confirm_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_confirm_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var crow := UI.hbox(cpanel, 10)
+	crow.position = Vector2(40, 88)
+	crow.size = Vector2(220, 24)
+	crow.alignment = BoxContainer.ALIGNMENT_CENTER
+	var yes_btn := UI.primary_button(crow, "ДА", 9, Vector2(100, 24))
+	yes_btn.pressed.connect(_confirm_pause_action)
+	var no_btn := UI.button(crow, "ОТМЕНА", 9, Vector2(100, 24))
+	no_btn.pressed.connect(func() -> void: pause_confirm_layer.visible = false)
 
 func _build_end_layer() -> void:
 	end_layer = Control.new()
@@ -681,15 +756,15 @@ func _refresh(delta: float) -> void:
 		hearts.visible = corner
 	if ammo_icon != null:
 		ammo_icon.visible = corner
-	hp_lbl.visible = corner
 	ammo_lbl.visible = corner
 	if int(_last_hp) != p.hp or int(_last_max_hp) != p.max_hp:
 		_last_hp = p.hp
 		_last_max_hp = p.max_hp
 		_sync_hearts(p)
-	hp_lbl.text = "%d/%d" % [maxi(p.hp, 0), p.max_hp]
-	if p.shield_charges > 0:
-		hp_lbl.text += " ★"
+	hp_lbl.text = "★" if p.shield_charges > 0 else ""
+	hp_lbl.visible = corner and p.shield_charges > 0
+	if cheat_banner != null:
+		cheat_banner.visible = GameManager.cheat_used
 	# патроны: при перезарядке счётчик и иконка становятся белыми
 	ammo_lbl.text = "%d/%d" % [p.mag, int(p.S.mag)]
 	ammo_lbl.add_theme_color_override("font_color", Color("#ffffff") if p.reloading else UI.GOLD)
@@ -766,12 +841,36 @@ func _sync_hearts(pl: Player) -> void:
 func toggle_pause() -> void:
 	if end_layer.visible:
 		return
+	if pause_confirm_layer != null and pause_confirm_layer.visible:
+		pause_confirm_layer.visible = false
+		return
 	var now := not pause_layer.visible
 	pause_layer.visible = now
 	get_tree().paused = now
 	if now:
 		_refresh_pause_menu()
 		AudioManager.play_sfx("ui", 0.9)
+
+func _open_pause_confirm(action_id: String, msg: String) -> void:
+	pause_confirm_action = action_id
+	if pause_confirm_lbl != null:
+		pause_confirm_lbl.text = msg
+	if pause_confirm_layer != null:
+		pause_confirm_layer.visible = true
+	AudioManager.play_sfx("ui", 0.95)
+
+func _confirm_pause_action() -> void:
+	if pause_confirm_layer != null:
+		pause_confirm_layer.visible = false
+	match pause_confirm_action:
+		"restart":
+			get_tree().paused = false
+			pause_layer.visible = false
+			GameManager.start_run(GameManager.run_config.duplicate())
+		"menu":
+			_pause_to_menu()
+		"quit":
+			get_tree().quit()
 
 ## Заполняет меню паузы: хронология перков с иконками и сводка по забегу.
 func _refresh_pause_menu() -> void:
@@ -1000,6 +1099,10 @@ func show_end(results: Dictionary, win: bool, secret_win: bool) -> void:
 					break
 
 	# Кнопки действий
+	if bool(results.get("cheats_used", false)):
+		var cw := UI.crisp_label(panel, "⚠ ЧИТЫ ИСПОЛЬЗОВАНЫ — ПРОГРЕСС НЕ СОХРАНЁН", 8, UI.DANGER, Vector2(20, 224))
+		cw.size = Vector2(panel.size.x - 40, 14)
+		cw.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var buttons := UI.hbox(panel, 8)
 	buttons.position = Vector2(20, 240)
 	buttons.size = Vector2(panel.size.x - 40, 44)
@@ -1183,3 +1286,67 @@ func _apply_outlines(node: Node) -> void:
 			continue
 		else:
 			_apply_outlines(child)
+
+func _on_cheat_state_changed(used: bool) -> void:
+	if cheat_banner != null:
+		cheat_banner.visible = used
+
+func _darkness_tier_color(lvl: int) -> Color:
+	if lvl >= 13:
+		return UI.GOLD_BRIGHT
+	if lvl >= 10:
+		return Color("#e0525a")
+	if lvl >= 7:
+		return Color("#b8353b")
+	if lvl >= 4:
+		return Color("#9d64f0")
+	return Color("#919aa5")
+
+func _sync_darkness_badge() -> void:
+	if dark_badge == null:
+		return
+	var lvl := int(GameManager.run_config.get("darkness", 1))
+	if lvl <= 0:
+		dark_badge.visible = false
+		return
+	dark_badge.visible = true
+	var tier_col := _darkness_tier_color(lvl)
+	var bg := Color(0.04, 0.03, 0.025, 0.88) if lvl >= 13 else (Color(0.27, 0.06, 0.08, 0.88) if lvl >= 10 else Color(0.05, 0.05, 0.07, 0.78))
+	var border := UI.GOLD if lvl >= 13 else tier_col.darkened(0.15)
+	dark_badge.add_theme_stylebox_override("panel", UI.style(bg, border, 1, 0))
+	dark_lbl.text = "Т×%d" % lvl
+	dark_lbl.add_theme_color_override("font_color", tier_col)
+	if dark_icon != null:
+		dark_icon.queue_redraw()
+
+func _draw_dark_icon() -> void:
+	if dark_icon == null:
+		return
+	var lvl := int(GameManager.run_config.get("darkness", 1))
+	var c := _darkness_tier_color(lvl)
+	dark_icon.draw_circle(Vector2(5, 5), 4.0, c)
+	dark_icon.draw_circle(Vector2(6.8, 4.3), 3.0, Color(0.05, 0.05, 0.07, 1.0))
+
+func _draw_darkness_fx() -> void:
+	if dark_overlay == null:
+		return
+	var lvl := int(GameManager.run_config.get("darkness", 1))
+	if lvl <= 0:
+		return
+	var w := dark_overlay.size.x
+	var h := dark_overlay.size.y
+	if w < 2.0:
+		w = 640.0
+		h = 360.0
+	var base_alpha := minf(float(lvl) * 0.012, 0.18)
+	dark_overlay.draw_rect(Rect2(0, 0, w, h), Color(0.02, 0.01, 0.03, base_alpha))
+	var vig_strength := minf(float(lvl) * 0.028, 0.36)
+	for i in 8:
+		var f := float(i) / 8.0
+		var band := 5.0
+		var a := vig_strength * (1.0 - f) * 0.32
+		var vc := Color(0.01, 0.005, 0.02, a)
+		dark_overlay.draw_rect(Rect2(0, float(i) * band, w, band), vc)
+		dark_overlay.draw_rect(Rect2(0, h - float(i + 1) * band, w, band), vc)
+		dark_overlay.draw_rect(Rect2(float(i) * band, 0, band, h), vc)
+		dark_overlay.draw_rect(Rect2(w - float(i + 1) * band, 0, band, h), vc)

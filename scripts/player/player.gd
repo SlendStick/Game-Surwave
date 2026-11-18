@@ -168,7 +168,11 @@ func recalc() -> void:
 	S.bounce = maxi(0, int(weapon.get("bounce", 0)) + int(add.get("bounce", 0)))
 	S.proj_speed = w_speed * (1.0 + float(add.get("proj_speed", 0.0)))
 	S.weapon_burn = w_burn
-	S.spread = w_spread + float(add.get("spread", 0.0))
+	S.spread = maxf(0.0, w_spread + float(add.get("spread", 0.0)))
+	if upg.flag_on("shield") and not has_meta("shield_perk_init"):
+		set_meta("shield_perk_init", true)
+		shield_charges = maxi(1, shield_charges)
+		shield_recharge_left = 0.0
 	S.move_speed = float(base.get("move_speed", 140.0)) * (1.0 + float(add.get("move_speed", 0.0))) * (1.0 + float(add.get("move_speed_mult", 0.0)))
 	S.pickup = float(base.get("pickup_range", 64.0)) * (1.0 + float(add.get("pickup", 0.0)))
 	S.vision = float(base.get("vision_radius", 190.0)) * (1.0 + float(add.get("vision", 0.0)))
@@ -583,17 +587,15 @@ func _tick_periodic(delta: float) -> void:
 			timers["wind"] = period
 			stacks["wind"] = mini(int(stacks.get("wind", 0)) + 1, max_st)
 			game.spawn_perk_fx("wind", global_position, 36.0, 0.26)
-	# Тень ветра
+	# Тень ветра: каждые 10 с без урона +10% темпа стрельбы и +1 пробитие (до 4 стаков)
 	if upg.flag_on("wind_shadow"):
 		timers["wind_shadow"] = float(timers.get("wind_shadow", 10.0)) - delta
 		if float(timers["wind_shadow"]) <= 0.0:
 			timers["wind_shadow"] = 10.0
-			stacks["wind_shadow"] = int(stacks.get("wind_shadow", 0)) + 1
-			set_timer("buff_fire_rate", 1.0)
-			stacks["buff_fire_rate"] = 0.10
-			game.spawn_perk_fx("wind", global_position, 40.0, 0.28)
-			if int(upg.add.get("pierce",0))<10:
-				upg.apply_mods({"pierce":1}); recalc()
+			var cur_ws := int(stacks.get("wind_shadow", 0))
+			if cur_ws < 4:
+				stacks["wind_shadow"] = cur_ws + 1
+				game.spawn_perk_fx("wind", global_position, 40.0, 0.28)
 	# Пронзительный взгляд
 	var gaze := upg.flag_num("gaze_dps", 0.0) * maxf(1.0, upg.flag_num("gaze_mult", 1.0))
 	if gaze > 0.0:
@@ -708,6 +710,12 @@ func fire_rate_multiplier() -> float:
 		m += upg.flag_num("highhp_fire_rate")
 	if has_timer("buff_fire_rate"):
 		m += float(stacks.get("buff_fire_rate", 0.0))
+	if has_timer("xp_rush"):
+		m += upg.flag_num("xp_rush")
+	if has_timer("resonance"):
+		m += upg.flag_num("resonance")
+	if int(stacks.get("wind_shadow", 0)) > 0:
+		m += 0.10 * float(stacks["wind_shadow"])
 	m += float(stacks.get("burning_fr", 0.0))
 	if upg.flag_num("aura_fire_rate") > 0.0 and has_timer("aura"):
 		m += upg.flag_num("aura_fire_rate")
@@ -830,8 +838,7 @@ func _finish_reload() -> void:
 		game.explode_orbs(current_damage() * 2.0)
 		game.spawn_perk_fx("curse", global_position, 56.0, 0.30)
 	if upg.flag_num("resonance") > 0.0:
-		set_timer("buff_fire_rate", 2.0)
-		stacks["buff_fire_rate"] = float(stacks.get("buff_fire_rate", 0.0)) + upg.flag_num("resonance")
+		set_timer("resonance", 2.0)
 
 func _shoot() -> void:
 	shots_fired += 1
@@ -860,6 +867,7 @@ func _shoot() -> void:
 		is_crit = true
 		dash_buff_double = false
 	var pierce_bonus := int(upg.flag_num("rhythm_pierce")) if game.elapsed < 60.0 else 0
+	pierce_bonus += int(stacks.get("wind_shadow", 0))
 	if upg.flag_on("unbending") and hp*2<=max_hp: pierce_bonus+=2
 	var opts := {
 		"speed": float(S.proj_speed), "pierce": int(S.pierce) + pierce_bonus, "bounce": int(S.bounce),
@@ -1021,9 +1029,11 @@ func _try_special_shot() -> void:
 	if passive == "arcane_fire":
 		var p: Dictionary = char_data["passive"]["params"]
 		if s % int(p.get("every", 4)) == 0:
-			_fire_special("fireball", float(p.get("damage", 5.0)) * dmg_multiplier(), {"burn": {"dps": float(p.get("burn_dps", 3.0)) * float(S.burn_mult), "dur": float(p.get("burn_dur", 3.0))}})
+			var af_dmg := float(p.get("damage", 5.0)) * dmg_multiplier()
+			_fire_special("fireball", af_dmg, {"behavior": "fireball", "explode": af_dmg, "explode_radius": 48.0, "burn": {"dps": float(p.get("burn_dps", 3.0)) * float(S.burn_mult), "dur": float(p.get("burn_dur", 3.0))}})
 	if upg.flag_num("fireball_every") > 0.0 and s % int(upg.flag_num("fireball_every")) == 0:
-		_fire_special("fireball", upg.flag_num("fireball_damage", 5.0) * dmg_multiplier(), {"burn": {"dps": upg.flag_num("fireball_burn", 3.0) * float(S.burn_mult), "dur": 3.0}})
+		var fb_dmg := upg.flag_num("fireball_damage", 5.0) * dmg_multiplier()
+		_fire_special("fireball", fb_dmg, {"behavior": "fireball", "explode": fb_dmg, "explode_radius": 48.0, "burn": {"dps": upg.flag_num("fireball_burn", 3.0) * float(S.burn_mult), "dur": 3.0}})
 	if upg.flag_num("ice_every") > 0.0 and s % int(upg.flag_num("ice_every")) == 0:
 		_fire_special("ice", upg.flag_num("ice_damage", 6.0) * dmg_multiplier(), {"freeze": 1.2 * float(S.freeze_dur)})
 	if passive == "frost_moth":
@@ -1039,6 +1049,8 @@ func _try_special_shot() -> void:
 		if took and upg.flag_num("charged_refill") > 0.0 and randf() < upg.flag_num("charged_refill"):
 			mag = mini(int(S.mag), mag + 3)
 			EventBus.ammo_changed.emit(mag, int(S.mag), false)
+			if upg.flag_num("resonance") > 0.0:
+				set_timer("resonance", 2.0)
 			game.spawn_perk_fx("lightning", global_position, 36.0, 0.24)
 	if upg.flag_num("spark_chance") > 0.0 and randf() < upg.flag_num("spark_chance"):
 		game.lightning_strike_nearest(global_position, 260.0, 18.0 * dmg_multiplier())
@@ -1307,6 +1319,8 @@ func take_damage(amount: int, from_pos: Vector2, ignore_iframes: bool = false) -
 		set_timer("rage_point", 30.0)
 	if String(char_data.get("passive", {}).get("id", "")) == "wind_in_back" or upg.flag_num("wind_runner") > 0.0:
 		stacks["wind"] = 0
+	if upg.flag_on("wind_shadow"):
+		stacks["wind_shadow"] = 0
 	if upg.flag_on("unbending") or upg.flag_on("lowhp_fury"):
 		pass
 	if hp <= 0:
@@ -1407,16 +1421,24 @@ func on_kill(enemy: Node2D) -> void:
 	if upg.flag_on("beast_kill_stack"):
 		var need := maxi(1, int(upg.flag_num("beast_kill_stack")))
 		if kills % need == 0:
-			upg.apply_mods({"summon_dmg": 0.10})
-			game.spawn_perk_fx("blood", global_position, 40.0, 0.28)
-	if upg.flag_on("justice") and kills_retribution > 0:
-		if kills_retribution >= 500:
-			kills_retribution -= 500
-			upg.apply_mods({"hp": 1})
+			upg.apply_mods({"summon_dmg": 0.01})
 			recalc()
-	if upg.flag_on("heaven_bless") and kills_retribution >= 500:
-		kills_retribution -= 500
-		heal(1)
+			game.spawn_perk_fx("blood", global_position, 40.0, 0.28)
+	if String(enemy.last_source) in ["retribution", "smite"]:
+		if upg.flag_on("justice") and int(stacks.get("justice_hp", 0)) < 3:
+			var jk := int(stacks.get("justice_kills", 0)) + 1
+			if jk >= 500:
+				jk -= 500
+				stacks["justice_hp"] = int(stacks.get("justice_hp", 0)) + 1
+				upg.apply_mods({"hp": 1})
+				recalc()
+			stacks["justice_kills"] = jk
+		if upg.flag_on("heaven_bless"):
+			var bk := int(stacks.get("bless_kills", 0)) + 1
+			if bk >= 500:
+				bk -= 500
+				heal(1)
+			stacks["bless_kills"] = bk
 	if upg.flag_num("bodiless_kills") > 0.0 and kills % int(upg.flag_num("bodiless_kills")) == 0:
 		bodiless_left = upg.flag_num("bodiless_dur", 2.0)
 	# сброс духов для некроманта

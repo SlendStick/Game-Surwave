@@ -12,6 +12,7 @@ var active := false
 var homing := false
 var burn := false
 var poison := false
+var source_role := ""
 var sprite: Sprite2D = null
 
 func setup(g: Node) -> void:
@@ -28,6 +29,7 @@ func spawn_at(pos: Vector2, dir: Vector2, dmg: int, opts: Dictionary = {}) -> vo
 	homing = bool(opts.get("homing", false))
 	burn = bool(opts.get("burn", false))
 	poison = bool(opts.get("poison", false))
+	source_role = String(opts.get("role", ""))
 	life = float(opts.get("life", 4.0))
 	active = true
 	visible = true
@@ -67,5 +69,5 @@ func tick(delta: float) -> void:
 				game.player.add_status("burn", 3.0, {"dps": 3.0})
 			if poison:
 				game.player.add_status("poison", 4.0, {"dps": 2.0})
-			game.damage_player(damage, global_position)
+			game.damage_player(damage, global_position, false, source_role)
 			deactivate()

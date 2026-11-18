@@ -423,17 +423,27 @@ func _build_maps() -> void:
 		else:
 			UI.label(details, "Откроется после прохождения предыдущей карты.", 8, UI.PURPLE, Vector2(8, 194))
 	# Тьма
+	var dlvl := int(sel["darkness"])
 	var dk := UI.hbox(content, 6)
-	dk.position = Vector2(0, 204)
-	UI.label(dk, "%s: %d" % [Loc.t("darkness_level"), int(sel["darkness"])], 10, UI.TEXT)
+	dk.position = Vector2(0, 200)
+	UI.label(dk, "%s: %d" % [Loc.t("darkness_level"), dlvl], 10, UI.TEXT)
 	var minus := UI.button(dk, "-", 9, Vector2(24, 18))
 	minus.pressed.connect(func() -> void:
-		sel["darkness"] = maxi(1, int(sel["darkness"]) - 1)
+		sel["darkness"] = maxi(0, int(sel["darkness"]) - 1)
 		_rebuild())
 	var plus := UI.button(dk, "+", 9, Vector2(24, 18))
 	plus.pressed.connect(func() -> void:
 		sel["darkness"] = mini(int(GameManager.meta.get("max_darkness", 1)), int(sel["darkness"]) + 1)
 		_rebuild())
+	var d_desc := "Без модификаторов Тьмы"
+	for entry in DB.darkness:
+		if int(entry.get("level", 0)) == dlvl:
+			d_desc = String(entry.get("desc", d_desc))
+			break
+	var d_bonus := "Бонусы: +%d%% душ/XP · +%d%% золота · +%d%% дропа" % [dlvl * 10, dlvl * 15, dlvl * 5]
+	var dlbl := UI.crisp_label(dk, "%s  |  %s" % [d_desc, d_bonus], 8, UI.GOLD if dlvl > 0 else UI.DIM)
+	dlbl.custom_minimum_size = Vector2(380, 18)
+	dlbl.clip_text = true
 
 # ------------------------------------------------------------------ АМУЛЕТЫ
 func _build_amulets() -> void:

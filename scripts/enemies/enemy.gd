@@ -569,6 +569,7 @@ func _attack_projectile_custom(delta: float, proj: Dictionary) -> void:
 			"speed": float(proj.get("speed", 170.0)),
 			"color": color.lerp(Color.WHITE, 0.35),
 			"poison_stacks": int(proj.get("poison_stacks", 0)),
+			"role": role,
 		})
 
 func _try_contact_damage() -> void:
@@ -593,7 +594,7 @@ func _try_contact_damage() -> void:
 			EventBus.ammo_changed.emit(game.player.mag, int(game.player.S.mag), false)
 		if flags.has("push_on_hit"):
 			p.global_position += (p.global_position - global_position).normalized() * float(flags["push_on_hit"]) * 0.2
-		game.damage_player(dmg, global_position)
+		game.damage_player(dmg, global_position, false, role)
 		# отталкивание врага от игрока
 		knock = (global_position - p.global_position).normalized() * 120.0
 
@@ -666,7 +667,7 @@ func _boss_tick(delta: float) -> void:
 		var p: Dictionary = patterns[i]
 		pattern_timers[i] = float(pattern_timers[i]) - delta * (1.0 + boss_rate_mult)
 		if float(pattern_timers[i]) <= 0.0:
-			pattern_timers[i] = float(p.get("interval", 2.0))
+			pattern_timers[i] = maxf(0.5 * (1.0 + boss_rate_mult), float(p.get("interval", 2.0)))
 			_exec_pattern(p)
 	_update_boss_bar()
 
@@ -838,9 +839,11 @@ func take_damage(amount: float, opts: Dictionary = {}) -> void:
 	if flags.has("reflect") and String(opts.get("source", "")) != "dot":
 		game.damage_player(int(float(amount) * float(flags["reflect"])), global_position)
 	var armor := float(data.get("armor", 0.0))
-	# «Бронебойные Пули»: половина брони игнорируется
-	if game != null and game.player != null and game.player.upg.flag_num("armor_pierce") > 0.0:
-		armor *= 0.5
+	# «Бронебойные Пули»: игнорирует долю брони (50% в базовом перке)
+	if game != null and game.player != null:
+		var ap := maxf(float(game.player.upg.add.get("armor_pierce", 0.0)), game.player.upg.flag_num("armor_pierce"))
+		if ap > 0.0:
+			armor *= (1.0 - clampf(ap, 0.0, 1.0))
 	if armor > 0.0:
 		amount *= (1.0 - clampf(armor, 0.0, 0.9))
 	var src := String(opts.get("source", "weapon"))

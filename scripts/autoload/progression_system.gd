@@ -63,6 +63,8 @@ func _refresh_quests() -> void:
 	SaveManager.data["quests"] = q
 
 func add_progress(kind: String, amount: int) -> void:
+	if GameManager.cheat_used:
+		return
 	_refresh_quests()
 	for task in SaveManager.data.get("season",{}).get("tasks",[]):
 		if String(task.get("type","")) == kind and not bool(task.get("claimed",false)):
@@ -76,6 +78,8 @@ func add_progress(kind: String, amount: int) -> void:
 	totals[kind] = int(totals.get(kind,0)) + amount
 
 func record_combo(value: int) -> void:
+	if GameManager.cheat_used:
+		return
 	for group in ["daily","weekly"]:
 		for q in SaveManager.data.get("quests",{}).get(group,[]):
 			if String(q.get("type","")) == "combo" and not bool(q.get("claimed",false)):

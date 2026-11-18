@@ -16,7 +16,9 @@ var fast_test := false
 var god_mode := false
 
 # --- читы (сбрасываются на каждом новом забеге)
+signal cheat_state_changed(used: bool)
 var cheat_open := false
+var cheat_used := false
 var cheat_dmg := 1.0
 var cheat_speed := 1.0
 var cheat_enemy_hp := 1.0
@@ -161,6 +163,11 @@ func start_run(config: Dictionary) -> void:
 ## Возвращает награду и обновляет прогресс. Вызывается из Game при победе/поражении.
 func end_run(results: Dictionary, victory: bool) -> Dictionary:
 	run_results = results
+	if cheat_used:
+		results["cheats_used"] = true
+		results["souls"] = 0
+		results["gold"] = 0
+		return {"souls": 0, "gold": 0}
 	var souls_gain := int(results.get("souls", 0))
 	var gold_reward := int(results.get("gold", 0))
 	meta["souls"] = int(meta["souls"]) + souls_gain
@@ -187,10 +194,17 @@ func end_run(results: Dictionary, victory: bool) -> Dictionary:
 	if victory and not bool(meta.get("beaten_maps", {}).get(map_id, false)):
 		meta["beaten_maps"][map_id] = true
 		_unlock_next_map(map_id)
-	# Тьма: победа на текущем уровне открывает следующий
+	# Тьма: победа открывает следующий уровень и достижения за 5/10/15
+	var played_dark := int(run_config.get("darkness", 1))
 	if victory:
-		meta["max_darkness"] = clampi(int(meta["max_darkness"]) + 1, 1, 15)
-	if String(run_config.get("weapon", "")) == "holy_hammer" and victory and int(run_config.get("darkness", 1)) >= 5:
+		meta["max_darkness"] = maxi(int(meta.get("max_darkness", 1)), clampi(played_dark + 1, 1, 15))
+		if played_dark >= 5:
+			add_achievement("darkness_5")
+		if played_dark >= 10:
+			add_achievement("darkness_10")
+		if played_dark >= 15:
+			add_achievement("darkness_15")
+	if String(run_config.get("weapon", "")) == "holy_hammer" and victory and played_dark >= 5:
 		_unlock_weapon("holy_hammer")
 	Progression.add_progress("kills", int(results.get("kills", 0)))
 	Progression.add_progress("runs", 1)
@@ -381,6 +395,7 @@ func amulet_bonuses() -> Array:
 ## Сброс читов перед новым забегом: время, множители, заморозка.
 func reset_cheats() -> void:
 	cheat_open = false
+	cheat_used = false
 	cheat_dmg = 1.0
 	cheat_speed = 1.0
 	cheat_enemy_hp = 1.0
@@ -388,6 +403,12 @@ func reset_cheats() -> void:
 	cheat_enemy_speed = 1.0
 	cheat_frozen = false
 	Engine.time_scale = 1.0
+	cheat_state_changed.emit(false)
+
+func mark_cheat_used() -> void:
+	if not cheat_used:
+		cheat_used = true
+		cheat_state_changed.emit(true)
 
 func set_setting(key: String, value: Variant) -> void:
 	var s: Dictionary = meta.get("settings", {})
@@ -404,13 +425,20 @@ func setting(key: String, def: Variant = null) -> Variant:
 
 func darkness_mods(level: int) -> Dictionary:
 	var mods: Dictionary = {}
+	var mult_keys := ["fodder_hp", "elite_hp", "boss_hp", "fodder_dmg", "elite_dmg", "boss_dmg", "fodder_speed", "elite_speed", "fodder_late_dmg"]
 	for entry in DB.darkness:
 		if int(entry.get("level", 0)) <= level:
 			for k in entry.get("mods", {}).keys():
-				mods[k] = float(mods.get(k, 0.0)) + float(entry["mods"][k])
+				var val := float(entry["mods"][k])
+				if mult_keys.has(String(k)):
+					mods[k] = (1.0 + float(mods.get(k, 0.0))) * (1.0 + val) - 1.0
+				else:
+					mods[k] = float(mods.get(k, 0.0)) + val
 	return mods
 
 func add_achievement(id: String) -> void:
+	if cheat_used:
+		return
 	var arr: Array = meta.get("achievements", [])
 	if not arr.has(id):
 		arr.append(id)
@@ -418,6 +446,8 @@ func add_achievement(id: String) -> void:
 		SaveManager.save_game()
 
 func add_album_enemy(id: String) -> void:
+	if cheat_used:
+		return
 	var arr: Array = meta.get("album_enemies", [])
 	if not arr.has(id):
 		arr.append(id)
@@ -425,6 +455,8 @@ func add_album_enemy(id: String) -> void:
 		SaveManager.save_game()
 
 func add_album_boss(id: String) -> void:
+	if cheat_used:
+		return
 	var arr: Array = meta.get("album_bosses", [])
 	if not arr.has(id):
 		arr.append(id)

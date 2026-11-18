@@ -71,7 +71,7 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(0, 0, w, h), tint)
 
-	# Дрейфующие клубы тумана / пурги / песчаной завесы
+	# Дрейфующие клубы мягкого тумана / пурги / песчаной завесы
 	if not fog_banks.is_empty():
 		var bank_col := Color(0.75, 0.80, 0.82, 1.0)
 		if kind == "snow":
@@ -88,9 +88,10 @@ func _draw() -> void:
 			var bh: float = float(b["h"])
 			var bx := fposmod(bp.x + (wind.x if absf(wind.x) > 0.1 else 0.6) * t * float(b["v"]), 1.3) * (w + bw) - bw
 			var by := bp.y * h + sin(t * 0.8 + float(b["ph"])) * 10.0
-			var ba: float = float(b["a"]) * (0.75 + 0.25 * sin(t + float(b["ph"])))
-			draw_rect(Rect2(bx, by, bw, bh), Color(bank_col.r, bank_col.g, bank_col.b, ba * 0.55))
-			draw_rect(Rect2(bx + bw * 0.15, by + bh * 0.2, bw * 0.7, bh * 0.6), Color(bank_col.r, bank_col.g, bank_col.b, ba * 0.55))
+			var ba: float = float(b["a"]) * (0.75 + 0.25 * sin(t + float(b["ph"]))) * 0.22
+			var rad := clampf(bh * 0.65, 12.0, 28.0)
+			draw_circle(Vector2(bx + bw * 0.35, by + bh * 0.5), rad, Color(bank_col.r, bank_col.g, bank_col.b, ba))
+			draw_circle(Vector2(bx + bw * 0.62, by + bh * 0.45), rad * 0.85, Color(bank_col.r, bank_col.g, bank_col.b, ba * 0.85))
 
 	var speed := 1.0
 	var col := Color(1, 1, 1, 0.75)
@@ -141,7 +142,7 @@ func _draw() -> void:
 		elif kind == "sand":
 			draw_line(Vector2(x * w, y * h), Vector2(x * w - s * 5.0, y * h - wind.y * s * 2.0), c, 1.0)
 		elif kind == "fog":
-			draw_rect(Rect2(x * w - s * 16.0, y * h, s * 32.0, s * 6.0), c)
+			draw_circle(Vector2(x * w, y * h), maxf(1.2, s * 1.35), Color(c.r, c.g, c.b, c.a * 0.45))
 		elif vertical:
 			draw_rect(Rect2(x * w, y * h, maxf(1.0, s * 0.6), s * 4.5), c)
 		else:

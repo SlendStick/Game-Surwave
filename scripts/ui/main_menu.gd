@@ -43,51 +43,23 @@ func _build() -> void:
 	add_child(slideshow)
 	slideshow.queue_redraw()
 
-	# --- левая часть: логотип и подпись
-	var logo := UI.title(self, "SURWAVE", 40, Vector2(38, 54), UI.GOLD)
+	# --- левая часть: только логотип, поднятый выше
+	var logo := UI.title(self, "SURWAVE", 40, Vector2(36, 18), UI.GOLD)
 	logo.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
-	UI.label(self, "выживание · рогалик · ручная стрельба", 9, UI.DIM, Vector2(42, 100))
-	UI.divider(self, Vector2(42, 114), 250.0, UI.GOLD_DEEP)
-
-	# --- карточка героя дня: готический герб и герои в пиксель-арте
-	var crest_tex := Assets.icon("ui_crest")
-	if crest_tex != null:
-		var crest := TextureRect.new()
-		crest.texture = crest_tex
-		crest.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		crest.position = Vector2(90, 152)
-		crest.size = Vector2(76, 76)
-		crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(crest)
-		var hero_classes: PackedStringArray = ["paladin", "mage", "necromancer"]
-		for idx_h in hero_classes.size():
-			var h_cls: String = hero_classes[idx_h]
-			var htex := Assets.icon(h_cls)
-			if htex != null:
-				var hr := TextureRect.new()
-				hr.texture = htex
-				hr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				hr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				hr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				hr.position = Vector2(68 + idx_h * 42, 232)
-				hr.size = Vector2(36, 36)
-				hr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				add_child(hr)
-	UI.label(self, "версия 1.4.16", 8, UI.MUTED, Vector2(42, 283))
+	UI.divider(self, Vector2(38, 66), 220.0, UI.GOLD_DEEP)
+	UI.label(self, "версия 1.4.16", 8, UI.MUTED, Vector2(20, 318))
 
 	# --- правая часть: меню на полупрозрачной готической раме поверх живого геймплея
 	var menu_frame := Panel.new()
-	menu_frame.position = Vector2(342, 46)
+	menu_frame.position = Vector2(342, 20)
 	menu_frame.size = Vector2(272, 246)
 	menu_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	menu_frame.add_theme_stylebox_override("panel", UI.style(Color(0.045, 0.048, 0.062, 0.72), UI.GOLD_DEEP, 1, 0))
+	menu_frame.add_theme_stylebox_override("panel", UI.style(Color(0.045, 0.048, 0.062, 0.76), UI.GOLD_DEEP, 1, 0))
 	add_child(menu_frame)
 
 	var menu := Control.new()
-	menu.position = Vector2(352, 56)
-	menu.size = Vector2(252, 240)
+	menu.position = Vector2(352, 30)
+	menu.size = Vector2(252, 230)
 	menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu)
 	var play := UI.primary_button(menu, Loc.t("play"), 14, Vector2(252, 34))
@@ -113,22 +85,6 @@ func _build() -> void:
 	quit.position = Vector2(0, y + 4)
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
-	# --- нижняя панель со статистикой
-	var info := UI.panel(self, Rect2(30, 300, 580, 50), UI.PANEL, UI.BORDER)
-	var line := ColorRect.new()
-	line.color = Color(0.36, 0.37, 0.41, 0.8)
-	line.position = Vector2(0, 0)
-	line.size = Vector2(580, 1)
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info.add_child(line)
-	souls_lbl = UI.label(info, "", 9, UI.PURPLE, Vector2(12, 8))
-	gold_lbl = UI.label(info, "", 9, UI.GOLD, Vector2(12, 24))
-	var ctrl_lbl := UI.crisp_label(info, Loc.t("controls"), 8, UI.MUTED, Vector2(214, 7))
-	ctrl_lbl.size = Vector2(354, 36)
-	ctrl_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ctrl_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	ctrl_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ctrl_lbl.clip_text = true
 	_refresh_info()
 
 func _refresh_info() -> void:
