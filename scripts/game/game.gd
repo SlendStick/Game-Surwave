@@ -4015,6 +4015,25 @@ func _run_boomerang_test() -> void:
 	var home_dist := boom.global_position.distance_to(player.global_position)
 	assert(home_dist < Ally.BOOMERANG_ORBIT + 46.0, "Бумеранг не вернулся в строй: %.1f px" % home_dist)
 	assert(boom.speed < 240.0, "Бумеранг слишком быстрый: %.1f" % boom.speed)
+	# Рикошет: с прокачкой бумеранг после удара летит к другому врагу
+	player.upg.apply_flags({"boomerang_ricochet": 2})
+	var e_a := spawn_enemy("slime", player.global_position + Vector2(90.0, 0.0))
+	var e_b := spawn_enemy("slime", player.global_position + Vector2(-90.0, 0.0))
+	assert(e_a != null and e_b != null, "Не удалось создать врагов для теста рикошета")
+	boom.boom_state = "idle"
+	boom.boom_timer = 0.0
+	boom.global_position = player.global_position
+	var bounced := false
+	for i in 600:
+		e_a.hp = 9999.0
+		e_b.hp = 9999.0
+		boom.tick(0.05)
+		if boom.boom_state == "out" and boom.boom_bounce_left < 2:
+			bounced = true
+			break
+	assert(bounced, "Бумеранг не отскочил к другому врагу при прокачке")
+	e_a.deactivate()
+	e_b.deactivate()
 	for a in allies:
 		if a.perk_summon:
 			a.deactivate()
