@@ -570,6 +570,101 @@ def check_gdscript_duplicate_children(errors: list[str]) -> None:
     ok(f"Проверено {checked} GDScript-файлов на двойное добавление узлов")
 
 
+# ---------------------------------------------------------------------------
+# Правки по плейтесту (запрос #10): курсор, режимы окна, копирование адреса,
+# лавина, тонкие шкалы над героем, кара, рикошеты, облики всех врагов.
+# ---------------------------------------------------------------------------
+def check_playtest_fixes(loaded: dict[str, object], errors: list[str]) -> None:
+    balance = json.loads((ROOT / "data" / "balance.json").read_text(encoding="utf-8"))
+    player_cfg = balance.get("player", {})
+    targets = int(player_cfg.get("retribution_targets", 0))
+    if not (3 <= targets <= 4):
+        fail(f"balance.player.retribution_targets={targets} (кара должна бить 3–4 врагов)", errors)
+    radius = float(player_cfg.get("retribution_radius", 0.0))
+    if radius < 120.0:
+        fail(f"balance.player.retribution_radius={radius} слишком мал", errors)
+    ok(f"Кара: {targets} цели в радиусе {radius:.0f} px")
+
+    perks = json.loads((ROOT / "data" / "perks.json").read_text(encoding="utf-8"))
+    boomerang = [p for p in perks.get("perks", []) if str(p.get("tree", "")) == "boomerang"]
+    ricochets = sum(int(float(p.get("flags", {}).get("boomerang_ricochet", 0))) for p in boomerang)
+    if ricochets < 6:
+        fail(f"Дерево бумеранга даёт только {ricochets} рикошетов (ожидалось ≥6: +1/+2/+3)", errors)
+    ok(f"Бумеранг: рикошеты в дереве +{ricochets}")
+
+    # курсор и режимы окна
+    game_src = (ROOT / "scripts" / "game" / "game.gd").read_text(encoding="utf-8")
+    if "func _sync_cursor()" not in game_src:
+        fail("game.gd: нет _sync_cursor() — курсор в меню паузы/перков может пропасть", errors)
+    if "MOUSE_MODE_VISIBLE" not in game_src:
+        fail("game.gd: курсор никогда не становится видимым", errors)
+    gm_src = (ROOT / "scripts" / "autoload" / "game_manager.gd").read_text(encoding="utf-8")
+    for token in ("func apply_window_mode(", "MODE_EXCLUSIVE_FULLSCREEN", "func _fit_window("):
+        if token not in gm_src:
+            fail(f"game_manager.gd: нет {token} — режимы окна не переключаются", errors)
+    if "PROCESS_MODE_ALWAYS" not in gm_src:
+        fail("game_manager.gd: автозагрузка не работает на паузе (режим окна зависнет)", errors)
+
+    # копирование адреса для друзей
+    net_src = (ROOT / "scripts" / "autoload" / "net_manager.gd").read_text(encoding="utf-8")
+    if "func address_text()" not in net_src:
+        fail("net_manager.gd: нет address_text()", errors)
+    menu_src = (ROOT / "scripts" / "ui" / "main_menu.gd").read_text(encoding="utf-8")
+    if "КОПИРОВАТЬ IP И ПОРТ" not in menu_src:
+        fail("main_menu.gd: нет кнопки копирования адреса", errors)
+    if "clipboard_set" not in menu_src:
+        fail("main_menu.gd: адрес не копируется в буфер обмена", errors)
+
+    # лавина должна наносить урон
+    av_match = re.search(r'"avalanche":.*?(?=\n\t\t"[a-z_]+":)', game_src, re.S)
+    av_block = av_match.group(0) if av_match else ""
+    if not av_block:
+        fail("game.gd: нет ветки события «avalanche»", errors)
+    elif "aoe_damage" not in av_block:
+        fail("game.gd: события «avalanche» не наносит урон (нет aoe_damage)", errors)
+    if '"avalanche"' not in (ROOT / "scripts" / "autoload" / "audio_manager.gd").read_text(encoding="utf-8"):
+        fail("audio_manager.gd: нет звука «avalanche»", errors)
+
+    # тонкие шкалы над героем, а не одна широкая
+    player_src = (ROOT / "scripts" / "player" / "player.gd").read_text(encoding="utf-8")
+    if "BAR_H" not in player_src or "func _bar_fill(" not in player_src:
+        fail("player.gd: шкалы HP/патронов над героем выглядят как одна полоса", errors)
+    if "func nearest_enemies(" not in game_src:
+        fail("game.gd: нет nearest_enemies() для мультицельных эффектов", errors)
+
+    # облики всех врагов на всех картах
+    sdir = ROOT / "assets" / "sprites"
+    enemies = loaded.get("data/enemies.json")
+    maps = loaded.get("data/maps.json")
+    missing: list[str] = []
+    if isinstance(enemies, list) and isinstance(maps, list):
+        for e in enemies:
+            eid = str(e.get("id", ""))
+            if not eid or eid.startswith("mb_"):
+                continue
+            for m in maps:
+                mid = str(m.get("id", ""))
+                if not mid:
+                    continue
+                if not (sdir / f"{eid}__{mid}.png").exists():
+                    missing.append(f"{eid}__{mid}")
+    if missing:
+        fail(f"нет обликов врагов для карт: {', '.join(missing[:6])} (всего {len(missing)})", errors)
+    else:
+        ok(f"Облики врагов: {len(enemies or [])} врагов × {len(maps or [])} карт")
+
+    for spr in ("ally_boomerang.png", "icon_tree_scythe.png", "illus_scythe_t1.png",
+                "illus_scythe_t2a.png", "illus_scythe_t2b.png", "illus_scythe_t3.png"):
+        if not (sdir / spr).exists():
+            fail(f"нет обновлённого арта assets/sprites/{spr}", errors)
+
+    # защита от повторения бага «перебор nearest_enemy() как списка врагов»
+    for path in (ROOT / "scripts").rglob("*.gd"):
+        src = path.read_text(encoding="utf-8")
+        if re.search(r"for\s+\w+\s+in\s+[\w.]*nearest_enemy\(", src):
+            fail(f"{path.relative_to(ROOT)}: nearest_enemy() возвращает [враг, дистанция], "
+                 f"его нельзя перебирать циклом — используйте nearest_enemies()", errors)
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -588,6 +683,7 @@ def main() -> int:
     check_data_integrity(loaded, errors)
     check_sprites(loaded, errors)
     check_balance_and_net(errors)
+    check_playtest_fixes(loaded, errors)
     check_gdscript_typos(errors)
     check_gdscript_scopes(errors)
     check_gdscript_duplicate_children(errors)
