@@ -1177,7 +1177,10 @@ func _run_ui_test() -> void:
 	assert(bg != null and bg.size.x >= 600.0 and bg.size.y >= 340.0, "MenuGameplayBg не заполнил экран")
 	assert(not (bg.get("scene_data") as Dictionary).is_empty(), "MenuGameplayBg не создал сцену")
 	assert(bg.get("floor_rect") != null and bg.get("bg_rect") != null, "MenuGameplayBg слои фона не созданы")
-	assert(_xp_for_level(1) == 10 and _xp_for_level(41) > _xp_for_level(40), "Кривая XP некорректна")
+	var xp_cfg: Dictionary = DB.balance.get("run", {}).get("xp_curve", {})
+	var xp_base := int(round(float(xp_cfg.get("base", 10.0))))
+	assert(_xp_for_level(1) == xp_base, "Кривая XP некорректна: %d вместо %d" % [_xp_for_level(1), xp_base])
+	assert(_xp_for_level(41) > _xp_for_level(40) and _xp_for_level(41) < _xp_for_level(40) * 2, "Поздняя кривая XP некорректна")
 	mm.queue_free()
 	print("[SURWAVE] ui OK: cards=%d hotkey=2 end_rows=%d out_of_bounds=%d" % [cards.size(), end_panel.get_child_count(), problems])
 
