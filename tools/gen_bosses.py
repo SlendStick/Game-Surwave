@@ -30,6 +30,7 @@ def phase(at, mult, patterns, regen=0.0, mega=False):
 REGULAR = {
     # 1. Инфернальный Лорд — огненный демон, первый босс
     "sands": dict(
+        ai="aggressive",
         name="Инфернальный Лорд", hp=3000, color="#8b0000", color2="#ff4500",
         damage=5, speed=35, element="fire", souls=150,
         desc="Демон огня. Первый босс забега, 4 фазы.",
@@ -55,6 +56,7 @@ REGULAR = {
     ),
     # 2. Ледяная Королева
     "tundra": dict(
+        ai="tactical",
         name="Ледяная Королева", hp=4500, color="#a8d8ea", color2="#4a90d9",
         damage=5, speed=30, element="ice", souls=150,
         desc="Повелительница льда, 4 фазы. Замораживает и бьёт лучами.",
@@ -81,6 +83,7 @@ REGULAR = {
     ),
     # 3. Титан Грозы
     "peak": dict(
+        ai="cautious",
         name="Титан Грозы", hp=6000, color="#6a5acd", color2="#ffd700",
         damage=6, speed=25, element="storm", souls=150,
         desc="Грозовой гигант. Медленный, но бьёт молниями по площади, 4 фазы.",
@@ -107,6 +110,7 @@ REGULAR = {
     ),
     # 4. Кровавый Рыцарь — вампиризм
     "forest": dict(
+        ai="aggressive",
         name="Кровавый Рыцарь", hp=5000, color="#8b0000", color2="#b22222",
         damage=5, speed=45, element="blood", souls=150,
         desc="Рыцарь в кровавых доспехах. Рывки, конусы и лечение, 3 фазы.",
@@ -129,6 +133,7 @@ REGULAR = {
     ),
     # 5. Некромант
     "graveyard": dict(
+        ai="tactical",
         name="Некромант", hp=4000, color="#4b0082", color2="#9370db",
         damage=4, speed=40, element="dark", souls=150,
         desc="Повелитель мёртвых. Призывает скелетов и ставит печати, 3 фазы.",
@@ -150,6 +155,7 @@ REGULAR = {
     ),
     # 6. Дракон Хаоса
     "rift": dict(
+        ai="chaotic",
         name="Дракон Хаоса", hp=7000, color="#9400d3", color2="#7fff00",
         damage=6, speed=40, element="chaos", souls=150,
         desc="Древний дракон хаоса. Непредсказуемые атаки, 4 фазы.",
@@ -176,6 +182,7 @@ REGULAR = {
     ),
     # 7. Повелитель Теней
     "abyss": dict(
+        ai="tactical",
         name="Повелитель Теней", hp=5500, color="#2f004f", color2="#9370db",
         damage=5, speed=42, element="shadow", souls=150,
         desc="Мастер теней: телепорты, цепи и проклятия, 3 фазы.",
@@ -197,6 +204,7 @@ REGULAR = {
     ),
     # 8. Каменный Голем
     "temple": dict(
+        ai="aggressive",
         name="Каменный Голем", hp=8000, color="#808080", color2="#c0c0c0",
         damage=8, speed=22, element="earth", souls=150,
         desc="Очень прочный и медленный страж храма, 3 фазы.",
@@ -218,6 +226,7 @@ REGULAR = {
     ),
     # 9. Чумной Доктор
     "hive": dict(
+        ai="cautious",
         name="Чумной Доктор", hp=4500, color="#6b8e23", color2="#9acd32",
         damage=4, speed=38, element="plague", souls=150,
         desc="Ядовитые облака и слизни, 3 фазы.",
@@ -239,6 +248,7 @@ REGULAR = {
     ),
     # 10. Архидемон
     "bloodmoon": dict(
+        ai="aggressive",
         name="Архидемон", hp=7500, color="#8b0000", color2="#ff6347",
         damage=7, speed=40, element="infernal", souls=150,
         desc="Высший демон: комбинации огня и тьмы, 4 фазы.",
@@ -264,6 +274,7 @@ REGULAR = {
     ),
     # 11. Огненный Титан
     "chaos": dict(
+        ai="aggressive",
         name="Огненный Титан", hp=7000, color="#ff4500", color2="#ffd700",
         damage=7, speed=30, element="fire", souls=150,
         desc="Титан из лавы: столпы, метеоры и огненный след, 4 фазы.",
@@ -288,6 +299,7 @@ REGULAR = {
     ),
     # 12. Ледяной Император
     "throne": dict(
+        ai="tactical",
         name="Ледяной Император", hp=6500, color="#a8d8ea", color2="#ffffff",
         damage=6, speed=28, element="ice", souls=150,
         desc="Император ледяного мира: лучи, бураны и печати, 4 фазы.",
@@ -313,6 +325,7 @@ REGULAR = {
     ),
     # 13. Пустота (бездонное эхо) — карта с секретом, включается в бесконечном режиме
     "void": dict(
+        ai="chaotic",
         name="Пустота", hp=8500, color="#1a0033", color2="#9400d3",
         damage=7, speed=45, element="void", souls=150,
         desc="Воплощение небытия: притяжение, разрывы и апокалипсис, 5 фаз.",
@@ -343,6 +356,7 @@ REGULAR = {
     ),
     # 14. Шемхаз — финальный босс (5 фаз + мегафаза)
     "shemhaz": dict(
+        ai="aggressive",
         name="Шемхаз", hp=10000, color="#8b0000", color2="#ff4500",
         damage=5, speed=40, element="final", souls=500,
         desc="Корень-демон. Финальный босс забега: 5 фаз и мегаформа.",
@@ -379,7 +393,7 @@ REGULAR = {
 SATANAIL = dict(
     id="boss_satanail", name="САТАНАИЛ", hp=10000, color="#8b0000", color2="#ffd700",
     radius=64, sprite=[192, 192], collide=[128, 128], damage=7, speed=50,
-    xp=2000, souls=500, element="void", reward="5 реликвий + Крыло САТАНАИЛА",
+    xp=2000, souls=500, element="void", ai="chaotic", reward="5 реликвий + Крыло САТАНАИЛА",
     desc="Секретный босс Пустоты, 5 фаз + мегафаза САТАН.",
     phases=[
         phase(1.00, 1.0, [
@@ -431,6 +445,7 @@ def build() -> dict:
             "xp": 500 if key != "shemhaz" else 2000,
             "souls": spec["souls"],
             "element": spec["element"],
+            "ai": spec.get("ai", "aggressive"),
             "reward": "реликвия",
             "desc": spec["desc"],
             "phases": spec["phases"],

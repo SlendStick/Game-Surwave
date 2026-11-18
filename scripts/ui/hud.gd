@@ -1100,7 +1100,8 @@ func _refresh(delta: float) -> void:
 		if has_live_boss:
 			var b: Enemy = game.boss_enemy
 			var bname := String(b.boss_def.get("name", "БОСС"))
-			var ph_lbl := " · САТАН" if game.megaphase else (" · ФАЗА %d" % (b.phase + 1))
+			var total_phases := maxi(1, (b.boss_def.get("phases", []) as Array).size())
+			var ph_lbl := " · САТАН" if game.megaphase else (" · ФАЗА %d/%d" % [b.phase + 1, total_phases])
 			boss_name.text = ("ФИНАЛЬНЫЙ БОСС: " if b.is_final else "БОСС: ") + bname + ph_lbl
 			var bfrac := clampf(b.hp / maxf(1.0, b.max_hp), 0.0, 1.0)
 			boss_fill.size = Vector2(300.0 * bfrac, 7)

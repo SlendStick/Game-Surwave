@@ -740,10 +740,28 @@ func _boss_tick(delta: float) -> void:
 			knock_timer = 0.42
 			game.spawn_fx(global_position, color.lightened(0.3), radius * 1.4, 0.25)
 	else:
+		# Тип ИИ из данных босса (спека §6): дистанция орбиты и темп движения
+		var ai_kind := String(boss_def.get("ai", "aggressive"))
+		var orbit := 115.0
+		var ai_speed := 1.0
+		var sway := 0.4
+		match ai_kind:
+			"aggressive":
+				orbit = 84.0
+				ai_speed = 1.12
+			"cautious":
+				orbit = 168.0
+				ai_speed = 0.9
+			"chaotic":
+				orbit = 118.0
+				ai_speed = 1.05
+				sway = 0.95
+			"tactical", _:
+				orbit = 132.0
 		var move_v := dir
-		if to_player.length() < 115.0:
-			move_v = (dir * 0.45 + dir.orthogonal() * sin(walk_phase * 0.4) * 0.75).normalized()
-		global_position += move_v * spd * delta
+		if to_player.length() < orbit:
+			move_v = (dir * 0.45 + dir.orthogonal() * sin(walk_phase * sway) * 0.75).normalized()
+		global_position += move_v * spd * ai_speed * delta
 	game.push_out_of_obstacles(self, radius)
 	var patterns := _phase_patterns()
 	while pattern_timers.size() < patterns.size():

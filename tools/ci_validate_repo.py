@@ -905,6 +905,9 @@ def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
         attacks = sum(len(ph.get("patterns", [])) for ph in phases)
         if attacks < 4:
             fail(f"bosses.json[{key}]: атак {attacks}, по спеке 4–8", errors)
+        ai_kind = str(bd.get("ai", ""))
+        if ai_kind not in ("aggressive", "cautious", "chaotic", "tactical"):
+            fail(f"bosses.json[{key}]: тип ИИ «{ai_kind}» не из спеки §6", errors)
         if float(bd.get("souls", 0)) <= 0:
             fail(f"bosses.json[{key}]: нет награды душами", errors)
         ats = [float(ph.get("at", 1.0)) for ph in phases]
@@ -997,6 +1000,13 @@ def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
             fail(f"enemy.gd: spawn_enemy зовёт несуществующего врага «{m.group(1)}»", errors)
     if 'spawn_from_role("fodder")' not in enemy_src:
         fail("enemy.gd: атака «mirror» должна призывать врагов из ростера карты", errors)
+    if 'boss_def.get("ai"' not in enemy_src:
+        fail("enemy.gd: тип ИИ босса не читается из данных", errors)
+    for ai_kind in ("aggressive", "cautious", "chaotic", "tactical"):
+        if f'"{ai_kind}"' not in enemy_src:
+            fail(f"enemy.gd: нет поведения ИИ «{ai_kind}»", errors)
+    if "ФАЗА %d/%d" not in (ROOT / "scripts/ui/hud.gd").read_text(encoding="utf-8"):
+        fail("hud.gd: в полосе босса не видно номер и общее число фаз", errors)
     for name in ("func _pdot(", "func _pdm("):
         if name not in enemy_src:
             fail(f"enemy.gd: нет {name}", errors)
