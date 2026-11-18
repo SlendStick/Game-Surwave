@@ -332,7 +332,12 @@ def run_case(godot_bin: str, tc: TestCase, log_dir: Path) -> tuple[bool, str]:
             print(f"    {f}")
         # по одной аннотации на каждую ошибку, чтобы причина читалась из API
         for f in fatals[:12]:
-            gh_error(f"{tc.name}: ошибка", f)
+            context = f
+            for i, ln in enumerate(lines):
+                if ln.rstrip() == f:
+                    context = " ".join(x.rstrip() for x in lines[i:i + 3])
+                    break
+            gh_error(f"{tc.name}: ошибка", context)
     print("  Tail of output:")
     for ln in lines[-60:]:
         print(f"    {ln.rstrip()}")
