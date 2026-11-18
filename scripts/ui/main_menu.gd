@@ -36,7 +36,12 @@ func _build() -> void:
 	UI.full_rect(self)
 	UI.backdrop(self, Color("#0b0c10"))
 	var slideshow: Control = load("res://scripts/ui/menu_gameplay_bg.gd").new()
+	slideshow.name = "MenuGameplayBg"
+	slideshow.position = Vector2.ZERO
+	slideshow.size = Vector2(640.0, 360.0)
+	UI.full_rect(slideshow)
 	add_child(slideshow)
+	slideshow.queue_redraw()
 
 	# --- левая часть: логотип и подпись
 	var logo := UI.title(self, "SURWAVE", 40, Vector2(38, 54), UI.GOLD)
@@ -118,7 +123,12 @@ func _build() -> void:
 	info.add_child(line)
 	souls_lbl = UI.label(info, "", 9, UI.PURPLE, Vector2(12, 8))
 	gold_lbl = UI.label(info, "", 9, UI.GOLD, Vector2(12, 24))
-	UI.label(info, Loc.t("controls"), 8, UI.MUTED, Vector2(238, 8))
+	var ctrl_lbl := UI.crisp_label(info, Loc.t("controls"), 8, UI.MUTED, Vector2(214, 7))
+	ctrl_lbl.size = Vector2(354, 36)
+	ctrl_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ctrl_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ctrl_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ctrl_lbl.clip_text = true
 	_refresh_info()
 
 func _refresh_info() -> void:

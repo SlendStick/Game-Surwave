@@ -81,19 +81,72 @@ func _load_all() -> void:
 	tree_by_id = _index(perk_trees)
 	_build_specializations()
 
-## Специализации: по одной на каждый перк для каждого персонажа (x3 эффект следующего перка).
+## Специализации: уникальные мастерства по каждому перку для каждого персонажа.
+## Каждая специализация даёт мгновенный эффект своего перка + усиление ×3 следующему перку.
 func _build_specializations() -> void:
 	specializations.clear()
 	spec_by_id.clear()
+	const TREE_FALLBACK_MODS := {
+		"fast_arrows": {"proj_speed": 0.25, "crit": 0.08},
+		"damage": {"dmg": 0.30},
+		"fire_rate": {"fire_rate": 0.22},
+		"multishot": {"proj": 1, "fire_rate": 0.10},
+		"reload": {"reload": 0.20, "mag": 1},
+		"proj_speed": {"proj_speed": 0.25, "crit": 0.08},
+		"pierce": {"pierce": 1, "proj_speed": 0.15},
+		"thunder": {"shock_dmg": 10.0, "fire_rate": 0.12},
+		"flame": {"burn_mult": 0.35, "dmg": 0.14},
+		"frost": {"freeze_chance": 0.22, "dmg": 0.12},
+		"dark": {"curse_chance": 0.25, "dmg": 0.14},
+		"light": {"dmg": 0.20, "hp": 1},
+		"health": {"hp": 1, "dmg": 0.14},
+		"shield": {"hp": 1, "reload": 0.15},
+		"dodge": {"dodge": 0.10, "move_speed": 0.10},
+		"soul": {"summon_dmg": 0.25, "pickup": 0.25},
+		"pickup": {"pickup": 0.35, "vision": 0.18},
+		"move": {"move_speed": 0.18, "dodge": 0.06},
+		"vision": {"vision": 0.35, "crit": 0.08},
+		"wind": {"move_speed": 0.14, "fire_rate": 0.14},
+		"summon": {"summon_dmg": 0.35, "summon_speed": 0.20},
+		"dragon": {"summon_dmg": 0.35, "burn_mult": 0.25},
+		"scythe": {"summon_dmg": 0.35, "summon_speed": 0.25},
+		"spear": {"summon_dmg": 0.35, "pierce": 1},
+		"beast": {"summon_dmg": 0.30, "summon_speed": 0.20},
+	}
 	for ch in characters:
 		var cid := String(ch.get("id", ""))
 		for perk in perks:
 			var pid := String(perk.get("id", ""))
+			var tree_id := String(perk.get("tree", ""))
+			var tree_name := String(tree_by_id.get(tree_id, {}).get("name", tree_id))
+			var tier := int(perk.get("tier", 1))
+			var p_mods: Dictionary = perk.get("mods", {})
+			var p_flags: Dictionary = perk.get("flags", {})
+			var spec_mods: Dictionary = {}
+			if not p_mods.is_empty():
+				for k in p_mods.keys():
+					var v := float(p_mods[k])
+					if k in ["hp", "mag", "proj", "pierce", "bounce", "summon_count"]:
+						var iv := int(round(v * 1.5))
+						if iv == 0 and v > 0.0:
+							iv = 1
+						spec_mods[k] = iv
+					else:
+						spec_mods[k] = snappedf(v * 1.5, 0.01)
+			else:
+				spec_mods = (TREE_FALLBACK_MODS.get(tree_id, {"dmg": 0.20}) as Dictionary).duplicate(true)
+			var p_desc := String(perk.get("desc", "")).strip_edges()
 			var spec := {
 				"id": "spec_%s_%s" % [cid, pid],
 				"name": "Спец: " + String(perk.get("name", "")),
 				"char": cid,
-				"desc": "Следующий выбранный перк получает x3 эффект.",
+				"perk_id": pid,
+				"tree": tree_id,
+				"tree_name": tree_name,
+				"tier": tier,
+				"mods": spec_mods,
+				"flags": p_flags.duplicate(true),
+				"desc": "%s · %s (×1.5) и ×3 следующему перку." % [tree_name, p_desc.trim_suffix(".")],
 				"kind": "specialization",
 			}
 			specializations.append(spec)

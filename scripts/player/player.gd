@@ -70,6 +70,7 @@ var soul_convert_left := 0.0
 
 var sprite: Sprite2D = null
 var marker: Sprite2D = null
+var shield_ring: Sprite2D = null
 var muzzle: Sprite2D = null
 var hp_bar: Sprite2D = null
 var ammo_pips: Array = []
@@ -234,6 +235,22 @@ func _refresh_visual() -> void:
 	marker.scale = Vector2(msize.x / float(Assets.BASE_PX), msize.y / float(Assets.BASE_PX))
 	marker.rotation += 0.012
 	marker.modulate = Color(1, 1, 1, 0.45 + 0.12 * sin(float(Time.get_ticks_msec()) * 0.006))
+	if shield_ring == null:
+		shield_ring = Sprite2D.new()
+		shield_ring.texture = Assets.tex("ring", Color(0.75, 0.92, 1.0, 0.85))
+		shield_ring.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		shield_ring.z_index = 2
+		add_child(shield_ring)
+	shield_ring.visible = shield_charges > 0 or (upg != null and upg.flag_num("gaze_dps") > 0.0)
+	if shield_ring.visible:
+		var pulse := 1.0 + 0.08 * sin(float(Time.get_ticks_msec()) * 0.009)
+		var ring_sz := (size + Vector2(14, 14)) * pulse
+		shield_ring.scale = Vector2(ring_sz.x / float(Assets.BASE_PX), ring_sz.y / float(Assets.BASE_PX))
+		shield_ring.rotation -= 0.028
+		if shield_charges > 0:
+			shield_ring.modulate = Color(0.72, 0.92, 1.0, 0.65)
+		else:
+			shield_ring.modulate = Color(1.0, 0.88, 0.45, 0.36)
 	# экипированное оружие в руках, нацеленное в сторону прицела
 	var wid := String(weapon.get("id", "revolver"))
 	var wtex := Assets.icon("weapon_" + wid)
@@ -553,6 +570,7 @@ func _tick_periodic(delta: float) -> void:
 		if float(timers["regen"]) <= 0.0:
 			timers["regen"] = regen_period
 			heal(1)
+			game.spawn_perk_fx("holy", global_position, 44.0, 0.34)
 	# Ветер в спине
 	if passive_id == "wind_in_back" or upg.flag_num("wind_runner") > 0.0:
 		var period := 10.0
@@ -564,6 +582,7 @@ func _tick_periodic(delta: float) -> void:
 		if float(timers["wind"]) <= 0.0:
 			timers["wind"] = period
 			stacks["wind"] = mini(int(stacks.get("wind", 0)) + 1, max_st)
+			game.spawn_perk_fx("wind", global_position, 36.0, 0.26)
 	# Тень ветра
 	if upg.flag_on("wind_shadow"):
 		timers["wind_shadow"] = float(timers.get("wind_shadow", 10.0)) - delta
@@ -572,6 +591,7 @@ func _tick_periodic(delta: float) -> void:
 			stacks["wind_shadow"] = int(stacks.get("wind_shadow", 0)) + 1
 			set_timer("buff_fire_rate", 1.0)
 			stacks["buff_fire_rate"] = 0.10
+			game.spawn_perk_fx("wind", global_position, 40.0, 0.28)
 			if int(upg.add.get("pierce",0))<10:
 				upg.apply_mods({"pierce":1}); recalc()
 	# Пронзительный взгляд
@@ -580,12 +600,17 @@ func _tick_periodic(delta: float) -> void:
 		timers["gaze"] = float(timers.get("gaze", 0.25)) - delta
 		if float(timers["gaze"]) <= 0.0:
 			timers["gaze"] = 0.25
-			game.aoe_damage(global_position, float(S.vision), gaze * 0.25, {"source": "gaze"})
+			var g_hits := game.aoe_damage(global_position, float(S.vision), gaze * 0.25, {"source": "gaze"})
+			if g_hits > 0:
+				var near_g := game.nearest_enemy(global_position, float(S.vision))
+				if not near_g.is_empty():
+					game.spawn_perk_fx("smite", near_g[0].global_position, 28.0, 0.22)
 	# Конвертация душ: каждая собранная душа по очереди становится +1 max HP.
 	if soul_convert_pending>0 and upg.flag_num("soul_convert")>0.0:
 		soul_convert_left-=delta
 		if soul_convert_left<=0.0:
 			soul_convert_pending-=1; upg.apply_mods({"hp":1}); recalc(); hp=mini(max_hp,hp+1); soul_convert_left=upg.flag_num("soul_convert")
+			game.spawn_perk_fx("curse", global_position, 44.0, 0.32)
 			game.notify("Душа преобразована: +1 максимум HP")
 	# Пылающий разум
 	if upg.flag_num("burning_fire_rate") > 0.0:
@@ -609,6 +634,7 @@ func _cast_gust(damage: float) -> void:
 	for i in echoes:
 		game.aoe_damage(target.global_position,gust_radius,dmg,{"source":"gust","knockback":35.0})
 		game.spawn_fx(target.global_position, Color(0.6, 1.0, 0.7), gust_radius, 0.15)
+		game.spawn_perk_fx("wind", target.global_position, gust_radius * 1.4, 0.28)
 
 # ------------------------------------------------------------------ ДВИЖЕНИЕ
 func _move(delta: float) -> void:
@@ -631,6 +657,7 @@ func _move(delta: float) -> void:
 		timers["run_burn_tick"]=float(timers.get("run_burn_tick",0.0))-delta
 		if float(timers["run_burn_tick"])<=0.0:
 			timers["run_burn_tick"]=0.25
+			game.spawn_perk_fx("fireball", global_position, 26.0, 0.22)
 			for enemy in game.enemies_in_radius(global_position,14.0): game.apply_status(enemy,"burn",3.0,{"dps":upg.flag_num("run_burn")})
 
 # ------------------------------------------------------------------ БОНУСЫ УРОНА
@@ -757,12 +784,16 @@ func _finish_reload() -> void:
 	reloading = false
 	mag = int(S.mag)
 	shots_fired = 0
+	var had_blood_mag := float(stacks.get("blood_mag", 0.0)) > 0.0
 	stacks["blood_mag"] = 0
 	_on_reload_reset()
 	EventBus.ammo_changed.emit(mag, int(S.mag), false)
 	AudioManager.play_sfx("reload", 1.15)
+	if had_blood_mag:
+		game.spawn_perk_fx("blood", global_position, 38.0, 0.28)
 	if upg.flag_num("fresh_mag") > 0.0:
 		set_timer("fresh_mag", 1.0)
+		game.spawn_perk_fx("holy", global_position, 36.0, 0.26)
 	var passive_id := String(char_data.get("passive", {}).get("id", ""))
 	if passive_id == "enchanted_blade":
 		var p: Dictionary = char_data["passive"]["params"]
@@ -1008,6 +1039,7 @@ func _try_special_shot() -> void:
 		if took and upg.flag_num("charged_refill") > 0.0 and randf() < upg.flag_num("charged_refill"):
 			mag = mini(int(S.mag), mag + 3)
 			EventBus.ammo_changed.emit(mag, int(S.mag), false)
+			game.spawn_perk_fx("lightning", global_position, 36.0, 0.24)
 	if upg.flag_num("spark_chance") > 0.0 and randf() < upg.flag_num("spark_chance"):
 		game.lightning_strike_nearest(global_position, 260.0, 18.0 * dmg_multiplier())
 	if float(S.freeze_chance) > 0.0:
@@ -1058,6 +1090,7 @@ func _on_last_shot() -> void:
 			var a := TAU * float(i) / float(fan_n)
 			game.spawn_bullet(global_position + Vector2.RIGHT.rotated(a) * 10.0, Vector2.RIGHT.rotated(a), fan_dmg,
 				{"speed": 180.0, "radius": 3.0, "color": Gfx.hex(String(weapon.get("color", "#ffffff"))), "life": 1.5, "source": "fan"})
+		game.spawn_perk_fx("wind", global_position, 52.0, 0.28)
 		AudioManager.play_sfx("shot_heavy", 1.1)
 	if upg.flag_num("last_shot_tornado") > 0.0:
 		for i in int(upg.flag_num("last_shot_tornado")):
@@ -1242,6 +1275,7 @@ func take_damage(amount: int, from_pos: Vector2, ignore_iframes: bool = false) -
 	# уворот
 	if not ignore_iframes and S.dodge > 0.0 and randf() < float(S.dodge):
 		game.spawn_fx(global_position, Color(0.7, 0.9, 1.0), 22.0, 0.2)
+		game.spawn_perk_fx("wind", global_position, 42.0, 0.28)
 		return
 	# щит
 	if shield_charges > 0:
@@ -1250,6 +1284,7 @@ func take_damage(amount: int, from_pos: Vector2, ignore_iframes: bool = false) -
 		if shield_recharge_left <= 0.0:
 			shield_recharge_left = 120.0
 		game.spawn_fx(global_position, Color(0.8, 0.9, 1.0), 34.0, 0.25)
+		game.spawn_perk_fx("holy", global_position, 56.0, 0.34)
 		AudioManager.play_sfx("hit", 0.7)
 		return
 	var dmg := amount
@@ -1360,15 +1395,20 @@ func on_kill(enemy: Node2D) -> void:
 		for i in n:
 			var dir := Vector2.RIGHT.rotated(TAU * float(i) / float(maxi(1, n)))
 			game.spawn_bullet(enemy.global_position, dir, current_damage() * upg.flag_num("split_dmg", 0.1), {"speed": float(S.proj_speed), "radius": 2.5, "color": Color(1, 0.9, 0.5), "source": "split"})
+		game.spawn_perk_fx("wind", enemy.global_position, 32.0, 0.22)
 	if upg.flag_num("kill_heal") > 0.0 and randf() < upg.flag_num("kill_heal"):
 		heal(1)
+		game.spawn_perk_fx("holy", global_position, 36.0, 0.26)
 	if upg.flag_on("sword_and_shield") and String(enemy.last_source) in ["retribution","smite"]:
 		shield_recharge_left=maxf(0.0,shield_recharge_left-1.0)
-		if shield_recharge_left<=0.0: shield_charges=1
+		if shield_recharge_left<=0.0:
+			shield_charges=1
+			game.spawn_perk_fx("smite", global_position, 48.0, 0.30)
 	if upg.flag_on("beast_kill_stack"):
 		var need := maxi(1, int(upg.flag_num("beast_kill_stack")))
 		if kills % need == 0:
 			upg.apply_mods({"summon_dmg": 0.10})
+			game.spawn_perk_fx("blood", global_position, 40.0, 0.28)
 	if upg.flag_on("justice") and kills_retribution > 0:
 		if kills_retribution >= 500:
 			kills_retribution -= 500
@@ -1385,6 +1425,7 @@ func on_kill(enemy: Node2D) -> void:
 
 func on_soul_collected() -> void:
 	souls_collected+=1
+	game.spawn_perk_fx("curse", global_position, 36.0, 0.28)
 	if upg.flag_num("soul_convert")>0.0:
 		soul_convert_pending+=1
 		if soul_convert_left<=0.0: soul_convert_left=upg.flag_num("soul_convert")

@@ -1134,6 +1134,31 @@ func _run_ui_test() -> void:
 		if r.position.x < -1.0 or r.position.y < -1.0 or r.end.x > 641.0 or r.end.y > 361.0:
 			print("[SURWAVE] ui_out %s %s" % [String(it["name"]), str(r)])
 			problems += 1
+	# 5) специализации сундуков отличаются ветками, иллюстрациями и описаниями
+	var specs := upg.spec_choices("aldar", 3)
+	assert(specs.size() == 3, "Специализаций меньше 3")
+	var spec_trees: Dictionary = {}
+	var spec_descs: Dictionary = {}
+	var spec_illus: Dictionary = {}
+	for sc in specs:
+		var sd: Dictionary = sc.get("data", {})
+		spec_trees[String(sd.get("tree", ""))] = true
+		spec_descs[String(sd.get("desc", ""))] = true
+		var il: Texture2D = hud._card_illustration(sc)
+		if il != null:
+			spec_illus[il.resource_path] = true
+	assert(spec_trees.size() == 3, "Специализации совпали по веткам")
+	assert(spec_descs.size() == 3, "Специализации совпали по описаниям")
+	assert(spec_illus.size() == 3, "Специализации совпали по иллюстрациям")
+	# 6) главное меню: живой геймплейный фон имеет полный размер и активную сцену
+	var mm_scene := load("res://scenes/main/main_menu.tscn") as PackedScene
+	var mm := mm_scene.instantiate() as Control
+	get_tree().root.add_child(mm)
+	await get_tree().process_frame
+	var bg := mm.get_node_or_null("MenuGameplayBg") as Control
+	assert(bg != null and bg.size.x >= 600.0 and bg.size.y >= 340.0, "MenuGameplayBg не заполнил экран")
+	assert(not (bg.get("scene_data") as Dictionary).is_empty(), "MenuGameplayBg не создал сцену")
+	mm.queue_free()
 	print("[SURWAVE] ui OK: cards=%d hotkey=2 end_rows=%d out_of_bounds=%d" % [cards.size(), end_panel.get_child_count(), problems])
 
 ## Проверка меню паузы: Esc ставит игру на паузу, слева хронология перков,
@@ -2161,6 +2186,7 @@ func damage_enemy(enemy: Node2D, amount: float, opts: Dictionary = {}) -> void:
 	if player != null and player.upg.flag_num("exec_threshold") > 0.0 and not enemy.boss:
 		if enemy.hp / maxf(1.0, enemy.max_hp) < player.upg.flag_num("exec_threshold"):
 			dmg = enemy.hp + 1.0
+			spawn_perk_fx("blood", enemy.global_position, 42.0, 0.28)
 	dmg = maxf(1.0, dmg)
 	if enemy.boss and qte_target == null and GameManager.setting("qte",true) and not GameManager.autoplay and enemy.hp/maxf(1.0,enemy.max_hp) > 0.05 and (enemy.hp-dmg)/maxf(1.0,enemy.max_hp) <= 0.05:
 		dmg = maxf(1.0, enemy.hp - enemy.max_hp*0.05)
@@ -2591,9 +2617,13 @@ func collect_pickup(pickup: Pickup) -> void:
 			if player.upg.flag_num("recharge_ammo") > 0.0 and randf() < player.upg.flag_num("recharge_ammo"):
 				player.mag = mini(int(player.S.mag), player.mag + 1)
 				EventBus.ammo_changed.emit(player.mag, int(player.S.mag), player.reloading)
+				if randf() < 0.35:
+					spawn_perk_fx("smite", player.global_position, 28.0, 0.22)
 			if player.upg.flag_num("xp_rush") > 0.0:
 				player.set_timer("buff_fire_rate", 1.0)
 				player.stacks["buff_fire_rate"] = player.upg.flag_num("xp_rush")
+				if randf() < 0.25:
+					spawn_perk_fx("holy", player.global_position, 32.0, 0.22)
 		"gold":
 			gold += int(round(pickup.value * (1.0 + float(combo)*0.01 + player.upg.flag_num("meta_gold"))))
 			AudioManager.play_sfx("gold")
@@ -2744,6 +2774,22 @@ func _open_next_choice() -> void:
 	if pending_level_ups > 0:
 		_open_level_up()
 
+func _card_vfx_kind(card: Dictionary) -> String:
+	var data: Dictionary = card.get("data", {})
+	var tree_id := String(data.get("tree", ""))
+	if tree_id == "":
+		tree_id = String(card.get("kind", ""))
+	match tree_id:
+		"thunder": return "lightning"
+		"flame", "dragon", "damage": return "fireball"
+		"frost", "pickup": return "frost"
+		"dark", "soul", "scythe", "beast": return "curse"
+		"light", "shield", "health", "spear", "seal": return "holy"
+		"wind", "dodge", "move", "fast_arrows", "multishot", "proj_speed": return "wind"
+		"reload", "fire_rate", "pierce", "char_upgrade": return "blood"
+		"vision", "summon", "synergy", "evolution": return "smite"
+		_: return "holy"
+
 func _on_choice_made(card: Dictionary) -> void:
 	if choice_queue.is_empty():
 		get_tree().paused = false
@@ -2755,6 +2801,8 @@ func _on_choice_made(card: Dictionary) -> void:
 		player.full_heal()
 	player.recalc()
 	player.mag = mini(player.mag, int(player.S.mag))
+	if player != null:
+		spawn_perk_fx(_card_vfx_kind(card), player.global_position, 64.0, 0.42)
 	get_tree().paused = false
 	paused_for_choice = false
 	_open_next_choice()
@@ -2884,7 +2932,18 @@ func _destroy_obstacles_in(pos: Vector2, radius: float, limit: int = 8) -> int:
 ## Зона притяжения игрока (зыбучие пески, болотные пучины).
 func spawn_pull_zone(pos: Vector2, radius: float, force: float, dur: float, dps: float, col: Color) -> void:
 	pulls.append({"pos": pos, "radius": radius, "force": force, "left": dur, "player": true})
-	spawn_hazard_zone(pos, dps, dur, radius, col, {"slow": 0.6})
+	spawn_hazard_zone(pos, dps, dur, radius, col, {"slow": 0.6, "pattern": "vortex"})
+
+func _event_map_pos(near_share: float = 0.25) -> Vector2:
+	var pad := 56.0
+	var inner := Rect2(
+		map_rect.position + Vector2(pad, pad),
+		Vector2(maxf(64.0, map_rect.size.x - pad * 2.0), maxf(64.0, map_rect.size.y - pad * 2.0))
+	)
+	if player != null and randf() < near_share:
+		var p := player.global_position + Vector2(randf_range(-220.0, 220.0), randf_range(-170.0, 170.0))
+		return p.clamp(inner.position, inner.end)
+	return Vector2(randf_range(inner.position.x, inner.end.x), randf_range(inner.position.y, inner.end.y))
 
 func _tick_player_pulls(delta: float) -> void:
 	for pl in pulls:
@@ -2898,22 +2957,33 @@ func _tick_player_pulls(delta: float) -> void:
 func run_map_event(ev: Dictionary) -> void:
 	var kind := String(ev.get("kind", ""))
 	var p: Dictionary = ev.get("params", {})
+	var map_id := String(map_data.get("id", ""))
 	match kind:
 		"aoe_zone":
-			var count := int(p.get("count", 1))
+			var count := int(p.get("count", 1)) + 3
+			var tele := float(p.get("telegraph", 1.2))
+			var rad := float(p.get("radius", 30.0))
 			for i in count:
-				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
-				spawn_delayed_aoe(pos, float(p.get("radius", 30.0)), float(p.get("damage", 10)), float(p.get("telegraph", 1.2)), Color(1, 0.45, 0.2), float(p.get("dot", 0.0)))
+				var pos := _event_map_pos(0.30)
+				spawn_delayed_aoe(pos, rad, float(p.get("damage", 10)), tele, Color(1, 0.45, 0.2), float(p.get("dot", 0.0)))
+				spawn_event_fx("aoe_strike", pos, tele, rad)
 		"rain":
-			for i in int(p.get("count", 5)):
-				var pos := player.global_position + Vector2(randf_range(-180, 180), randf_range(-180, 180))
-				spawn_delayed_aoe(pos, float(p.get("radius", 32.0)), float(p.get("damage", 10)), float(p.get("telegraph", 1.1)), Color(1, 0.5, 0.2))
+			var r_count := int(p.get("count", 5)) + 6
+			var r_tele := float(p.get("telegraph", 1.1))
+			var r_rad := float(p.get("radius", 32.0))
+			var rain_fx := "crystal_rain" if map_id == "abyss" else "ember_rain"
+			for i in r_count:
+				var pos := _event_map_pos(0.25)
+				spawn_delayed_aoe(pos, r_rad, float(p.get("damage", 10)), r_tele, Color(1, 0.5, 0.2))
+				spawn_event_fx(rain_fx, pos, r_tele, r_rad)
 		"band":
 			_band_event(float(p.get("damage", 3)), float(p.get("width", 320.0)), bool(p.get("burn", false)))
 		"vision":
 			vision_mult = float(p.get("mult", 0.4))
 			player.add_status("slow", 0.0, {})
 			notify("Видимость ухудшилась")
+			if player != null:
+				spawn_event_fx("madness_pulse", player.global_position, 0.5, 42.0)
 			run_later(float(p.get("duration", 8.0)), func() -> void: vision_mult = 1.0)
 			if float(p.get("enemy_speed", 0.0)) > 0.0:
 				for enemy in enemies:
@@ -2922,17 +2992,22 @@ func run_map_event(ev: Dictionary) -> void:
 				notify("Враги ускорились")
 		"spawn":
 			for i in int(p.get("count", 3)):
-				spawn_enemy(String(p.get("enemy", "")), _spawn_position())
+				var sp := _spawn_position()
+				spawn_enemy(String(p.get("enemy", "")), sp)
+				spawn_event_fx("void_rift", sp, 0.4, 28.0)
 		"heal":
-			spawn_pickup("heart", player.global_position + Vector2(randf_range(-40, 40), randf_range(-40, 40)), 1.0)
+			var hpos := _event_map_pos(0.5)
+			spawn_pickup("heart", hpos, 1.0)
+			spawn_perk_fx("holy", hpos, 38.0, 0.30)
 		"slow_zones":
-			for i in int(p.get("count", 2)):
-				var pos := player.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160))
-				spawn_delayed_aoe(pos, float(p.get("radius", 48.0)), 0.0, 0.3, Color(0.8, 0.7, 0.3))
-				player.add_status("slow", float(p.get("duration", 6.0)), {"amount": float(p.get("slow", 0.6))})
+			for i in int(p.get("count", 2)) + 2:
+				var pos := _event_map_pos(0.30)
+				var srad := float(p.get("radius", 48.0))
+				spawn_hazard_zone(pos, 0.0, float(p.get("duration", 6.0)), srad, Color(0.8, 0.7, 0.3), {"slow": float(p.get("slow", 0.6)), "pattern": "swirl"})
+				spawn_perk_fx("frost", pos, srad * 0.9, 0.28)
 		"lightning":
-			for i in int(p.get("count", 1)):
-				var pos := player.global_position + Vector2(randf_range(-80, 80), randf_range(-80, 80))
+			for i in int(p.get("count", 1)) + 3:
+				var pos := _event_map_pos(0.30)
 				spawn_delayed_aoe(pos, float(p.get("radius", 48.0)), float(p.get("damage", 20)), 0.8, Color(0.8, 0.9, 1.0))
 				var pos_copy := pos
 				run_later(0.8, func() -> void:
@@ -2942,37 +3017,46 @@ func run_map_event(ev: Dictionary) -> void:
 			var dir := (map_rect.get_center() - player.global_position).normalized()
 			player.global_position += dir * float(p.get("force", 120.0)) * 0.5
 			player.take_damage(int(p.get("damage", 5)), player.global_position, true)
+			spawn_event_fx("void_rift", map_rect.get_center(), 0.5, 48.0)
 			notify("Водоворот!")
 		"buff":
 			notify("Волна силы врагов")
+			var shown := 0
 			for enemy in enemies:
 				if enemy.active:
 					enemy.speed *= 1.0 + float(p.get("speed", 0.0))
+					if shown < 10:
+						spawn_perk_fx("blood", enemy.global_position, 28.0, 0.24)
+						shown += 1
 		"cursed_ground":
-			var c_pat := "void" if String(map_data.get("id", "")) in ["void", "rift", "chaos"] else "rune"
-			for i in int(p.get("count", 2)):
-				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
+			var c_pat := "void" if map_id in ["void", "rift", "chaos"] else "rune"
+			for i in int(p.get("count", 2)) + 3:
+				var pos := _event_map_pos(0.25)
 				spawn_hazard_zone(pos, float(p.get("dot", 3.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 48.0)), Color(0.4, 0.2, 0.5), {"slow": float(p.get("slow", 0.0)), "pattern": c_pat})
+				spawn_perk_fx("curse", pos, 44.0, 0.30)
 		"obstacle_toggle":
 			notify("Обвал!")
 			_collapse_obstacles(int(p.get("count", 4)), float(p.get("duration", 15.0)))
 		"reflect_buff":
 			notify("Резонанс кристаллов")
+			for obstacle in obstacles:
+				if String(obstacle.get("kind", "")) == "reflect":
+					spawn_event_fx("crystal_flash", (obstacle["rect"] as Rect2).get_center(), 0.4, 48.0)
 			for b in bullets:
 				if b.active:
 					b.vel *= 2.0
 		"roll":
-			for i in int(p.get("count", 3)):
-				var pos := Vector2(rng.randf_range(100, map_rect.size.x - 100), player.global_position.y - 120.0)
+			for i in int(p.get("count", 3)) + 2:
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, 34.0, float(p.get("damage", 3)), 1.4, Color(0.7, 0.7, 0.7))
 				spawn_event_fx("boulder", pos, 1.4, 34.0)
 		"meteor":
-			var m_count := int(p.get("count", 8))
+			var m_count := int(p.get("count", 8)) + 4
 			var tele := float(p.get("telegraph", 2.5))
 			var m_rad := float(p.get("radius", 30.0))
 			var destroy := bool(p.get("destroy", true))
 			for i in m_count:
-				var pos := player.global_position + Vector2(randf_range(-170, 170), randf_range(-170, 170))
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, m_rad, float(p.get("damage", 2)), tele, Color(1, 0.45, 0.15))
 				spawn_event_fx("meteor", pos, tele, m_rad)
 				if destroy:
@@ -3003,35 +3087,37 @@ func run_map_event(ev: Dictionary) -> void:
 				{"vision": 0.3, "slow": 0.25, "push": Vector2(0.7, 0.7).normalized() * float(p.get("push", 40.0)), "flash": true, "wind": Vector2(0.8, 0.6), "amount": 150})
 		"tumbleweed":
 			var from_left := randf() < 0.5
-			for i in int(p.get("count", 5)):
-				var y := player.global_position.y + randf_range(-150, 150)
+			for i in int(p.get("count", 5)) + 3:
+				var y := randf_range(map_rect.position.y + 40.0, map_rect.end.y - 40.0)
 				var x := map_rect.position.x + 20.0 if from_left else map_rect.end.x - 20.0
 				var dir := Vector2.RIGHT if from_left else Vector2.LEFT
 				spawn_mover("tumbleweed", Vector2(x, y), dir * float(p.get("speed", 150.0)) + Vector2(0, randf_range(-20, 20)),
 					{"life": float(p.get("life", 9.0)), "damage": float(p.get("damage", 1)), "radius": 11.0, "color": Color(0.55, 0.4, 0.2)})
 		"wisps":
-			for i in int(p.get("count", 4)):
-				var pos := player.global_position + Vector2(randf_range(-200, 200), randf_range(-200, 200))
+			for i in int(p.get("count", 4)) + 3:
+				var pos := _event_map_pos(0.25)
 				spawn_mover("wisp", pos, Vector2.ZERO, {"life": float(p.get("duration", 9.0)), "damage": 0.0, "chase": float(p.get("speed", 26.0)), "radius": 10.0})
+				spawn_perk_fx("holy", pos, 32.0, 0.26)
 		"insect_swarm":
-			for i in int(p.get("count", 2)):
-				var pos := player.global_position + Vector2(randf_range(-140, 140), randf_range(-140, 140))
+			for i in int(p.get("count", 2)) + 2:
+				var pos := _event_map_pos(0.25)
 				spawn_mover("insects", pos, Vector2.RIGHT.rotated(randf() * TAU) * 30.0,
 					{"life": float(p.get("duration", 10.0)), "damage": 1.0, "dot": 1.0, "chase": 34.0, "radius": 22.0, "color": Color(0.2, 0.18, 0.16)})
+				spawn_perk_fx("curse", pos, 36.0, 0.28)
 		"quicksand":
-			for i in int(p.get("count", 5)):
-				var pos := player.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160))
+			for i in int(p.get("count", 5)) + 4:
+				var pos := _event_map_pos(0.20)
 				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), minf(float(p.get("duration", 5.5)), 6.0), float(p.get("radius", 44.0)),
 					Color(0.72, 0.62, 0.36), {"slow": float(p.get("slow", 0.65)), "telegraph": 0.6, "pattern": "swirl"})
 		"pull_zone":
-			for i in int(p.get("count", 4)):
-				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
+			for i in int(p.get("count", 4)) + 3:
+				var pos := _event_map_pos(0.20)
 				spawn_pull_zone(pos, float(p.get("radius", 52.0)), float(p.get("force", 40.0)), minf(float(p.get("duration", 5.0)), 5.5),
 					float(p.get("dps", 1.5)), Color(0.30, 0.24, 0.16))
 			notify("Трясина!")
 		"ice_spikes":
-			for i in int(p.get("count", 6)):
-				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
+			for i in int(p.get("count", 6)) + 5:
+				var pos := _event_map_pos(0.25)
 				var sp_tele := float(p.get("telegraph", 1.6))
 				var sp_rad := float(p.get("radius", 18.0))
 				spawn_delayed_aoe(pos, sp_rad, float(p.get("damage", 2)), sp_tele, Color(0.66, 0.85, 0.95))
@@ -3042,19 +3128,20 @@ func run_map_event(ev: Dictionary) -> void:
 			flash_screen(Color(0.9, 0.95, 1.0))
 			var width := float(p.get("width", 140.0))
 			var damage := float(p.get("damage", 3))
-			spawn_event_fx("avalanche", player.global_position, 0.8, width)
+			var av_pos := _event_map_pos(0.35)
+			spawn_event_fx("avalanche", av_pos, 0.8, width)
 			for i in 3:
-				var pos := Vector2(player.global_position.x + randf_range(-60, 60), player.global_position.y - 190.0 + float(i) * 70.0)
+				var pos := Vector2(av_pos.x + randf_range(-60, 60), av_pos.y - 190.0 + float(i) * 70.0)
 				spawn_delayed_aoe(pos, width * 0.5, damage, 0.8 + float(i) * 0.25, Color(0.92, 0.96, 1.0))
-			var m_pos := player.global_position + Vector2(0, -160)
+			var m_pos := av_pos + Vector2(0, -160)
 			_destroy_obstacles_in(m_pos, width, 6)
 		"rockfall":
 			notify("Камнепад!")
 			var r_dmg := float(p.get("damage", 2))
 			var r_tele := float(p.get("telegraph", 2.0))
 			var r_rad := float(p.get("radius", 26.0))
-			for i in int(p.get("count", 8)):
-				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
+			for i in int(p.get("count", 8)) + 5:
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, r_rad, r_dmg, r_tele, Color(0.55, 0.5, 0.45))
 				spawn_event_fx("boulder", pos, r_tele, r_rad)
 				var p_copy := pos
@@ -3064,13 +3151,12 @@ func run_map_event(ev: Dictionary) -> void:
 			notify("Извержение вулкана!")
 			shake(22.0)
 			flash_screen(Color(1.0, 0.45, 0.15))
-			var center := map_rect.get_center() if bool(p.get("at_center", false)) else player.global_position + Vector2(randf_range(-90, 90), randf_range(-90, 90))
+			var center := map_rect.get_center() if bool(p.get("at_center", false)) else _event_map_pos(0.25)
 			var er_rad := float(p.get("radius", 150.0))
 			var er_tele := float(p.get("telegraph", 3.0))
 			spawn_delayed_aoe(center, er_rad, float(p.get("damage", 3)), er_tele, Color(1, 0.4, 0.1), float(p.get("dot", 2.0)))
-			run_later(er_tele, func() -> void:
-				spawn_perk_fx("fireball", center, er_rad * 1.15, 0.50))
-			for i in int(p.get("pools", 5)):
+			spawn_event_fx("eruption", center, er_tele, er_rad)
+			for i in int(p.get("pools", 5)) + 3:
 				var pos := center + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(40, er_rad)
 				spawn_hazard_zone(pos, float(p.get("dot", 2.0)), 5.0, 26.0, Color(1, 0.35, 0.1), {"pattern": "fire"})
 		"cave_in":
@@ -3079,17 +3165,21 @@ func run_map_event(ev: Dictionary) -> void:
 			var c_dmg := float(p.get("damage", 2))
 			var c_tele := float(p.get("telegraph", 2.2))
 			var c_rad := float(p.get("radius", 32.0))
-			for i in int(p.get("count", 6)):
-				var pos := player.global_position + Vector2(randf_range(-130, 130), randf_range(-130, 130))
+			for i in int(p.get("count", 6)) + 5:
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, c_rad, c_dmg, c_tele, Color(0.45, 0.45, 0.46))
 				spawn_event_fx("stalactite", pos, c_tele, c_rad)
 			_collapse_obstacles(int(p.get("count", 6)) / 2, float(p.get("duration", 12.0)))
 		"crystal_flash":
 			flash_screen(Color(0.85, 0.95, 1.0))
 			start_weather("Вспышка кристаллов", "fog", Color(0.85, 0.95, 1.0), 0.6, {"vision": 0.2, "amount": 40})
+			var flashed := 0
 			for obstacle in obstacles:
 				if String(obstacle.get("kind", "")) == "reflect":
 					var c: Vector2 = (obstacle["rect"] as Rect2).get_center()
+					if flashed < 10:
+						spawn_event_fx("crystal_flash", c, 0.3, 44.0)
+						flashed += 1
 					if player.global_position.distance_to(c) < float(p.get("radius", 96.0)):
 						player.take_damage(int(p.get("damage", 1)), c, true)
 						break
@@ -3097,8 +3187,8 @@ func run_map_event(ev: Dictionary) -> void:
 			notify("Гейзер!")
 			var g_tele := float(p.get("telegraph", 1.4))
 			var g_rad := float(p.get("radius", 34.0))
-			for i in int(p.get("count", 5)):
-				var pos := player.global_position + Vector2(randf_range(-150, 150), randf_range(-150, 150))
+			for i in int(p.get("count", 5)) + 5:
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, g_rad, float(p.get("damage", 2)), g_tele, Color(0.6, 0.95, 0.2))
 				spawn_event_fx("geyser", pos, g_tele, g_rad)
 				var p_copy := pos
@@ -3109,10 +3199,12 @@ func run_map_event(ev: Dictionary) -> void:
 			flash_screen(Color(0.9, 0.1, 0.45))
 			player.add_status("charm", float(p.get("duration", 3.0)))
 			start_weather("Безумие", "spores", Color(0.85, 0.15, 0.5), float(p.get("duration", 3.0)), {"vision": 0.6, "amount": 60})
+			for i in 4:
+				spawn_event_fx("madness_pulse", _event_map_pos(0.5), 0.4, 48.0)
 			notify("Безумие: управление искажено!")
 		"ghost_hands":
-			for i in int(p.get("count", 6)):
-				var pos := player.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120))
+			for i in int(p.get("count", 6)) + 5:
+				var pos := _event_map_pos(0.25)
 				var gh_rad := float(p.get("radius", 22.0))
 				spawn_hazard_zone(pos, 0.0, 3.5, gh_rad, Color(0.75, 0.78, 0.8), {"telegraph": 1.0, "root": 1.2, "hits_enemies": false})
 				spawn_event_fx("ghost_hand", pos, 1.0, gh_rad, {"dur": 3.5})
@@ -3123,36 +3215,44 @@ func run_map_event(ev: Dictionary) -> void:
 				run_later(4.0 + float(i) * 5.0, func() -> void:
 					if not ended:
 						for k in 2:
-							spawn_enemy(String(p.get("enemy", "skeleton")), _spawn_position()))
+							var sp := _spawn_position()
+							spawn_enemy(String(p.get("enemy", "skeleton")), sp)
+							spawn_event_fx("void_rift", sp, 0.3, 28.0))
 		"curse":
-			for i in int(p.get("count", 3)):
-				var pos := player.global_position + Vector2(randf_range(-130, 130), randf_range(-130, 130))
+			for i in int(p.get("count", 3)) + 3:
+				var pos := _event_map_pos(0.25)
 				spawn_hazard_zone(pos, float(p.get("dps", 1.0)), minf(float(p.get("duration", 5.0)), 5.5), float(p.get("radius", 46.0)),
 					Color(0.45, 0.1, 0.15), {"slow": float(p.get("slow", 0.4)), "telegraph": 0.8, "pattern": "rune"})
+				spawn_perk_fx("curse", pos, 44.0, 0.32)
 			player.add_status("curse", float(p.get("curse", 4.0)))
 		"hell_flame":
 			var share = float(p.get("share", 0.3))
 			for obstacle in obstacles:
 				if String(obstacle["kind"]) == "pentagram" and randf() < share:
 					_ignite_pentagram(obstacle)
+					spawn_perk_fx("fireball", (obstacle["rect"] as Rect2).get_center(), 54.0, 0.36)
 		"blood_rain":
 			notify("Кровавый дождь: все пентаграммы активны!")
 			for obstacle in obstacles:
 				if String(obstacle["kind"]) == "pentagram":
 					_ignite_pentagram(obstacle, float(p.get("duration", 10.0)))
+					spawn_perk_fx("blood", (obstacle["rect"] as Rect2).get_center(), 52.0, 0.36)
 		"pentagram_random":
-			for i in int(p.get("count", 5)):
-				var pos := player.global_position + Vector2(randf_range(-140, 140), randf_range(-140, 140))
+			for i in int(p.get("count", 5)) + 4:
+				var pos := _event_map_pos(0.25)
 				spawn_delayed_aoe(pos, 32.0, float(p.get("damage", 8)), 1.5, Color(1, 0.2, 0.1), 4.0)
+				spawn_event_fx("aoe_strike", pos, 1.5, 32.0)
 				var p_copy := pos
 				run_later(1.5, func() -> void:
 					spawn_perk_fx("blood", p_copy, 48.0, 0.35))
 
 func _band_event(dmg: float, width: float, burn: bool) -> void:
 	notify("Волна!")
+	var band_center := _event_map_pos(0.45)
+	spawn_event_fx("band_wave", band_center, 0.9, width)
 	# полоса проходит через карту сверху вниз
 	for i in 3:
-		var pos := Vector2(player.global_position.x, player.global_position.y - 160.0 + float(i) * 60.0)
+		var pos := Vector2(band_center.x, band_center.y - 160.0 + float(i) * 60.0)
 		spawn_delayed_aoe(pos, width * 0.5, dmg, 0.9, Color(1, 0.4, 0.2))
 	if burn:
 		player.add_status("burn", 2.0, {"dps": 3.0})

@@ -179,7 +179,7 @@ func elite_choices(char_id: String, count: int = 4) -> Array:
 	picked.append_array(_weighted_pick(cards, count - picked.size()))
 	return picked
 
-## Специализации персонажа (x3 следующему перку).
+## Специализации персонажа (уникальный дар ветки + x3 следующему перку).
 func spec_choices(char_id: String, count: int = 3) -> Array:
 	var pool: Array = []
 	for spec in DB.specializations:
@@ -187,8 +187,27 @@ func spec_choices(char_id: String, count: int = 3) -> Array:
 			pool.append(spec)
 	pool.shuffle()
 	var cards: Array = []
-	for i in mini(count, pool.size()):
-		cards.append({"kind": "specialization", "id": String(pool[i]["id"]), "data": pool[i], "weight": 1.0})
+	var used_trees: Dictionary = {}
+	for spec in pool:
+		if cards.size() >= count:
+			break
+		var tree_id := String(spec.get("tree", ""))
+		if tree_id != "" and used_trees.has(tree_id):
+			continue
+		used_trees[tree_id] = true
+		cards.append({"kind": "specialization", "id": String(spec["id"]), "data": spec, "weight": 1.0})
+	if cards.size() < count:
+		for spec in pool:
+			if cards.size() >= count:
+				break
+			var sid := String(spec["id"])
+			var dup := false
+			for c in cards:
+				if String(c["id"]) == sid:
+					dup = true
+					break
+			if not dup:
+				cards.append({"kind": "specialization", "id": sid, "data": spec, "weight": 1.0})
 	return cards
 
 ## Древние печати (с боссов): выбор 1 из 3.
@@ -240,8 +259,10 @@ func take_card(card: Dictionary) -> String:
 			EventBus.synergy_unlocked.emit(id)
 			log.append({"kind": kind, "id": id})
 		"specialization":
+			apply_mods(data.get("mods", {}))
+			apply_flags(data.get("flags", {}))
 			specialization_pending += 1
-			log.append({"kind": kind, "id": id})
+			log.append({"kind": kind, "id": id, "perk_id": String(data.get("perk_id", ""))})
 		"seal":
 			taken_seals.append(id)
 			apply_mods(data.get("mods", {}))

@@ -884,11 +884,12 @@ func _die() -> void:
 	dead = true
 	if has_status("freeze") and float(game.player.upg.flag_num("frozen_explode")) > 0.0:
 		game.queue_aoe(global_position, 48.0, float(game.player.upg.flag_num("frozen_explode")), {"source": "frozen_explode"})
+		game.spawn_perk_fx("frost", global_position, 52.0, 0.30)
 	if has_status("burn") and float(game.player.upg.flag_num("burn_explode"))>0.0:
 		var burn: Dictionary=statuses["burn"]
 		var total_burn:=float(burn.get("dps",0.0))*float(burn.get("left",0.0))*float(burn.get("stacks",1))
 		var explosion_damage:=maxf(float(game.player.upg.flag_num("burn_explode")),total_burn)
-		game.queue_aoe(global_position,48.0,explosion_damage,{"source":"burn_explode"}); game.spawn_fx(global_position,Color("#ff6a20"),48.0,0.2)
+		game.queue_aoe(global_position,48.0,explosion_damage,{"source":"burn_explode"}); game.spawn_fx(global_position,Color("#ff6a20"),48.0,0.2); game.spawn_perk_fx("fireball", global_position, 56.0, 0.32)
 	if flags.has("explode"):
 		var ex: Dictionary = flags["explode"]
 		game.queue_aoe(global_position, float(ex.get("radius", 32.0)), float(ex.get("damage", 2)), {"source": "enemy_explode"})

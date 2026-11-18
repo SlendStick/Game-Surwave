@@ -20,9 +20,13 @@ var vfx_cd := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	UI.full_rect(self)
+	if size.x < 10.0 or size.y < 10.0:
+		size = Vector2(640.0, 360.0)
 	rng.randomize()
 	_next_slide()
+	slide_t = FADE_DUR
+	queue_redraw()
 
 func _next_slide() -> void:
 	slide_t = 0.0
@@ -98,6 +102,8 @@ func _next_slide() -> void:
 
 	var proj_kinds := ["projectile_fire", "projectile_arrow", "projectile_lightning", "projectile_spear", "projectile_dagger", "projectile_orb", "projectile_ice"]
 	var vfx_pool := ["lightning", "fireball", "smite", "frost", "curse", "holy", "wind", "blood", "meteor"]
+	var va: String = vfx_pool[rng.randi() % vfx_pool.size()]
+	var vb: String = vfx_pool[rng.randi() % vfx_pool.size()]
 	scene_data = {
 		"map_id": mid,
 		"map_name": String(m.get("name", mid)),
@@ -112,9 +118,22 @@ func _next_slide() -> void:
 		"boss_pos": boss_pos,
 		"xp": xp_list,
 		"proj": proj_kinds[rng.randi() % proj_kinds.size()],
-		"vfx_a": vfx_pool[rng.randi() % vfx_pool.size()],
-		"vfx_b": vfx_pool[rng.randi() % vfx_pool.size()],
+		"vfx_a": va,
+		"vfx_b": vb,
 	}
+	# Сразу создаём живую сцену боя с первого кадра
+	var aim0: Vector2 = (boss_pos - hero_pos).normalized()
+	for k in [-0.20, 0.0, 0.20]:
+		var bdir := aim0.rotated(float(k))
+		bullets.append({"pos": hero_pos + bdir * 34.0, "vel": bdir * 230.0, "life": 1.15})
+	vfx.append({"kind": va, "pos": boss_pos, "t": 0.08, "dur": 0.48})
+	if not mob_list.is_empty():
+		var mp0: Vector2 = mob_list[0]["pos"]
+		vfx.append({"kind": vb, "pos": mp0, "t": 0.04, "dur": 0.48})
+		popups.append({"pos": mp0 + Vector2(0, -14), "txt": "48!", "crit": true, "t": 0.05, "dur": 0.65})
+	shoot_cd = 0.14
+	eshoot_cd = 0.25
+	vfx_cd = 0.20
 
 func _process(delta: float) -> void:
 	t += delta
@@ -154,7 +173,7 @@ func _process(delta: float) -> void:
 			aim_target = Vector2(mobs[rng.randi() % mobs.size()]["pos"])
 		var dir: Vector2 = (aim_target - hpos).normalized()
 		for k in [-0.18, 0.0, 0.18]:
-			bullets.append({"pos": hpos, "vel": dir.rotated(k) * 230.0, "life": 1.35})
+			bullets.append({"pos": hpos, "vel": dir.rotated(float(k)) * 230.0, "life": 1.35})
 
 	eshoot_cd -= delta
 	if eshoot_cd <= 0.0:
@@ -206,9 +225,9 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var w := size.x
-	var h := size.y
-	if w < 10.0 or scene_data.is_empty():
+	var w := size.x if size.x >= 10.0 else 640.0
+	var h := size.y if size.y >= 10.0 else 360.0
+	if scene_data.is_empty():
 		return
 	var fade := 1.0
 	if slide_t < FADE_DUR:
@@ -216,14 +235,17 @@ func _draw() -> void:
 	elif slide_t > SLIDE_DUR - FADE_DUR:
 		fade = (SLIDE_DUR - slide_t) / FADE_DUR
 	fade = clampf(fade, 0.0, 1.0)
-	var mod := Color(0.84, 0.84, 0.90, 0.90 * fade)
+	var tile_mod := Color(1.28, 1.28, 1.34, 0.98 * fade)
+	var mod := Color(1.0, 1.0, 1.0, 0.96 * fade)
 
 	var pan := Vector2(sin(slide_t * 0.45) * 14.0, cos(slide_t * 0.35) * 8.0)
 	var tile_tex := Assets.tile(String(scene_data.get("map_id", "sands")))
 	if tile_tex != null:
 		for tx in range(-64, int(w) + 64, 64):
 			for ty in range(-64, int(h) + 64, 64):
-				draw_texture_rect(tile_tex, Rect2(Vector2(float(tx), float(ty)) + pan, Vector2(64, 64)), false, mod)
+				draw_texture_rect(tile_tex, Rect2(Vector2(float(tx), float(ty)) + pan, Vector2(64, 64)), false, tile_mod)
+	else:
+		draw_rect(Rect2(0, 0, w, h), Color(0.09, 0.09, 0.12, fade))
 
 	for ob in scene_data.get("obs", []):
 		var otex := Assets.icon(String(ob["shape"]))
@@ -328,8 +350,9 @@ func _draw() -> void:
 		var pcol := Color(1.0, 0.85, 0.30, (1.0 - pk) * fade) if bool(pop["crit"]) else Color(0.95, 0.90, 0.82, (1.0 - pk) * fade)
 		draw_string(font, Vector2(pop["pos"]) + pan, String(pop["txt"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10 if bool(pop["crit"]) else 8, pcol)
 
-	# Мягкое готическое затемнение по краям для читаемости интерфейса
-	draw_rect(Rect2(0, 0, w, h), Color(0.025, 0.03, 0.045, 0.48))
-	draw_rect(Rect2(342, 46, 272, 248), Color(0.02, 0.025, 0.035, 0.42))
+	# Лёгкая подложка только под блоками интерфейса для читаемости текста
+	draw_rect(Rect2(0, 0, w, h), Color(0.015, 0.018, 0.025, 0.16))
+	draw_rect(Rect2(28, 44, 286, 82), Color(0.02, 0.022, 0.03, 0.34))
+	draw_rect(Rect2(342, 46, 272, 246), Color(0.02, 0.025, 0.035, 0.32))
 	var tag := "%s · %s" % [String(scene_data.get("map_name", "")), String(scene_data.get("hero_name", ""))]
-	draw_string(font, Vector2(32, 290), tag, HORIZONTAL_ALIGNMENT_LEFT, 260, 8, Color(0.82, 0.76, 0.62, 0.72 * fade))
+	draw_string(font, Vector2(32, 294), tag, HORIZONTAL_ALIGNMENT_LEFT, 260, 8, Color(0.92, 0.85, 0.68, 0.88 * fade))

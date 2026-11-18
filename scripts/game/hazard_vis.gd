@@ -59,6 +59,12 @@ func _draw() -> void:
 		"void":
 			draw_circle(Vector2.ZERO, r * 0.90, Color(0.08, 0.04, 0.12, a * 0.52))
 			draw_arc(Vector2.ZERO, r * 0.64, -elapsed * 1.1, -elapsed * 1.1 + 3.4, 12, Color(0.65, 0.35, 0.92, a * 0.48), 1.5)
+		"vortex":
+			draw_circle(Vector2.ZERO, r * 0.88, Color(color.r * 0.55, color.g * 0.55, color.b * 0.65, a * 0.45))
+			for i in 3:
+				var vr := r * (0.30 + 0.25 * float(i))
+				var ang_v := -elapsed * (2.2 - 0.35 * float(i)) + float(i) * 2.1
+				draw_arc(Vector2.ZERO, vr, ang_v, ang_v + 2.4, 12, Color(color.r + 0.25, color.g + 0.22, color.b + 0.28, a * 0.68), 1.5)
 		_:
 			# Обычные события/удары: без красных рамок опасных зон — только лёгкая тень падения
 			if not armed and telegraph > 0.05:

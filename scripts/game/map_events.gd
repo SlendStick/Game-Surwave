@@ -14,13 +14,15 @@ func setup(g: Node, map_data: Dictionary) -> void:
 	modifiers = map_data.get("mods", {})
 	timers.clear()
 	for i in events.size():
-		# первое срабатывание — позже, чтобы игрок успел освоиться
-		timers.append(float(events[i].get("interval", 60.0)) * 0.7)
+		# Первое срабатывание и последующие интервалы случайно разбросаны около 1 минуты (~44–76 с)
+		var base := clampf(float(events[i].get("interval", 60.0)), 45.0, 75.0)
+		timers.append(randf_range(base * 0.38, base * 1.05))
 
 func tick(delta: float) -> void:
 	for i in events.size():
 		timers[i] = float(timers[i]) - delta
 		if float(timers[i]) <= 0.0:
 			var ev: Dictionary = events[i]
-			timers[i] = float(ev.get("interval", 60.0))
+			var base := clampf(float(ev.get("interval", 60.0)), 45.0, 75.0)
+			timers[i] = randf_range(base * 0.74, base * 1.26)
 			game.run_map_event(ev)

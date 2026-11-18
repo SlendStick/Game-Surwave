@@ -415,6 +415,7 @@ func open_choice(cards: Array, title: String, _kind: String) -> void:
 ## Иллюстрация для карточки выбора (96x48 pixel art).
 func _card_illustration(card: Dictionary) -> Texture2D:
 	var kind := String(card.get("kind", "perk"))
+	var data: Dictionary = card.get("data", {})
 	var cid := String(card.get("id", ""))
 	var tex := Assets.icon("illus_" + cid)
 	if tex != null:
@@ -422,6 +423,11 @@ func _card_illustration(card: Dictionary) -> Texture2D:
 	if kind == "evolution":
 		return Assets.icon("illus_evolution")
 	if kind == "specialization":
+		var pid := String(data.get("perk_id", ""))
+		if pid != "":
+			var ptex := Assets.icon("illus_" + pid)
+			if ptex != null:
+				return ptex
 		return Assets.icon("illus_specialization")
 	return _card_icon(card)
 
@@ -433,9 +439,42 @@ func _card_tier_badge(card: Dictionary) -> String:
 		var tier := int(data.get("tier", 1))
 		var stack := int(upg.taken.get(String(card.get("id", "")), 0)) if upg != null else 0
 		return "T%d ×%d" % [tier, stack] if stack > 0 else "T%d" % tier
-	if kind == "specialization" and upg != null and upg.specialization_pending > 0:
-		return "×%d" % int(upg.spec_mult)
+	if kind == "specialization":
+		var tname := String(data.get("tree_name", ""))
+		if tname != "":
+			return "%s · ×3" % tname
+		return "T%d · ×3" % int(data.get("tier", 1))
 	return ""
+
+func _format_spec_mods(mods: Dictionary) -> String:
+	if mods.is_empty():
+		return ""
+	const STAT_NAMES := {
+		"dmg": "урон", "fire_rate": "скорострельность", "proj_speed": "скорость пуль",
+		"reload": "перезарядка", "move_speed": "скорость бега", "pickup": "радиус сбора",
+		"vision": "обзор", "knockback": "отбрасывание", "size": "размер",
+		"summon_dmg": "урон призыва", "summon_speed": "скорость призыва", "xp": "опыт",
+		"hp": "макс. HP", "mag": "патроны в обойме", "proj": "снарядов",
+		"pierce": "пробитие", "bounce": "рикошет", "summon_count": "призывов",
+		"dodge": "уклонение", "crit": "шанс крита", "armor_pierce": "пробитие брони",
+		"shock_dmg": "урон молнии", "shock_radius": "радиус молнии",
+		"burn_mult": "урон горения", "burn_dur": "длительность горения",
+		"freeze_chance": "шанс заморозки", "curse_chance": "шанс проклятия",
+		"spread": "разброс",
+	}
+	var lines: Array = []
+	for k in mods.keys():
+		var key := String(k)
+		var v := float(mods[k])
+		var label_name := String(STAT_NAMES.get(key, key))
+		if key in ["hp", "mag", "proj", "pierce", "bounce", "summon_count", "shock_dmg", "spread"]:
+			var sign := "+" if v >= 0.0 else ""
+			lines.append("%s%d %s" % [sign, int(round(v)), label_name])
+		else:
+			var pct := int(round(v * 100.0))
+			var sign2 := "+" if pct >= 0 else ""
+			lines.append("%s%d%% %s" % [sign2, pct, label_name])
+	return "\n".join(lines)
 
 ## Читаемая визуальная ветвь улучшений в нижней половине карточки (T1 -> T2a / T2b -> T3).
 func _build_card_branch(parent: Control, card: Dictionary, width: float, accent: Color) -> void:
@@ -504,12 +543,32 @@ func _build_card_branch(parent: Control, card: Dictionary, width: float, accent:
 		return
 
 	# Для синергий, печатей, эволюций, спецов и апгрейдов
-	var hdr2 := UI.crisp_label(wrap, "ЭФФЕКТ И УСЛОВИЯ", 8, UI.GOLD_BRIGHT, Vector2(6, 5))
+	var hdr2_txt := "ЭФФЕКТ И УСЛОВИЯ"
+	if kind == "specialization":
+		hdr2_txt = "МАСТЕРСТВО: " + String(data.get("tree_name", "ВЕТВЬ")).to_upper()
+	var hdr2 := UI.crisp_label(wrap, hdr2_txt, 8, UI.GOLD_BRIGHT, Vector2(6, 5))
+	hdr2.size = Vector2(width - 12, 12)
+	hdr2.clip_text = true
 	hdr2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body_txt := _card_meta(card)
-	var req_txt := _card_requires(data)
-	if req_txt != "":
-		body_txt += "\n\n" + req_txt
+	if kind == "specialization":
+		var mod_lines := _format_spec_mods(data.get("mods", {}))
+		var p_flags: Dictionary = data.get("flags", {})
+		var parts: Array = []
+		if mod_lines != "":
+			parts.append(mod_lines)
+		if not p_flags.is_empty():
+			var pid := String(data.get("perk_id", ""))
+			var pdata: Dictionary = DB.perk(pid)
+			var pdesc := String(pdata.get("desc", ""))
+			if pdesc != "":
+				parts.append("Дар: " + pdesc)
+		parts.append("Следующий перк: ×3 эффект")
+		body_txt = "\n".join(parts)
+	else:
+		var req_txt := _card_requires(data)
+		if req_txt != "":
+			body_txt += "\n\n" + req_txt
 	var blbl := UI.crisp_label(wrap, body_txt, 8, Color("#e4dfd3"), Vector2(6, 22))
 	blbl.size = Vector2(width - 12, 106)
 	blbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -543,6 +602,11 @@ func _card_icon(card: Dictionary) -> Texture2D:
 			if game != null and game.player != null:
 				return Assets.icon(String(game.player.char_data.get("cls", "")))
 		"specialization":
+			var tree_id := String(data.get("tree", ""))
+			if tree_id != "":
+				var t_ico := Assets.icon("icon_tree_" + tree_id)
+				if t_ico != null:
+					return t_ico
 			return Assets.icon("ui_crest")
 	return null
 
@@ -568,6 +632,9 @@ func _card_meta(card: Dictionary) -> String:
 		"seal":
 			return "Древняя печать"
 		"specialization":
+			var tname := String(data.get("tree_name", ""))
+			if tname != "":
+				return "Специализация · %s" % tname
 			if upg != null and upg.specialization_pending > 0:
 				return "Специализация · ×%d следующему перку" % int(upg.spec_mult)
 			return "Специализация"

@@ -234,10 +234,12 @@ func _hit(enemy: Node2D) -> void:
 	if pierce > 0:
 		pierce -= 1
 		damage *= 0.8  # -20% урона за каждое пробитие (техспека 4.3)
+		game.spawn_fx(global_position, color.lightened(0.25), 14.0, 0.14, true)
 		return
 	if bounce > 0:
 		bounce -= 1
 		damage *= 0.9  # -10% урона за каждый отскок (техспека 4.4)
+		game.spawn_fx(global_position, Color(1.0, 0.9, 0.45), 16.0, 0.16)
 		var near: Array = game.nearest_enemy_excluding(global_position, 200.0, hit_list)
 		if not near.is_empty():
 			vel = (near[0].global_position - global_position).normalized() * vel.length()

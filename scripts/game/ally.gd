@@ -135,6 +135,7 @@ func _spear_hunt(delta: float) -> void:
 		hit_cd[key] = 0.35
 		game.damage_enemy(enemy, damage, {"source": "holy_spear", "knockback": 18.0, "knock_dir": (enemy.global_position - global_position)})
 		game.spawn_fx(enemy.global_position, color, 14.0, 0.18)
+		game.spawn_perk_fx("holy", enemy.global_position, 28.0, 0.22)
 	for key in hit_cd.keys():
 		hit_cd[key] = float(hit_cd[key]) - delta
 		if float(hit_cd[key]) <= 0.0:
@@ -173,7 +174,7 @@ func _chase_and_shoot(delta: float) -> void:
 				game.lightning_strike_at(tgt.global_position, 28.0, damage)
 			_:
 				if kind=="dragonling" and dragon_breath:
-					game.aoe_damage(tgt.global_position,48.0,damage,{"source":"dragon_breath"}); game.apply_status_radius(tgt.global_position,48.0,"burn",3.0,{"dps":4.0}); game.spawn_fx(tgt.global_position,Color("#ff6a20"),48.0,0.3)
+					game.aoe_damage(tgt.global_position,48.0,damage,{"source":"dragon_breath"}); game.apply_status_radius(tgt.global_position,48.0,"burn",3.0,{"dps":4.0}); game.spawn_fx(tgt.global_position,Color("#ff6a20"),48.0,0.3); game.spawn_perk_fx("fireball", tgt.global_position, 52.0, 0.30)
 				else:
 					game.spawn_bullet(global_position, dir.normalized(), damage, {"speed": 300.0, "radius": 3.5, "color": color, "source": "summon", "burn": {"dps": 2.0, "dur": 2.0} if kind in ["dragonling", "phoenix"] else {}})
 
@@ -198,6 +199,8 @@ func _orbit(delta: float) -> void:
 			continue
 		hit_cd[key] = 0.45
 		game.damage_enemy(enemy, damage, {"source": "scythe" if kind == "scythe" else "summon"})
+		if kind == "scythe":
+			game.spawn_perk_fx("curse", enemy.global_position, 28.0, 0.22)
 	# остывание индивидуальных целей
 	for key in hit_cd.keys():
 		hit_cd[key] = float(hit_cd[key]) - delta

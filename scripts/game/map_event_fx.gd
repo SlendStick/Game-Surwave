@@ -80,6 +80,51 @@ func setup(g: Node, ev_kind: String, pos: Vector2, tele: float, rad: float, extr
 			sprite.texture = Assets.icon("event_ghost_hand_0")
 			sprite.position = Vector2(0, -6)
 			sprite.modulate.a = 0.35
+		"ember_rain", "crystal_rain":
+			duration = telegraph + 0.55
+			start_offset = Vector2(randf_range(-36.0, 36.0), -210.0)
+			sprite.texture = Assets.icon("event_meteor_0" if kind == "ember_rain" else "event_ice_spike_1")
+			sprite.scale = Vector2(0.85, 1.15)
+			sprite.position = start_offset
+			if kind == "crystal_rain":
+				sprite.modulate = Color(0.75, 0.95, 1.0, 0.95)
+		"aoe_strike":
+			duration = telegraph + 0.65
+			start_offset = Vector2(0.0, -180.0)
+			sprite.texture = Assets.icon("vfx_smite_0")
+			sprite.scale = Vector2(maxf(1.0, radius / 26.0), 1.4)
+			sprite.position = Vector2(0, -24)
+			sprite.modulate = Color(1.0, 0.9, 0.55, 0.35)
+		"eruption":
+			duration = telegraph + 1.4
+			sprite.texture = Assets.icon("event_geyser_0")
+			sprite.scale = Vector2(maxf(1.5, radius / 42.0), maxf(1.5, radius / 42.0))
+			sprite.modulate = Color(1.0, 0.55, 0.20, 0.35)
+		"crystal_flash":
+			duration = 0.75
+			shadow.visible = false
+			sprite.texture = Assets.icon("vfx_frost_1")
+			sprite.scale = Vector2.ONE * 1.4
+			sprite.modulate = Color(0.85, 0.98, 1.0, 0.95)
+		"madness_pulse":
+			duration = 1.4
+			shadow.visible = false
+			sprite.texture = Assets.icon("vfx_curse_0")
+			sprite.scale = Vector2.ONE * 1.6
+			sprite.modulate = Color(0.95, 0.25, 0.62, 0.85)
+		"void_rift":
+			duration = 1.35
+			shadow.visible = false
+			sprite.texture = Assets.icon("vfx_curse_0")
+			sprite.scale = Vector2.ONE * maxf(1.1, radius / 24.0)
+			sprite.modulate = Color(0.75, 0.45, 0.95, 0.9)
+		"band_wave":
+			duration = telegraph + 1.1
+			shadow.visible = false
+			sprite.texture = Assets.icon("event_avalanche_wave")
+			sprite.scale = Vector2(maxf(1.6, radius / 28.0), 0.9)
+			sprite.modulate = Color(1.0, 0.52, 0.22, 0.85)
+			sprite.position = Vector2(0, -140.0)
 		_:
 			duration = telegraph + 0.6
 
@@ -163,6 +208,73 @@ func _process(delta: float) -> void:
 				var after_h := elapsed - telegraph
 				sprite.texture = Assets.icon("event_ghost_hand_%d" % mini(2, int(after_h * 8.0)))
 				sprite.modulate.a = clampf(1.0 - maxf(0.0, after_h - 1.8) / 1.0, 0.0, 0.95)
+		"ember_rain", "crystal_rain":
+			if not impacted:
+				var fall_r := k * k
+				sprite.position = start_offset.lerp(Vector2.ZERO, fall_r)
+				if kind == "ember_rain":
+					sprite.texture = Assets.icon("event_meteor_%d" % (frame_idx % 4))
+				shadow.scale = Vector2.ONE * (radius * (0.25 + 0.75 * k) / 16.0)
+				shadow.modulate.a = 0.14 + 0.28 * k
+				if k >= 1.0:
+					_on_impact()
+			else:
+				var after_r := elapsed - telegraph
+				sprite.modulate.a = clampf(1.0 - after_r / 0.45, 0.0, 1.0)
+				shadow.modulate.a = sprite.modulate.a * 0.25
+		"aoe_strike":
+			if not impacted:
+				sprite.texture = Assets.icon("vfx_smite_%d" % (frame_idx % 4))
+				sprite.modulate = Color(1.0, 0.92, 0.62, 0.20 + 0.45 * k)
+				shadow.scale = Vector2.ONE * (radius * (0.4 + 0.6 * k) / 16.0)
+				if k >= 1.0:
+					_on_impact()
+			else:
+				var after_a := elapsed - telegraph
+				sprite.texture = Assets.icon("vfx_smite_%d" % mini(3, int(after_a * 10.0)))
+				sprite.modulate.a = clampf(1.0 - after_a / 0.55, 0.0, 1.0)
+		"eruption":
+			if not impacted:
+				sprite.texture = Assets.icon("event_geyser_0")
+				sprite.modulate = Color(1.0, 0.50, 0.16, 0.22 + 0.48 * k)
+				shadow.scale = Vector2.ONE * (radius * (0.4 + 0.6 * k) / 16.0)
+				trail_cd -= delta
+				if trail_cd <= 0.0 and game != null:
+					trail_cd = 0.18
+					game.spawn_fx(global_position + Vector2(randf_range(-radius * 0.4, radius * 0.4), randf_range(-16, 16)), Color(1.0, 0.45, 0.12, 0.7), 20.0, 0.28, true)
+				if k >= 1.0:
+					_on_impact()
+			else:
+				var after_e := elapsed - telegraph
+				sprite.texture = Assets.icon("event_geyser_%d" % mini(2, int(after_e * 8.0)))
+				sprite.modulate = Color(1.0, 0.55, 0.20, clampf(1.0 - after_e / 1.3, 0.0, 1.0))
+		"crystal_flash":
+			var cf_k := clampf(elapsed / duration, 0.0, 1.0)
+			sprite.texture = Assets.icon("vfx_frost_%d" % mini(2, int(cf_k * 3.0)))
+			sprite.rotation += delta * 4.5
+			sprite.scale = Vector2.ONE * (1.2 + cf_k * 2.4)
+			sprite.modulate = Color(0.85, 0.98, 1.0, 1.0 - cf_k)
+		"madness_pulse":
+			var mp_k := clampf(elapsed / duration, 0.0, 1.0)
+			sprite.texture = Assets.icon("vfx_curse_%d" % (frame_idx % 4))
+			sprite.rotation -= delta * 3.8
+			sprite.scale = Vector2.ONE * (1.0 + sin(mp_k * PI) * 2.2)
+			sprite.modulate = Color(0.95, 0.22, 0.65, sin(mp_k * PI) * 0.9)
+		"void_rift":
+			var vr_k := clampf(elapsed / duration, 0.0, 1.0)
+			sprite.texture = Assets.icon("vfx_curse_%d" % (frame_idx % 4))
+			sprite.rotation += delta * 5.2
+			var vr_sc := maxf(1.0, radius / 24.0) * (0.6 + sin(vr_k * PI) * 0.7)
+			sprite.scale = Vector2.ONE * vr_sc
+			sprite.modulate = Color(0.75, 0.45, 0.98, sin(vr_k * PI) * 0.95)
+		"band_wave":
+			var bw_k := clampf(elapsed / duration, 0.0, 1.0)
+			sprite.position = Vector2(0, lerpf(-140.0, 160.0, bw_k))
+			sprite.modulate.a = sin(bw_k * PI)
+			trail_cd -= delta
+			if trail_cd <= 0.0 and game != null:
+				trail_cd = 0.07
+				game.spawn_fx(global_position + sprite.position + Vector2(randf_range(-radius * 0.5, radius * 0.5), 0), Color(1.0, 0.50, 0.18, 0.65), 20.0, 0.30, true)
 
 	if elapsed >= duration:
 		queue_free()
@@ -196,3 +308,18 @@ func _on_impact() -> void:
 			game.spawn_fx(global_position, Color(0.55, 0.95, 0.25, 0.75), radius * 1.8, 0.35)
 	elif kind == "ghost_hand":
 		sprite.modulate.a = 0.95
+	elif kind == "ember_rain":
+		if game != null:
+			game.spawn_perk_fx("fireball", global_position, radius * 1.7, 0.28)
+	elif kind == "crystal_rain":
+		if game != null:
+			game.spawn_perk_fx("frost", global_position, radius * 1.6, 0.26)
+	elif kind == "aoe_strike":
+		sprite.modulate.a = 1.0
+		if game != null:
+			game.spawn_perk_fx("holy", global_position, radius * 1.8, 0.34)
+	elif kind == "eruption":
+		sprite.modulate.a = 1.0
+		if game != null:
+			game.spawn_perk_fx("fireball", global_position, radius * 1.2, 0.52)
+			game.shake(8.0)
