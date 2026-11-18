@@ -12,7 +12,7 @@ func _ready() -> void:
 
 func default_data() -> Dictionary:
 	return {
-		"version": "1.4.16",
+		"version": "1.5.0",
 		"gold": 0,
 		"souls": 0,
 		"crystals": 0,
@@ -36,7 +36,12 @@ func default_data() -> Dictionary:
 		"achievements": [],
 		"album_enemies": [],
 		"album_bosses": [],
-		"settings": {"music": 0.8, "sfx": 0.8, "lang": "ru", "shake": true, "god_mode": false, "boss_fx": true, "slowmo": true, "qte": true, "post_fx": true, "photo_ui": true, "hud_vitals": "corner"},
+		"settings": {"music": 0.8, "sfx": 0.8, "lang": "ru", "shake": true, "god_mode": false,
+			"boss_fx": true, "slowmo": true, "qte": true, "post_fx": true, "photo_ui": true,
+			"hud_vitals": "corner", "window_mode": "windowed", "vsync": true,
+			"camera_distance": "normal", "camera_shake": "normal", "damage_numbers": true,
+			"crosshair": true, "aim_line": true, "vignette": true, "screen_flash": true,
+			"hit_stop": true, "combo_fx": true, "net_name": "", "net_port": 7777, "net_last_ip": ""},
 		"stats": {"kills": 0, "runs": 0, "wins": 0, "damage_dealt": 0, "souls_earned": 0},
 	}
 
@@ -84,6 +89,12 @@ func load_game() -> void:
 			if not loaded.has(key):
 				loaded[key] = data[key]
 		data = loaded
+	var default_settings: Dictionary = default_data()["settings"]
+	var settings: Dictionary = data.get("settings", {})
+	for skey in default_settings.keys():
+		if not settings.has(skey):
+			settings[skey] = default_settings[skey]
+	data["settings"] = settings
 	if not data.get("settings", {}).has("lang"):
 		data["settings"]["lang"] = "ru"
 	if not data.get("settings", {}).has("hud_vitals"):

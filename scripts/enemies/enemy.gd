@@ -53,11 +53,19 @@ var transition_left := 0.0
 var attack_anim := 0.0
 var hurt_anim := 0.0
 
+# --- сеть: id врага на хосте и режим «куклы» на клиенте
+var net_id := 0
+var net_remote := false
+var net_target := Vector2.ZERO
+
 func setup(g: Node) -> void:
 	game = g
 
 func init_enemy(g: Node, enemy_data: Dictionary, pos: Vector2, hp_mult: float = 1.0, dmg_mult: float = 1.0, speed_mult: float = 1.0, make_elite: bool = false) -> void:
 	game = g
+	net_remote = false
+	net_id = 0
+	net_target = pos
 	data = enemy_data
 	id = String(data.get("id", ""))
 	role = String(data.get("role", "fodder"))
@@ -245,6 +253,9 @@ func deactivate() -> void:
 func tick(delta: float) -> void:
 	if not active:
 		return
+	if net_remote:
+		_tick_remote(delta)
+		return
 	spawn_anim = minf(0.15, spawn_anim + delta)
 	walk_phase += delta * (8.0 if id == "bat" else 5.0)
 	attack_anim = maxf(0.0, attack_anim - delta)
@@ -297,6 +308,27 @@ func tick(delta: float) -> void:
 		_tick_specials(delta)
 	_apply_knock(delta)
 	_try_contact_damage()
+	if hp_bar != null and hp_bar.visible:
+		var frac := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
+		hp_bar.scale = Vector2(maxf(0.5, 14.0 * frac), 1.5)
+		hp_bar.position.x = -14.0 * (1.0 - frac)
+
+## Клиентская «кукла»: визуал по снапшоту хоста, без ИИ и урона.
+func _tick_remote(delta: float) -> void:
+	walk_phase += delta * (8.0 if id == "bat" else 5.0)
+	hit_flash = maxf(0.0, hit_flash - delta)
+	global_position = global_position.lerp(net_target, clampf(16.0 * delta, 0.0, 1.0))
+	if sprite != null:
+		var vcls := visual_class()
+		var fr := Assets.frames(vcls, "walk")
+		if not fr.is_empty():
+			sprite.texture = fr[int(floor(walk_phase * 1.4)) % fr.size()]
+		sprite.position.y = sin(walk_phase) * (1.8 if id == "bat" else 0.5)
+		if game != null and game.player != null:
+			sprite.flip_h = game.player.global_position.x < global_position.x
+		sprite.modulate = Color(1.9, 1.9, 1.9) if hit_flash > 0.0 else _base_modulate()
+	if elite_ring != null and elite_ring.visible:
+		elite_ring.rotation += delta * 1.1
 	if hp_bar != null and hp_bar.visible:
 		var frac := clampf(hp / maxf(1.0, max_hp), 0.0, 1.0)
 		hp_bar.scale = Vector2(maxf(0.5, 14.0 * frac), 1.5)
@@ -575,6 +607,13 @@ func _attack_projectile_custom(delta: float, proj: Dictionary) -> void:
 func _try_contact_damage() -> void:
 	if game.coop_player != null and game.coop_player.active and global_position.distance_to(game.coop_player.global_position) < radius + 8.0:
 		game.coop_player.take_damage(damage,global_position)
+	# сетевые напарники (на хосте): урон уходит клиенту по сети
+	if game.net_active and game.net_host:
+		for np in game.net_proxies:
+			if np.dead:
+				continue
+			if global_position.distance_to(np.global_position) < radius + 8.0:
+				game.net_hit_proxy(np, damage, global_position)
 	var p: Node2D = game.player
 	if p == null or p.dead:
 		return

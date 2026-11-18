@@ -231,13 +231,13 @@
    ]
   },
   {
-   "id": "spear",
-   "name": "Святое Копьё",
+   "id": "boomerang",
+   "name": "Бумеранг",
    "nodes": [
-    "spear_t1",
-    "spear_t2a",
-    "spear_t2b",
-    "spear_t3"
+    "boomerang_t1",
+    "boomerang_t2a",
+    "boomerang_t2b",
+    "boomerang_t3"
    ]
   },
   {
@@ -1844,70 +1844,70 @@
    "max_stacks": 1
   },
   {
-   "id": "spear_t1",
-   "name": "Святое Копьё",
-   "tree": "spear",
+   "id": "boomerang_t1",
+   "name": "Бумеранг",
+   "tree": "boomerang",
    "tier": 1,
    "branch": "",
-   "desc": "Призывает святое копьё, преследующее врагов.",
+   "desc": "Бумеранг кружит у героя, затем летит к врагу по дуге и возвращается.",
    "mods": {},
    "flags": {
-    "summon": "holy_spear"
+    "summon": "boomerang"
    },
    "req": [],
    "req_any": [],
    "max_stacks": 1
   },
   {
-   "id": "spear_t2a",
-   "name": "Рыцарь Копья",
-   "tree": "spear",
+   "id": "boomerang_t2a",
+   "name": "Рыцарь Бумеранга",
+   "tree": "boomerang",
    "tier": 2,
    "branch": "a",
-   "desc": "+15 урона копья за каждую душу. Требует перк «Душа».",
+   "desc": "+15 урона бумеранга за каждую собранную душу. Требует перк «Душа».",
    "mods": {},
    "flags": {
-    "spear_soul": 15.0
+    "boomerang_soul": 15.0
    },
    "req": [
-    "spear_t1",
+    "boomerang_t1",
     "soul_t1"
    ],
    "req_any": [],
    "max_stacks": 1
   },
   {
-   "id": "spear_t2b",
-   "name": "Мастер Копья",
-   "tree": "spear",
+   "id": "boomerang_t2b",
+   "name": "Мастер Бумеранга",
+   "tree": "boomerang",
    "tier": 2,
    "branch": "b",
-   "desc": "Урон копья +40%.",
+   "desc": "Урон бумеранга +40%.",
    "mods": {
     "summon_dmg": 0.4
    },
    "flags": {},
    "req": [
-    "spear_t1"
+    "boomerang_t1"
    ],
    "req_any": [],
    "max_stacks": 1
   },
   {
-   "id": "spear_t3",
-   "name": "Святые Копья",
-   "tree": "spear",
+   "id": "boomerang_t3",
+   "name": "Вихрь Бумерангов",
+   "tree": "boomerang",
    "tier": 3,
    "branch": "",
-   "desc": "+3 копья.",
+   "desc": "+3 бумеранга кружат у героя.",
    "mods": {
     "summon_count": 3
    },
    "flags": {},
    "req": [],
    "req_any": [
-    "spear_t2a",
-    "spear_t2b"
+    "boomerang_t2a",
+    "boomerang_t2b"
    ],
    "max_stacks": 1
   },

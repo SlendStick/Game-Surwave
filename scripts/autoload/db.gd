@@ -110,7 +110,7 @@ func _build_specializations() -> void:
 		"summon": {"summon_dmg": 0.35, "summon_speed": 0.20},
 		"dragon": {"summon_dmg": 0.35, "burn_mult": 0.25},
 		"scythe": {"summon_dmg": 0.35, "summon_speed": 0.25},
-		"spear": {"summon_dmg": 0.35, "pierce": 1},
+		"boomerang": {"summon_dmg": 0.35, "pierce": 1},
 		"beast": {"summon_dmg": 0.30, "summon_speed": 0.20},
 	}
 	for ch in characters:

@@ -33,6 +33,7 @@ func _ready() -> void:
 	meta = SaveManager.data
 	god_mode = bool(meta.get("settings", {}).get("god_mode", false))
 	_setup_input()
+	apply_display_settings()
 	AudioManager.apply_settings(float(meta["settings"].get("music", 0.8)), float(meta["settings"].get("sfx", 0.8)))
 	Loc.set_lang(String(meta["settings"].get("lang", "ru")))
 	_parse_cli()
@@ -127,6 +128,7 @@ func _add_action(action: String, keys: Array = [], mouse_buttons: Array = []) ->
 func goto(path: String) -> void:
 	get_tree().paused = false
 	game = null
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	get_tree().change_scene_to_file(path)
 
 func goto_menu() -> void:
@@ -150,6 +152,10 @@ func start_run(config: Dictionary) -> void:
 		"seed": int(config.get("seed", 0)),
 		"trials": (config.get("trials", []) as Array).duplicate(),
 		"blessing": String(config.get("blessing", "")),
+		"network": bool(config.get("network", false)),
+		"is_host": bool(config.get("is_host", false)),
+		"players": int(config.get("players", 1)),
+		"loadouts": (config.get("loadouts", {}) as Dictionary).duplicate(true),
 	}
 	if (run_config["trials"] as Array).has("sniper") and not ["crossbow","bow","lightning_staff"].has(String(run_config["weapon"])):
 		run_config["weapon"] = "crossbow"
@@ -391,6 +397,72 @@ func amulet_bonuses() -> Array:
 		out.append({"id": String(id), "rank": rank, "per_rank": float(amu.get("per_rank", 0.0))})
 	return out
 
+# ------------------------------------------------------------------ ОКНО / ДИСПЛЕЙ
+## Порядок переключения режимов окна кнопкой в настройках и по F11.
+const WINDOW_MODES := ["windowed", "borderless", "fullscreen"]
+const WINDOW_MODE_NAMES := {
+	"windowed": "ОКОННЫЙ",
+	"borderless": "ОКНО НА ВЕСЬ ЭКРАН",
+	"fullscreen": "ПОЛНОЭКРАННЫЙ",
+}
+const CAMERA_MODES := ["normal", "close", "far"]
+const CAMERA_MODE_NAMES := {"normal": "СТАНДАРТ", "close": "БЛИЗКО", "far": "ДАЛЕКО"}
+const CAMERA_ZOOM_SCALE := {"normal": 1.0, "close": 1.16, "far": 0.84}
+
+func window_mode() -> String:
+	var m := String(setting("window_mode", "windowed"))
+	return m if WINDOW_MODES.has(m) else "windowed"
+
+func window_mode_name() -> String:
+	return String(WINDOW_MODE_NAMES.get(window_mode(), "ОКОННЫЙ"))
+
+## Следующий режим окна по кругу: оконный → окно на весь экран → полный экран.
+func cycle_window_mode() -> String:
+	var idx := WINDOW_MODES.find(window_mode())
+	var next_mode := String(WINDOW_MODES[(idx + 1) % WINDOW_MODES.size()])
+	set_setting("window_mode", next_mode)
+	apply_window_mode(next_mode)
+	return next_mode
+
+## Применяет режим окна. В headless-режиме (CI) ничего не трогает.
+func apply_window_mode(mode: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var win := get_window()
+	if win == null:
+		return
+	match mode:
+		"fullscreen":
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		"borderless":
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+			DisplayServer.window_set_position(Vector2i.ZERO)
+			DisplayServer.window_set_size(DisplayServer.screen_get_size(DisplayServer.window_get_current_screen()))
+		_:
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			var scr := DisplayServer.screen_get_size(DisplayServer.window_get_current_screen())
+			var target := Vector2i(mini(1280, scr.x), mini(720, scr.y))
+			DisplayServer.window_set_size(target)
+			DisplayServer.window_set_position((scr - target) / 2)
+
+func apply_vsync() -> void:
+	var enabled := bool(setting("vsync", true))
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.window_set_vsync_mode(
+		DisplayServer.VSYNC_ENABLED if enabled else DisplayServer.VSYNC_DISABLED)
+
+func apply_display_settings() -> void:
+	apply_vsync()
+	apply_window_mode(window_mode())
+
+## Множитель зума камеры из настроек (близко / стандарт / далеко).
+func camera_zoom_scale() -> float:
+	return float(CAMERA_ZOOM_SCALE.get(String(setting("camera_distance", "normal")), 1.0))
+
 # ------------------------------------------------------------------ НАСТРОЙКИ
 ## Сброс читов перед новым забегом: время, множители, заморозка.
 func reset_cheats() -> void:
@@ -418,7 +490,17 @@ func set_setting(key: String, value: Variant) -> void:
 		Loc.set_lang(String(value))
 	if key == "music" or key == "sfx":
 		AudioManager.apply_settings(float(s.get("music", 0.8)), float(s.get("sfx", 0.8)))
+	if key == "window_mode":
+		apply_window_mode(String(value))
+	if key == "vsync":
+		apply_vsync()
 	SaveManager.save_game()
+
+## F11 в любом экране: оконный → окно на весь экран → полный экран.
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("fullscreen"):
+		cycle_window_mode()
+		get_viewport().set_input_as_handled()
 
 func setting(key: String, def: Variant = null) -> Variant:
 	return meta.get("settings", {}).get(key, def)

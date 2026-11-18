@@ -14,6 +14,9 @@ var burn := false
 var poison := false
 var source_role := ""
 var sprite: Sprite2D = null
+## Снаряд-кукла на клиенте: рисуется по снапшоту и не наносит урон.
+var net_remote := false
+var net_target := Vector2.ZERO
 
 func setup(g: Node) -> void:
 	game = g
@@ -23,7 +26,7 @@ func setup(g: Node) -> void:
 func spawn_at(pos: Vector2, dir: Vector2, dmg: int, opts: Dictionary = {}) -> void:
 	global_position = pos
 	damage = dmg
-	vel = dir.normalized() * float(opts.get("speed", 170.0))
+	vel = dir.normalized() * float(opts.get("speed", 110.0))
 	color = opts.get("color", Color(1, 0.4, 0.4))
 	radius = float(opts.get("radius", 3.5))
 	homing = bool(opts.get("homing", false))
@@ -50,6 +53,12 @@ func deactivate() -> void:
 func tick(delta: float) -> void:
 	if not active:
 		return
+	if net_remote:
+		global_position = global_position.lerp(net_target, clampf(20.0 * delta, 0.0, 1.0))
+		life -= delta
+		if life <= 0.0:
+			deactivate()
+		return
 	if homing:
 		var dir: Vector2 = (game.player.global_position - global_position)
 		if dir.length() > 1.0:
@@ -71,3 +80,13 @@ func tick(delta: float) -> void:
 				game.player.add_status("poison", 4.0, {"dps": 2.0})
 			game.damage_player(damage, global_position, false, source_role)
 			deactivate()
+			return
+	# сетевые напарники: урон считает хост и отправляет клиенту
+	if game.net_active and game.net_host:
+		for np in game.net_proxies:
+			if np.dead:
+				continue
+			if global_position.distance_to(np.global_position) < radius + 8.0:
+				game.net_hit_proxy(np, damage, global_position)
+				deactivate()
+				return

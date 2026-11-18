@@ -188,7 +188,7 @@ func _next_slide() -> void:
 	var b_ang: float = rng.randf_range(-0.9, 0.9)
 	var boss_pos := (hero_pos + Vector2(cos(b_ang), sin(b_ang)) * 135.0).clamp(Vector2(64, 64), Vector2(560, 290))
 
-	var ally_kinds := ["ally_spirit", "ally_dragon", "ally_scythe", "ally_skeleton", "ally_spear"]
+	var ally_kinds := ["ally_spirit", "ally_dragon", "ally_scythe", "ally_skeleton", "ally_boomerang"]
 	var ally_list: Array = []
 	for i in rng.randi_range(2, 4):
 		ally_list.append({

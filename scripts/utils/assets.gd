@@ -89,7 +89,7 @@ static func shape_of(cls: String) -> String:
 		"ally_spirit", "ally_moth": return "diamond"
 		"ally_skeleton": return "cross"
 		"ally_turret": return "rect"
-		"ally_blade", "ally_scythe", "ally_spear": return "inv_triangle"
+		"ally_blade", "ally_scythe", "ally_spear", "ally_boomerang": return "inv_triangle"
 		"ally_tornado", "ally_aura": return "ring"
 		"ally_phoenix", "ally_dragon": return "star"
 		"ally_beetle": return "hex"

@@ -309,6 +309,18 @@ def generate_allies() -> int:
     cv.outline(c("night"))
     save_a("spirit", cv)
 
+    # boomerang: бронзовая V-образная пластина с бликом
+    cv = Canvas(24, 24)
+    cv.line(6, 18, 12, 4, c("brass"), 3)
+    cv.line(12, 4, 18, 18, c("brass"), 3)
+    cv.line(7, 17, 12, 5, c("gold_lt"))
+    cv.line(12, 5, 17, 17, c("gold_lt"))
+    cv.px(12, 6, c("cream"))
+    cv.px(9, 12, c("gold_glow"))
+    cv.px(15, 12, c("gold_glow"))
+    cv.outline(c("black"))
+    save_a("boomerang", cv)
+
     # skeleton
     cv = Canvas(24, 24)
     cv.rect(9, 5, 6, 5, c("parchment"))
@@ -429,6 +441,12 @@ def _draw_symbol_icon(name: str, accent: Color, motif: str) -> Canvas:
         cv.poly([(13, 6), (18, 6), (18, 11)], hi)
         cv.line(6, 14, 8, 16, accent)
         cv.line(8, 16, 10, 18, accent)
+    elif motif == "boomerang":
+        cv.line(7, 17, 12, 9, hi, 2)
+        cv.line(12, 9, 17, 17, hi, 2)
+        cv.px(12, 8, c("white"))
+        cv.line(6, 18, 9, 14, accent)
+        cv.line(18, 18, 15, 14, accent)
     elif motif == "sword":
         cv.line(7, 17, 17, 7, hi, 2)
         cv.line(6, 14, 10, 18, c("gold"))
@@ -527,7 +545,7 @@ def generate_rpg_icons() -> int:
         "summon": (c("ghost_violet"), "star"),
         "dragon": (c("ember_red"), "dragon"),
         "scythe": (c("crimson"), "scythe"),
-        "spear": (c("gold_lt"), "sword"),
+        "boomerang": (c("brass"), "boomerang"),
         "beast": (c("life"), "dragon"),
     }
     for tid, (col, mot) in trees.items():

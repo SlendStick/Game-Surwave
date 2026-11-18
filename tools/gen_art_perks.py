@@ -37,7 +37,7 @@ TREE_THEMES: dict[str, tuple[Color, Color, str]] = {
     "summon": (c("ghost_violet"), c("arcane"), "summon"),
     "dragon": (c("ember_red"), c("gold_glow"), "dragon"),
     "scythe": (c("crimson"), c("violet_lt"), "scythe"),
-    "spear": (c("gold_lt"), c("frost"), "spear"),
+    "boomerang": (c("brass"), c("gold_lt"), "boomerang"),
     "beast": (c("life"), c("amber"), "beast"),
 }
 
@@ -227,6 +227,18 @@ def _draw_motif_scene(cv: Canvas, motif: str, accent: Color, hi: Color, variant:
         cv.poly([(cx + 8, 16), (cx + 10, 6), (cx + 2, 14)], hi)
         cv.px(cx - 3, 20, c("white"))
         cv.px(cx + 3, 20, c("white"))
+    elif motif == "boomerang":
+        # Дуга полёта и возврата + вращающийся бумеранг в центре
+        cv.ellipse(cx, cy + 6, 34, 12, (accent[0], accent[1], accent[2], 60), True)
+        cv.line(14, cy + 12, cx - 10, cy - 8, mul(accent, 0.7))
+        cv.line(cx + 10, cy - 8, 82, cy + 12, mul(accent, 0.7))
+        cv.line(cx - 10, cy - 8, cx + 10, cy - 8, hi, 2)
+        for k in range(3):
+            r = 8 + k * 5
+            cv.line(cx - r, cy - 2 - k * 2, cx - 2, cy - 6 - k, mul(hi, 0.8 - k * 0.2))
+            cv.line(cx + 2, cy - 6 - k, cx + r, cy - 2 - k * 2, mul(hi, 0.8 - k * 0.2))
+        cv.poly([(cx - 16, cy + 10), (cx, cy + 2), (cx + 16, cy + 10)], accent)
+        cv.poly([(cx - 12, cy + 10), (cx, cy + 5), (cx + 12, cy + 10)], hi)
     else:  # spear
         for s in (-1, 0, 1):
             yy = cy + s * 9

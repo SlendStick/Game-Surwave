@@ -7,6 +7,12 @@ var shop_tab := "characters"
 var album_tab := "enemies"
 var souls_lbl: Label
 var gold_lbl: Label
+var overlay_kind := ""
+var reset_armed := false
+var lobby_map := "forest"
+var status := ""
+var _net_status_label: Label = null
+var _net_rebuilding := false
 
 const ACHIEVEMENTS := [
 	{"id": "first_win", "name": "Первая победа", "desc": "Победить на любой карте."},
@@ -28,6 +34,14 @@ func _ready() -> void:
 		call_deferred("_open_overlay", OS.get_environment("SURW_MENU_OVERLAY"))
 	_build()
 	AudioManager.play_menu_music()
+	Net.session_start_requested.connect(_on_session_start)
+	Net.lobby_changed.connect(_on_net_lobby_changed)
+	Net.notice.connect(_on_net_notice)
+	Net.connection_failed.connect(_on_net_failed)
+	if Net.enabled:
+		status = "Соединение активно" if Net.is_client() else "Сервер открыт"
+	else:
+		Net.start_lan_listen()
 
 func _build() -> void:
 	UI.full_rect(self)
@@ -44,7 +58,7 @@ func _build() -> void:
 	var logo := UI.title(self, "SURWAVE", 40, Vector2(36, 18), UI.GOLD)
 	logo.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	UI.divider(self, Vector2(38, 66), 220.0, UI.GOLD_DEEP)
-	UI.label(self, "версия 1.4.16", 8, UI.MUTED, Vector2(20, 318))
+	UI.label(self, "версия 1.5.0 · сетевой кооп", 8, UI.MUTED, Vector2(20, 318))
 
 	# --- правая часть: меню на полупрозрачной готической раме поверх живого геймплея
 	var menu_frame := Panel.new()
@@ -59,12 +73,15 @@ func _build() -> void:
 	menu.size = Vector2(252, 304)
 	menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu)
-	var play := UI.primary_button(menu, Loc.t("play"), 16, Vector2(252, 42))
+	var play := UI.primary_button(menu, Loc.t("play"), 15, Vector2(252, 38))
 	play.position = Vector2(0, 0)
 	play.pressed.connect(func() -> void:
 		AudioManager.play_sfx("ui")
 		GameManager.goto_select())
-	var y := 50
+	var net_btn := UI.primary_button(menu, "СЕТЕВАЯ ИГРА", 13, Vector2(252, 30))
+	net_btn.position = Vector2(0, 42)
+	net_btn.pressed.connect(func() -> void: _open_overlay("network"))
+	var y := 78
 	for item in [
 		[Loc.t("album"), "album"],
 		["ДРЕВО ПРОГРЕССИИ", "progression"],
@@ -73,12 +90,12 @@ func _build() -> void:
 		[Loc.t("achievements"), "achievements"],
 		[Loc.t("settings"), "settings"],
 	]:
-		var btn := UI.button(menu, String(item[0]), 11, Vector2(252, 32))
+		var btn := UI.button(menu, String(item[0]), 10, Vector2(252, 27))
 		btn.position = Vector2(0, y)
 		var key := String(item[1])
 		btn.pressed.connect(func() -> void: _open_overlay(key))
-		y += 36
-	var quit := UI.button(menu, Loc.t("quit"), 11, Vector2(252, 32))
+		y += 30
+	var quit := UI.button(menu, Loc.t("quit"), 10, Vector2(252, 27))
 	quit.position = Vector2(0, y + 4)
 	quit.pressed.connect(func() -> void: get_tree().quit())
 
@@ -91,8 +108,11 @@ func _refresh_info() -> void:
 	gold_lbl.text = "%s: %d   ·   %s: %d" % [Loc.t("gold").capitalize(), int(GameManager.meta.get("gold", 0)), Loc.t("stats_runs"), int(GameManager.meta.get("stats", {}).get("runs", 0))]
 
 # ------------------------------------------------------------------ ОВЕРЛЕЙ
-func _open_overlay(kind: String) -> void:
-	AudioManager.play_sfx("ui")
+func _open_overlay(kind: String, silent: bool = false) -> void:
+	if not silent:
+		AudioManager.play_sfx("ui")
+	overlay_kind = kind
+	_net_status_label = null
 	if overlay != null:
 		overlay.queue_free()
 	overlay = Control.new()
@@ -110,13 +130,15 @@ func _open_overlay(kind: String) -> void:
 	accent.size = Vector2(590, 1)
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(accent)
-	var titles := {"shops": Loc.t("shops"), "album": Loc.t("album"), "progression":"ДРЕВО ПРОГРЕССИИ", "quests":"ЗАДАНИЯ И СЕЗОН", "records":"ЛОКАЛЬНЫЕ РЕКОРДЫ И ГАЛЕРЕЯ", "achievements": Loc.t("achievements"), "settings": Loc.t("settings")}
+	var titles := {"shops": Loc.t("shops"), "album": Loc.t("album"), "progression":"ДРЕВО ПРОГРЕССИИ", "quests":"ЗАДАНИЯ И СЕЗОН", "records":"ЛОКАЛЬНЫЕ РЕКОРДЫ И ГАЛЕРЕЯ", "achievements": Loc.t("achievements"), "settings": Loc.t("settings"), "network":"СЕТЕВАЯ ИГРА"}
 	UI.label(panel, String(titles.get(kind, "")), 14, UI.GOLD, Vector2(10, 6))
 	var back := UI.button(panel, Loc.t("back"), 9, Vector2(70, 20))
 	back.position = Vector2(508, 6)
 	back.pressed.connect(func() -> void:
 		overlay.queue_free()
 		overlay = null
+		overlay_kind = ""
+		status = ""
 		_refresh_info())
 	var body := Control.new()
 	body.position = Vector2(10, 28)
@@ -130,6 +152,7 @@ func _open_overlay(kind: String) -> void:
 		"records": _build_records(body)
 		"achievements": _build_achievements(body)
 		"settings": _build_settings(body)
+		"network": _build_network(body)
 
 func _shops_tabs(parent: Control) -> void:
 	var tabs: Array = [["characters", Loc.t("shops_chars")], ["weapons", Loc.t("shops_weapons")], ["amulets", Loc.t("shops_amulets")]]
@@ -384,74 +407,408 @@ func _build_achievements(body: Control) -> void:
 	var st: Dictionary = GameManager.meta.get("stats", {})
 	UI.label(v, "%s: %d · %s: %d · %s: %d" % [Loc.t("stats_kills"), int(st.get("kills", 0)), Loc.t("stats_runs"), int(st.get("runs", 0)), Loc.t("stats_wins"), int(st.get("wins", 0))], 9, UI.TEXT)
 
+# ------------------------------------------------------------------ НАСТРОЙКИ
+func _settings_cell(parent: Control) -> HBoxContainer:
+	var cell := UI.hbox(parent, 6)
+	cell.custom_minimum_size = Vector2(272, 22)
+	return cell
+
+func _settings_section(v: Control, title: String) -> void:
+	var l := UI.label(v, title, 9, UI.GOLD)
+	l.custom_minimum_size = Vector2(556, 13)
+	var line := ColorRect.new()
+	line.color = Color(UI.GOLD_DEEP.r, UI.GOLD_DEEP.g, UI.GOLD_DEEP.b, 0.5)
+	line.custom_minimum_size = Vector2(556, 1)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(line)
+
+func _settings_toggle(parent: Control, key: String, text: String, def_value: bool = true) -> void:
+	var cell := _settings_cell(parent)
+	var l := UI.label(cell, text, 8, UI.TEXT)
+	l.custom_minimum_size = Vector2(160, 18)
+	l.clip_text = true
+	var value := bool(GameManager.setting(key, def_value))
+	var b := UI.button(cell, "ВКЛ" if value else "ВЫКЛ", 8, Vector2(74, 20))
+	b.custom_minimum_size = Vector2(74, 20)
+	b.add_theme_color_override("font_color", UI.GREEN if value else UI.DIM)
+	b.pressed.connect(func() -> void:
+		GameManager.set_setting(key, not bool(GameManager.setting(key, def_value)))
+		AudioManager.play_sfx("ui")
+		_open_overlay("settings"))
+	cell.add_child(b)
+
+func _settings_cycle(parent: Control, key: String, text: String, values: Array, names: Array, def_value: String = "") -> void:
+	var cell := _settings_cell(parent)
+	var l := UI.label(cell, text, 8, UI.TEXT)
+	l.custom_minimum_size = Vector2(104, 18)
+	l.clip_text = true
+	var current := String(GameManager.setting(key, def_value))
+	var idx := values.find(current)
+	if idx < 0:
+		idx = 0
+	var b := UI.button(cell, String(names[idx]), 8, Vector2(140, 20))
+	b.custom_minimum_size = Vector2(140, 20)
+	b.pressed.connect(func() -> void:
+		var cur := String(GameManager.setting(key, def_value))
+		var i := values.find(cur)
+		if i < 0:
+			i = 0
+		GameManager.set_setting(key, String(values[(i + 1) % values.size()]))
+		AudioManager.play_sfx("ui")
+		_open_overlay("settings"))
+	cell.add_child(b)
+
+func _settings_slider(parent: Control, key: String, text: String) -> void:
+	var cell := _settings_cell(parent)
+	var l := UI.label(cell, text, 8, UI.TEXT)
+	l.custom_minimum_size = Vector2(88, 18)
+	var s := HSlider.new()
+	s.min_value = 0.0
+	s.max_value = 1.0
+	s.step = 0.05
+	s.value = float(GameManager.setting(key, 0.8))
+	s.custom_minimum_size = Vector2(168, 16)
+	s.value_changed.connect(func(val: float) -> void: GameManager.set_setting(key, val))
+	cell.add_child(s)
+
+func _settings_text(parent: Control, key: String, text: String, def_value: String, numeric: bool = false, max_len: int = 16) -> void:
+	var cell := _settings_cell(parent)
+	var l := UI.label(cell, text, 8, UI.TEXT)
+	l.custom_minimum_size = Vector2(96, 18)
+	l.clip_text = true
+	var edit := LineEdit.new()
+	edit.text = String(GameManager.setting(key, def_value))
+	edit.max_length = max_len
+	edit.custom_minimum_size = Vector2(160, 20)
+	edit.add_theme_font_override("font", UI.crisp_font())
+	edit.add_theme_font_size_override("font_size", 9)
+	edit.add_theme_color_override("font_color", UI.TEXT)
+	edit.add_theme_color_override("font_placeholder_color", UI.MUTED)
+	edit.add_theme_stylebox_override("normal", UI.style(Color(0.07, 0.065, 0.055, 0.95), UI.BORDER, 1, 0))
+	edit.add_theme_stylebox_override("focus", UI.style(Color(0.10, 0.09, 0.07, 1.0), UI.GOLD_DEEP, 1, 0))
+	if numeric:
+		edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	edit.text_submitted.connect(func(value: String) -> void: _apply_text_setting(key, value, numeric))
+	edit.focus_exited.connect(func() -> void: _apply_text_setting(key, edit.text, numeric))
+	cell.add_child(edit)
+
+func _apply_text_setting(key: String, value: String, numeric: bool) -> void:
+	var clean := value.strip_edges()
+	if numeric:
+		if not clean.is_valid_int():
+			return
+		GameManager.set_setting(key, clampi(int(clean), 1024, 65535))
+	else:
+		GameManager.set_setting(key, clean)
+		if key == "net_name":
+			Net.set_my_name(clean)
+
 func _build_settings(body: Control) -> void:
-	var y := 6
-	UI.label(body, Loc.t("music"), 10, UI.TEXT, Vector2(0, y))
-	var music := HSlider.new()
-	music.min_value = 0.0
-	music.max_value = 1.0
-	music.step = 0.05
-	music.value = float(GameManager.setting("music", 0.8))
-	music.position = Vector2(120, y)
-	music.size = Vector2(180, 16)
-	music.value_changed.connect(func(val: float) -> void:
-		GameManager.set_setting("music", val))
-	body.add_child(music)
-	y += 28
-	UI.label(body, Loc.t("sfx"), 10, UI.TEXT, Vector2(0, y))
-	var sfx := HSlider.new()
-	sfx.min_value = 0.0
-	sfx.max_value = 1.0
-	sfx.step = 0.05
-	sfx.value = float(GameManager.setting("sfx", 0.8))
-	sfx.position = Vector2(120, y)
-	sfx.size = Vector2(180, 16)
-	sfx.value_changed.connect(func(val: float) -> void:
-		GameManager.set_setting("sfx", val)
-		AudioManager.play_sfx("ui"))
-	body.add_child(sfx)
-	y += 28
-	var lang_btn := UI.button(body, "%s: %s" % [Loc.t("lang"), "RU" if Loc.lang == "ru" else "EN"], 9, Vector2(150, 20))
-	lang_btn.position = Vector2(0, y)
-	lang_btn.pressed.connect(func() -> void:
-		GameManager.set_setting("lang", "en" if Loc.lang == "ru" else "ru")
-		_open_overlay("settings"))
-	y += 26
-	var shake_btn := UI.button(body, "%s: %s" % [Loc.t("shake"), Loc.t("on") if bool(GameManager.setting("shake", true)) else Loc.t("off")], 9, Vector2(150, 20))
-	shake_btn.position = Vector2(0, y)
-	shake_btn.pressed.connect(func() -> void:
-		GameManager.set_setting("shake", not bool(GameManager.setting("shake", true)))
-		_open_overlay("settings"))
-	y += 26
-	var god_btn := UI.button(body, "%s: %s" % [Loc.t("god_mode"), Loc.t("on") if bool(GameManager.setting("god_mode", false)) else Loc.t("off")], 9, Vector2(190, 20))
-	god_btn.position = Vector2(0, y)
-	god_btn.pressed.connect(func() -> void:
-		GameManager.set_setting("god_mode", not bool(GameManager.setting("god_mode", false)))
-		GameManager.god_mode = bool(GameManager.setting("god_mode", false))
-		_open_overlay("settings"))
-	var vitals_btn := UI.button(body, "Патроны и HP: %s" % ("над игроком" if String(GameManager.setting("hud_vitals", "corner")) == "player" else "слева сверху"), 9, Vector2(220, 20))
-	vitals_btn.position = Vector2(0, y + 26)
-	vitals_btn.pressed.connect(func() -> void:
-		var now := String(GameManager.setting("hud_vitals", "corner"))
-		GameManager.set_setting("hud_vitals", "corner" if now == "player" else "player")
-		_open_overlay("settings"))
-	var reset := UI.button(body, Loc.t("reset_save"), 9, Vector2(170, 20))
-	reset.position = Vector2(240, y)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2.ZERO
+	scroll.size = Vector2(572, 252)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.custom_minimum_size = Vector2(556, 0)
+	v.add_theme_constant_override("separation", 4)
+	scroll.add_child(v)
+
+	_settings_section(v, "ЗВУК")
+	var srow := UI.hbox(v, 8)
+	_settings_slider(srow, "music", Loc.t("music"))
+	_settings_slider(srow, "sfx", Loc.t("sfx"))
+
+	_settings_section(v, "ЭКРАН И ОКНО")
+	var r1 := UI.hbox(v, 8)
+	_settings_cycle(r1, "window_mode", "Режим окна", ["windowed", "borderless", "fullscreen"],
+		["ОКОННЫЙ", "ОКНО НА ВЕСЬ ЭКРАН", "ПОЛНОЭКРАННЫЙ"], "windowed")
+	_settings_toggle(r1, "vsync", "Вертикальная синхронизация", true)
+	var r2 := UI.hbox(v, 8)
+	_settings_cycle(r2, "camera_distance", "Дальность камеры", ["normal", "close", "far"],
+		["СТАНДАРТ", "БЛИЗКО", "ДАЛЕКО"], "normal")
+	_settings_cycle(r2, "camera_shake", "Тряска камеры", ["normal", "off", "strong"],
+		["УМЕРЕННАЯ", "ВЫКЛ", "СИЛЬНАЯ"], "normal")
+	var r3 := UI.hbox(v, 8)
+	_settings_toggle(r3, "post_fx", "Экранные эффекты", true)
+	_settings_toggle(r3, "vignette", "Виньетка и глубина", true)
+	var r4 := UI.hbox(v, 8)
+	_settings_toggle(r4, "screen_flash", "Вспышки экрана", true)
+	_settings_toggle(r4, "hit_stop", "Хит-стоп на ударах", true)
+
+	_settings_section(v, "ИНТЕРФЕЙС")
+	var r5 := UI.hbox(v, 8)
+	_settings_cycle(r5, "lang", "Язык", ["ru", "en"], ["RU", "EN"], "ru")
+	_settings_toggle(r5, "damage_numbers", "Цифры урона", true)
+	var r6 := UI.hbox(v, 8)
+	_settings_toggle(r6, "crosshair", "Прицел и линия огня", true)
+	_settings_cycle(r6, "hud_vitals", "Патроны и HP", ["corner", "player"],
+		["СЛЕВА СВЕРХУ", "НАД ИГРОКОМ"], "corner")
+	var r7 := UI.hbox(v, 8)
+	_settings_toggle(r7, "boss_fx", "Постановка боссов", true)
+	_settings_toggle(r7, "qte", "QTE-добивания", true)
+	var r8 := UI.hbox(v, 8)
+	_settings_toggle(r8, "slowmo", "Замедления", true)
+	_settings_toggle(r8, "combo_fx", "Эффекты комбо", true)
+
+	_settings_section(v, "ИГРОВОЙ ПРОЦЕСС")
+	var r9 := UI.hbox(v, 8)
+	_settings_toggle(r9, "god_mode", "Бессмертие (тест)", false)
+	var hint := UI.label(r9, "God mode влияет на получаемый урон.", 8, UI.DIM)
+	hint.custom_minimum_size = Vector2(272, 18)
+	hint.clip_text = true
+
+	_settings_section(v, "СЕТЬ")
+	var r10 := UI.hbox(v, 8)
+	_settings_text(r10, "net_name", "Имя в сети", Net.my_name, false, 16)
+	_settings_text(r10, "net_port", "Порт", "7777", true, 5)
+
+	var reset := UI.button(body, "ТОЧНО СБРОСИТЬ?" if reset_armed else Loc.t("reset_save"), 9, Vector2(206, 22))
+	reset.position = Vector2(0, 258)
+	reset.add_theme_color_override("font_color", UI.DANGER if reset_armed else UI.DIM)
 	reset.pressed.connect(func() -> void:
-		SaveManager.reset()
-		GameManager.meta = SaveManager.data
-		GameManager.god_mode = false
-		Loc.set_lang("ru")
+		if reset_armed:
+			reset_armed = false
+			SaveManager.reset()
+			GameManager.meta = SaveManager.data
+			GameManager.god_mode = false
+			GameManager.apply_display_settings()
+			Loc.set_lang("ru")
+		else:
+			reset_armed = true
+			AudioManager.play_sfx("error")
 		_open_overlay("settings"))
-	UI.label(body, "God mode — только для проверки, влияет на получаемый урон.", 8, UI.DIM, Vector2(0, y + 50))
-	var fx_keys := [["boss_fx","Постановка боссов"],["slowmo","Замедления"],["qte","QTE"],["post_fx","Экранные эффекты"]]
-	var fy := 62
-	for pair in fx_keys:
-		var key := String(pair[0]); var b := UI.button(body, "%s: %s" % [pair[1], "ВКЛ" if bool(GameManager.setting(key,true)) else "ВЫКЛ"], 8, Vector2(190,20))
-		b.position = Vector2(350,fy); fy += 26
-		b.pressed.connect(func() -> void:
-			GameManager.set_setting(key,not bool(GameManager.setting(key,true)))
-			_open_overlay("settings"))
+	UI.label(body, "F11 — оконный / окно на весь экран / полный экран. Настройки сохраняются сразу.", 8, UI.DIM, Vector2(214, 262))
+
+# ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
+func _net_edit(parent: Control, value: String, pos: Vector2, size: Vector2, placeholder: String, max_len: int = 24) -> LineEdit:
+	var edit := LineEdit.new()
+	edit.text = value
+	edit.placeholder_text = placeholder
+	edit.max_length = max_len
+	edit.position = pos
+	edit.size = size
+	edit.add_theme_font_override("font", UI.crisp_font())
+	edit.add_theme_font_size_override("font_size", 9)
+	edit.add_theme_color_override("font_color", UI.TEXT)
+	edit.add_theme_color_override("font_placeholder_color", UI.MUTED)
+	edit.add_theme_stylebox_override("normal", UI.style(Color(0.07, 0.065, 0.055, 0.95), UI.BORDER, 1, 0))
+	edit.add_theme_stylebox_override("focus", UI.style(Color(0.10, 0.09, 0.07, 1.0), UI.GOLD_DEEP, 1, 0))
+	parent.add_child(edit)
+	return edit
+
+func _net_status(text: String, color: Color = UI.DIM) -> void:
+	if not is_instance_valid(_net_status_label):
+		return
+	_net_status_label.text = text
+	_net_status_label.add_theme_color_override("font_color", color)
+
+func _build_network(body: Control) -> void:
+	# ---------------------------------------------------------- левая колонна: подключение
+	UI.label(body, "ИМЯ В СЕТИ", 9, UI.GOLD, Vector2(0, 0))
+	var name_edit := _net_edit(body, Net.my_name, Vector2(0, 14), Vector2(254, 20), "Странник", 16)
+	name_edit.text_submitted.connect(func(value: String) -> void:
+		var clean := value.strip_edges()
+		if clean != "":
+			Net.set_my_name(clean))
+	name_edit.focus_exited.connect(func() -> void:
+		var clean := name_edit.text.strip_edges()
+		if clean != "":
+			Net.set_my_name(clean))
+	var host_btn := UI.button(body, "СОЗДАТЬ СЕРВЕР", 9, Vector2(254, 24))
+	host_btn.position = Vector2(0, 40)
+	host_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui")
+		var err := Net.host_game()
+		if err != "":
+			status = err
+		else:
+			status = "Сервер открыт. Друзья подключаются по вашему IP."
+		_open_overlay("network", true))
+	UI.label(body, "IP ХОСТА (локальная сеть или интернет)", 9, UI.GOLD, Vector2(0, 70))
+	var ip_edit := _net_edit(body, String(GameManager.setting("net_last_ip", "")), Vector2(0, 84), Vector2(254, 20), "192.168.1.10", 40)
+	var port_edit := _net_edit(body, str(int(GameManager.setting("net_port", 7777))), Vector2(188, 110), Vector2(66, 20), "7777", 5)
+	var join_btn := UI.button(body, "ПОДКЛЮЧИТЬСЯ", 9, Vector2(180, 24))
+	join_btn.position = Vector2(0, 108)
+	join_btn.pressed.connect(func() -> void:
+		AudioManager.play_sfx("ui")
+		var port := int(port_edit.text) if port_edit.text.is_valid_int() else int(GameManager.setting("net_port", 7777))
+		GameManager.set_setting("net_port", port)
+		var err := Net.join_game(ip_edit.text, port)
+		status = err if err != "" else "Подключаемся…"
+		_open_overlay("network", true))
+	var lan_btn := UI.button(body, "ОБНОВИТЬ СПИСОК ЛОКАЛЬНОЙ СЕТИ", 8, Vector2(254, 22))
+	lan_btn.position = Vector2(0, 136)
+	lan_btn.pressed.connect(func() -> void:
+		Net.start_lan_listen()
+		status = "Ищем хосты в локальной сети…"
+		_open_overlay("network", true))
+	var char_btn := UI.button(body, "ГЕРОЙ: %s" % _char_name(Net.local_character), 8, Vector2(254, 22))
+	char_btn.position = Vector2(0, 164)
+	char_btn.pressed.connect(func() -> void:
+		var ids := _available_chars()
+		var idx := maxi(0, ids.find(Net.local_character))
+		Net.set_loadout(String(ids[(idx + 1) % ids.size()]), Net.local_weapon)
+		_open_overlay("network"))
+	var weap_btn := UI.button(body, "ОРУЖИЕ: %s" % _weapon_name(Net.local_weapon), 8, Vector2(254, 22))
+	weap_btn.position = Vector2(0, 190)
+	weap_btn.pressed.connect(func() -> void:
+		var ids := _available_weapons()
+		var idx := maxi(0, ids.find(Net.local_weapon))
+		Net.set_loadout(Net.local_character, String(ids[(idx + 1) % ids.size()]))
+		_open_overlay("network"))
+	var local_ip := Net.local_ip
+	var info := "Мой IP: %s · порт %d" % [local_ip, int(GameManager.setting("net_port", 7777))]
+	UI.label(body, info, 8, UI.PURPLE, Vector2(0, 216))
+	if Net.enabled:
+		var disc := UI.button(body, "ОТКЛЮЧИТЬСЯ", 8, Vector2(254, 22))
+		disc.position = Vector2(0, 236)
+		disc.add_theme_color_override("font_color", UI.DANGER)
+		disc.pressed.connect(func() -> void:
+			Net.leave_session("Вы отключились")
+			status = "Соединение закрыто"
+			_open_overlay("network", true))
+
+	# ---------------------------------------------------------- правая колонна: лобби и LAN
+	var right := 270
+	UI.label(body, "ИГРОКИ В ЛОББИ: %d/%d" % [maxi(1, Net.peer_count()) if Net.enabled else 1, Net.max_players()], 9, UI.GOLD, Vector2(right, 0))
+	var lobby := VBoxContainer.new()
+	lobby.position = Vector2(right, 15)
+	lobby.size = Vector2(286, 70)
+	lobby.add_theme_constant_override("separation", 2)
+	body.add_child(lobby)
+	if Net.lobby_players.is_empty():
+		var empty_lbl := UI.label(lobby, "Никто не подключён. Создайте сервер или найдите хост в LAN.", 8, UI.DIM)
+		empty_lbl.custom_minimum_size = Vector2(286, 16)
+	for key in Net.lobby_players.keys():
+		var entry: Dictionary = Net.lobby_players[key]
+		var is_me := String(key) == str(Net.my_id())
+		var role := "ХОСТ" if String(key) == "1" else "ИГРОК"
+		var text := "%s · %s · %s" % [String(entry.get("name", "Игрок")), _char_name(String(entry.get("character", "aldar"))), role]
+		var row := UI.label(lobby, ("▸ " if is_me else "  ") + text, 8, UI.GOLD_BRIGHT if is_me else UI.TEXT)
+		row.custom_minimum_size = Vector2(286, 15)
+		row.clip_text = true
+	UI.label(body, "ХОСТЫ В ЛОКАЛЬНОЙ СЕТИ", 9, UI.GOLD, Vector2(right, 90))
+	var lan_box := VBoxContainer.new()
+	lan_box.position = Vector2(right, 105)
+	lan_box.size = Vector2(286, 100)
+	lan_box.add_theme_constant_override("separation", 2)
+	body.add_child(lan_box)
+	var hosts := Net.lan_list()
+	if hosts.is_empty():
+		var no_lan := UI.label(lan_box, "Хосты не найдены. Обновите список или введите IP вручную.", 8, UI.DIM)
+		no_lan.custom_minimum_size = Vector2(286, 16)
+	for h in hosts:
+		var host_entry: Dictionary = h
+		var label := "%s · %s:%d · %d/%d" % [String(host_entry.get("name", "Хост")), String(host_entry.get("ip", "")), int(host_entry.get("port", 7777)), int(host_entry.get("players", 1)), int(host_entry.get("max", Net.max_players()))]
+		var btn := UI.button(lan_box, label, 8, Vector2(286, 20))
+		btn.pressed.connect(func() -> void:
+			var err := Net.join_game(String(host_entry.get("ip", "")), int(host_entry.get("port", 7777)))
+			status = err if err != "" else "Подключаемся…"
+			_open_overlay("network"))
+	if Net.is_host():
+		var map_btn := UI.button(body, "КАРТА: %s" % _map_name(lobby_map), 9, Vector2(286, 22))
+		map_btn.position = Vector2(right, 210)
+		map_btn.pressed.connect(func() -> void:
+			var ids := _available_maps()
+			var idx := maxi(0, ids.find(lobby_map))
+			lobby_map = String(ids[(idx + 1) % ids.size()])
+			_open_overlay("network"))
+		var start := UI.primary_button(body, "НАЧАТЬ ЗАБЕГ", 11, Vector2(286, 28))
+		start.position = Vector2(right, 238)
+		start.pressed.connect(func() -> void:
+			AudioManager.play_sfx("ui")
+			Net.start_session({
+				"map": lobby_map,
+				"mode": "standard",
+				"darkness": 1,
+				"seed": randi() % 999983 + 1,
+				"loadouts": Net.loadout_table(),
+			}))
+	else:
+		var wait_txt := "Ждём старта от хоста…" if Net.is_client() else "Подключитесь, чтобы играть вместе."
+		UI.label(body, wait_txt, 9, UI.DIM, Vector2(right, 214))
+	_net_status_label = UI.label(body, status, 8, UI.GREEN if Net.enabled else UI.DIM, Vector2(right, 264))
+	_net_status_label.size = Vector2(286, 18)
+	_net_status_label.clip_text = true
+
+func _char_name(id: String) -> String:
+	var ch := DB.character(id)
+	return String(ch.get("name", id))
+
+func _weapon_name(id: String) -> String:
+	var w := DB.weapon(id)
+	return String(w.get("name", id))
+
+func _map_name(id: String) -> String:
+	var m := DB.map(id)
+	return String(m.get("name", id))
+
+func _available_chars() -> Array:
+	var out: Array = []
+	for ch in DB.characters:
+		var cid := String(ch.get("id", ""))
+		if cid != "" and GameManager.is_char_unlocked(cid):
+			out.append(cid)
+	if out.is_empty():
+		out.append("aldar")
+	return out
+
+func _available_weapons() -> Array:
+	var out: Array = []
+	for w in DB.weapons:
+		var wid := String(w.get("id", ""))
+		if wid != "" and GameManager.is_weapon_unlocked(wid):
+			out.append(wid)
+	if out.is_empty():
+		out.append("revolver")
+	return out
+
+func _available_maps() -> Array:
+	var out: Array = []
+	for m in DB.maps:
+		var mid := String(m.get("id", ""))
+		if mid != "" and not bool(m.get("secret", false)) and GameManager.is_map_unlocked(mid):
+			out.append(mid)
+	if out.is_empty():
+		out.append("forest")
+	return out
+
+## Хост нажал «начать» или клиент получил старт: каждый грузит забег со своим героем.
+func _on_session_start(config: Dictionary) -> void:
+	AudioManager.play_sfx("ui")
+	var cfg := config.duplicate(true)
+	var loadouts: Dictionary = cfg.get("loadouts", {})
+	var mine: Array = loadouts.get(str(Net.my_id()), [])
+	var ch: String = String(mine[0]) if mine.size() > 0 else Net.local_character
+	var wp: String = String(mine[1]) if mine.size() > 1 else Net.local_weapon
+	GameManager.start_run({
+		"character": ch,
+		"weapon": wp,
+		"map": String(cfg.get("map", "forest")),
+		"mode": String(cfg.get("mode", "standard")),
+		"darkness": int(cfg.get("darkness", 1)),
+		"seed": int(cfg.get("seed", 0)),
+		"network": true,
+		"is_host": Net.is_host(),
+		"players": maxi(1, Net.peer_count()),
+		"loadouts": loadouts,
+	})
+
+func _on_net_lobby_changed() -> void:
+	if overlay_kind != "network" or overlay == null or _net_rebuilding:
+		return
+	_net_rebuilding = true
+	_open_overlay("network", true)
+	_net_rebuilding = false
+
+func _on_net_notice(text: String) -> void:
+	status = text
+	_on_net_lobby_changed()
+
+func _on_net_failed(reason: String) -> void:
+	status = reason
+	_on_net_lobby_changed()
 
 func _process(_delta: float) -> void:
 	_refresh_info()
@@ -460,5 +817,7 @@ func _input(event: InputEvent) -> void:
 	if overlay != null and event.is_action_pressed("pause"):
 		overlay.queue_free()
 		overlay = null
+		overlay_kind = ""
+		status = ""
 		_refresh_info()
 		get_viewport().set_input_as_handled()

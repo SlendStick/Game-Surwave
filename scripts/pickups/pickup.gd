@@ -12,6 +12,8 @@ var color := Color.WHITE
 var size := 5.0
 var magnet := false
 var age := 0.0
+## Копия подбора на клиенте: только визуал, подбирает хост.
+var net_remote := false
 
 func setup(g: Node) -> void:
 	game = g

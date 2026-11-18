@@ -778,6 +778,23 @@ def _generate_event_and_vfx_sprites() -> int:
         ho.save(OUT / f"vfx_holy_{f}.png")
         count += 1
 
+    # Бумеранг: дуга полёта + вращающаяся V-пластина (4 кадра)
+    for f in range(4):
+        bm = Canvas(36, 36)
+        r = 7 + f * 4
+        for ang in (-40 + f * 26, 40 + f * 26):
+            a = math.radians(ang)
+            bm.rect(int(18 + math.cos(a) * r), int(18 + math.sin(a) * r), 2, 2, c("gold_glow"))
+        bm.ring(18, 18, r, max(1, r - 2), (c("brass")[0], c("brass")[1], c("brass")[2], 220 - f * 45))
+        spin = f * 0.6
+        for side in (-1, 1):
+            ex = 18 + int(math.cos(spin) * 10.0 * side)
+            ey = 18 + int(math.sin(spin) * 10.0 * side) - 2
+            bm.line(18, 18, ex, ey, c("gold_lt"), 2)
+        bm.poly([(18, 12), (22, 18), (14, 18)], c("cream"))
+        bm.save(OUT / f"vfx_boomerang_{f}.png")
+        count += 1
+
     for f in range(3):
         wn = Canvas(32, 32)
         r = 6 + f * 4

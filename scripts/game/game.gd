@@ -93,6 +93,12 @@ var satanail_defeated := false
 var secret_spawn_pending := false
 
 var vision_mult := 1.0
+var vignette_rect: ColorRect = null
+var vignette_mat: ShaderMaterial = null
+var vignette_pulse := 0.0
+var camera_kick := Vector2.ZERO
+var look_ahead := Vector2.ZERO
+var hitstop_left := 0.0
 var last_intensity_check := 0.0
 var rng := RandomNumberGenerator.new()
 var run_started := false
@@ -132,6 +138,17 @@ var dodge_qte_damage := 0
 var dodge_qte_source := Vector2.ZERO
 var counter_qte_left := 0.0
 var coop_player: CoopCompanion = null
+
+# --- сеть (кооп до 4 игроков: хост считает мир, клиенты присылают состояние)
+var net_active := false
+var net_host := false
+var net_proxies: Array = []
+var net_enemies: Dictionary = {}
+var net_bullets: Array = []
+var net_pickup_ghosts: Array = []
+var net_id_seq := 1
+var _net_snapshot_cd := 0.0
+var _net_state_cd := 0.0
 var wave_number := 0
 var wave_break := 0.0
 var photo_filter := 0
@@ -149,6 +166,7 @@ var solid_cells: Dictionary = {}
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameManager.game = self
+	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN if bool(GameManager.setting("crosshair", true)) else Input.MOUSE_MODE_VISIBLE)
 	mode = String(GameManager.run_config.get("mode", "standard"))
 	var seed_value := int(GameManager.run_config.get("seed", 0))
 	if seed_value == 0:
@@ -189,11 +207,13 @@ func _ready() -> void:
 	if mode == "coop":
 		coop_player = CoopCompanion.new(); world.add_child(coop_player); coop_player.setup(self,player.global_position+Vector2(28,0))
 	xp_need = _xp_for_level(1)
+	_setup_net()
 	wave_mgr = WaveManager.new()
 	wave_mgr.setup(self, map_data, mode, diff_mods)
 	events_mgr = MapEvents.new()
 	events_mgr.setup(self, map_data)
 	_setup_vision_layer()
+	_setup_vignette()
 	_setup_hud()
 	_setup_photo_ui()
 	_apply_map_mods()
@@ -321,7 +341,8 @@ func _setup_camera() -> void:
 	camera.limit_top = 0
 	camera.limit_right = int(map_rect.size.x)
 	camera.limit_bottom = int(map_rect.size.y)
-	camera.zoom = Vector2(BASE_CAMERA_ZOOM, BASE_CAMERA_ZOOM)
+	var z0 := BASE_CAMERA_ZOOM * GameManager.camera_zoom_scale()
+	camera.zoom = Vector2(z0, z0)
 	add_child(camera)
 	camera.make_current()
 
@@ -444,7 +465,7 @@ func hit_obstacle(obstacle: Dictionary, amount: float) -> void:
 	if node != null and is_instance_valid(node):
 		node.queue_free()
 	_unregister_obstacle(obstacle)
-	if not player.has_meta("no_heal") and randf() < 0.07:
+	if not player.has_meta("no_heal") and randf() < 0.035:
 		spawn_pickup("heart", rect.get_center(), 1.0)
 
 func _unregister_obstacle(obstacle: Dictionary) -> void:
@@ -648,10 +669,10 @@ func _run_perk_dependency_test() -> void:
 	var ids:=_perk_ids_for_test({})
 	assert(ids.size()==25,"На старте должны быть доступны только 25 перков T1")
 	for pid in ids: assert(int(DB.perk(pid).get("tier",0))==1,"До T1 открылся старший перк: "+pid)
-	ids=_perk_ids_for_test({"spear_t1":1})
-	assert(ids.has("spear_t2b") and not ids.has("spear_t2a"),"Рыцарь Копья открылся без Души")
-	ids=_perk_ids_for_test({"spear_t1":1,"soul_t1":1})
-	assert(ids.has("spear_t2a"),"Рыцарь Копья не открылся с Душой")
+	ids=_perk_ids_for_test({"boomerang_t1":1})
+	assert(ids.has("boomerang_t2b") and not ids.has("boomerang_t2a"),"Рыцарь Бумеранга открылся без Души")
+	ids=_perk_ids_for_test({"boomerang_t1":1,"soul_t1":1})
+	assert(ids.has("boomerang_t2a"),"Рыцарь Бумеранга не открылся с Душой")
 	ids=_perk_ids_for_test({"soul_t1":1,"soul_t2a":1})
 	assert(not ids.has("soul_t3"),"Душа-Рыцарь открылся без дерева Призыва")
 	ids=_perk_ids_for_test({"soul_t1":1,"soul_t2a":1,"summon_t1":1})
@@ -698,17 +719,17 @@ func _run_perk_effect_test() -> void:
 	if player != null:
 		var saved_flags: Dictionary = player.upg.flags.duplicate(true)
 		player.upg.apply_flags({"summon": "scythe"})
-		player.upg.apply_flags({"summon": "holy_spear"})
+		player.upg.apply_flags({"summon": "boomerang"})
 		player._tick_perk_summons()
 		var has_scythe := false
-		var has_spear := false
+		var has_boomerang := false
 		for a in allies:
 			if a.active and a.kind == "scythe":
 				has_scythe = true
-			elif a.active and a.kind == "holy_spear":
-				has_spear = true
+			elif a.active and a.kind == "boomerang":
+				has_boomerang = true
 		assert(has_scythe, "Перк Призрачный Серп не призвал серп")
-		assert(has_spear, "Перк Святое Копьё не призвал копьё")
+		assert(has_boomerang, "Перк Бумеранг не призвал бумеранг")
 		for a in allies:
 			if a.perk_summon:
 				a.deactivate()
@@ -1410,6 +1431,8 @@ func _prof(name: String, t0: int) -> void:
 func _process(delta: float) -> void:
 	_tick_flash(delta)
 	_tick_vision()
+	_tick_vignette(delta)
+	_tick_hitstop(delta)
 	if not run_started or ended:
 		return
 	if get_tree().paused:
@@ -1428,6 +1451,7 @@ func _process(delta: float) -> void:
 	var _t0 := Time.get_ticks_usec()
 	_tick_player(delta)
 	if coop_player != null: coop_player.tick(delta)
+	_net_tick(delta)
 	_prof("player", _t0)
 	_t0 = Time.get_ticks_usec()
 	_tick_enemies(delta)
@@ -1447,8 +1471,9 @@ func _process(delta: float) -> void:
 	_tick_player_pulls(delta)
 	_tick_fx(delta)
 	_tick_map(delta)
-	wave_mgr.tick(delta)
-	events_mgr.tick(delta)
+	if not (net_active and not net_host):
+		wave_mgr.tick(delta)
+		events_mgr.tick(delta)
 	_tick_audio(delta)
 	_tick_perf_guard(delta)
 	_tick_camera(delta)
@@ -1535,12 +1560,14 @@ func _player_zones_heal(delta: float) -> void:
 		pass
 
 func _tick_enemies(delta: float) -> void:
-	if GameManager.cheat_frozen:
+	if GameManager.cheat_frozen and (not net_active or net_host):
 		return
 	for enemy in enemies:
 		if not enemy.active:
 			continue
 		enemy.tick(delta)
+	if net_active and not net_host:
+		return
 	var _t0 := Time.get_ticks_usec()
 	_apply_separation(delta)
 	_prof("separation", _t0)
@@ -1589,6 +1616,8 @@ func _tick_ebullets(delta: float) -> void:
 			b.tick(delta)
 
 func _tick_pickups(delta: float) -> void:
+	if net_active and not net_host:
+		return
 	for p in pickups:
 		if p.active:
 			p.tick(delta)
@@ -1789,30 +1818,76 @@ func _tick_chaos(_delta: float) -> void:
 		3: director_mods.spawn = 2.0
 		4: upg.apply_mods({"proj":1}); player.recalc()
 
+## Камера: смотрит вперёд по прицелу, следит за напарниками в сети,
+## отъезжает при наплыве врагов и добавляет кинематографичный «кик» при попаданиях.
 func _tick_camera(delta: float) -> void:
 	if player == null:
 		return
-	var target := player.global_position
+	var base_zoom := BASE_CAMERA_ZOOM * GameManager.camera_zoom_scale()
+	var target: Vector2 = player.global_position
+	var zoom_target := base_zoom
+	# сетевой кооп: держим в кадре всю группу
+	if net_active and not net_proxies.is_empty():
+		var group_center := player.global_position
+		var group := 1.0
+		for np in net_proxies:
+			if np.dead:
+				continue
+			group_center += np.global_position
+			group += 1.0
+		group_center /= group
+		var spread := player.global_position.distance_to(group_center)
+		target = target.lerp(group_center, 0.6)
+		zoom_target *= clampf(1.0 - spread / 1100.0, 0.7, 1.0)
+	# мягкий «взгляд вперёд» по прицелу — кадр дышит в сторону боя
+	var ahead_len := 16.0 if player.moving_now else 10.0
+	look_ahead = look_ahead.lerp(player.aim_dir * ahead_len, clampf(3.0 * delta, 0.0, 1.0))
+	target += look_ahead
 	if boss_enemy != null and boss_enemy.active:
 		boss_focus += delta
-		# 60% фокус на боссе, но игрок остаётся читаемым в кадре
-		target = player.global_position.lerp(boss_enemy.global_position, 0.38)
-		camera_zoom_target = BASE_CAMERA_ZOOM + (0.15 if boss_enemy.hp / boss_enemy.max_hp < 0.3 else 0.0)
+		target = target.lerp(boss_enemy.global_position, 0.34)
+		zoom_target += 0.10 + (0.10 if boss_enemy.hp / boss_enemy.max_hp < 0.3 else 0.0)
 	else:
 		boss_focus = 0.0
-		camera_zoom_target = BASE_CAMERA_ZOOM + (0.1 if player.hp <= 1 else 0.0)
-	camera.global_position = camera.global_position.lerp(target, clampf((6.0 if boss_enemy != null else 9.0) * delta, 0.0, 1.0))
-	var z := lerpf(camera.zoom.x, camera_zoom_target, clampf(3.0*delta,0.0,1.0))
-	camera.zoom = Vector2(z,z)
-	if shake_amount > 0.0:
-		shake_amount = maxf(0.0, shake_amount - delta * 18.0)
-		camera.offset = Vector2(randf_range(-shake_amount, shake_amount), randf_range(-shake_amount, shake_amount))
+		# наплыв толпы: чуть шире кадр, чтобы читать угрозы
+		var crowd := float(enemies_in_radius(player.global_position, 190.0).size())
+		zoom_target += clampf(crowd / 160.0, 0.0, 0.09)
+		if player.hp <= 1:
+			zoom_target += 0.05
+	if photo_mode:
+		zoom_target = camera.zoom.x
+	camera_zoom_target = zoom_target
+	camera.global_position = camera.global_position.lerp(target, clampf((5.0 if boss_enemy != null else 8.5) * delta, 0.0, 1.0))
+	var z := lerpf(camera.zoom.x, camera_zoom_target, clampf(3.4 * delta, 0.0, 1.0))
+	camera.zoom = Vector2(z, z)
+	var shake_mult := 1.0
+	match String(GameManager.setting("camera_shake", "normal")):
+		"off":
+			shake_mult = 0.0
+		"strong":
+			shake_mult = 1.8
+	shake_amount = maxf(0.0, shake_amount - delta * 17.0)
+	camera_kick = camera_kick.lerp(Vector2.ZERO, clampf(10.0 * delta, 0.0, 1.0))
+	if shake_amount > 0.0 and shake_mult > 0.0:
+		camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake_amount * shake_mult + camera_kick
 	else:
-		camera.offset = Vector2.ZERO
+		camera.offset = camera_kick
+
+## Направленный «толчок» камеры от попадания.
+func kick_camera(dir: Vector2, amount: float) -> void:
+	var mult := 1.0
+	match String(GameManager.setting("camera_shake", "normal")):
+		"off":
+			mult = 0.0
+		"strong":
+			mult = 1.7
+	camera_kick = dir.normalized() * amount * mult
 
 func _cleanup() -> void:
 	for i in range(enemies.size() - 1, -1, -1):
 		if not enemies[i].active:
+			if enemies[i].net_id > 0 and net_enemies.get(enemies[i].net_id, null) == enemies[i]:
+				net_enemies.erase(enemies[i].net_id)
 			if enemy_pool.size() < 400:
 				enemy_pool.append(enemies[i])
 			else:
@@ -1909,6 +1984,10 @@ func spawn_enemy(enemy_id: String, pos: Vector2, opts: Dictionary = {}) -> Enemy
 		float(opts.get("speed_mult", mult["speed"])),
 		bool(opts.get("elite", false)))
 	enemy.apply_map_tint(Gfx.hex(String(map_data.get("palette", {}).get("enemy", "#ffffff"))))
+	if net_active and net_host:
+		enemy.net_id = net_id_seq
+		net_id_seq += 1
+		net_enemies[enemy.net_id] = enemy
 	enemies.append(enemy)
 	GameManager.add_album_enemy(enemy_id)
 	return enemy
@@ -2080,7 +2159,9 @@ func spawn_enemy_bullet(pos: Vector2, dir: Vector2, dmg: int, opts: Dictionary =
 		b.setup(self)
 	else:
 		b = ebullet_pool.pop_back()
-	opts["speed"] = clampf(float(opts.get("speed", 100.0)), 30.0, 250.0)  # вражеская пуля: 100 баз., макс. 250
+	var proj_mult := float(DB.balance["run"].get("enemy_proj_speed", 0.74))
+	# вражеский снаряд намеренно медленный и читаемый: база 100 → ~74, потолок 190
+	opts["speed"] = clampf(float(opts.get("speed", 100.0)) * proj_mult, 24.0, 190.0)
 	b.spawn_at(pos, dir, dmg, opts)
 	ebullets.append(b)
 
@@ -2107,7 +2188,7 @@ func spawn_pickup(kind: String, pos: Vector2, value: float = 1.0) -> void:
 func spawn_ally(kind: String, opts: Dictionary) -> void:
 	opts=opts.duplicate()
 	var soul_bonus:=player.upg.flag_num("soul_knight")*float(player.souls_collected)
-	if kind=="holy_spear": soul_bonus+=player.upg.flag_num("spear_soul")*float(player.souls_collected)
+	if kind=="boomerang": soul_bonus+=player.upg.flag_num("boomerang_soul")*float(player.souls_collected)
 	if kind=="dragonling":
 		var mins:=floorf(elapsed/60.0)
 		opts["damage"]=(float(opts.get("damage",5.0))+player.upg.flag_num("dragon_flat")*mins)*(1.0+player.upg.flag_num("dragon_growth")*mins)
@@ -2124,7 +2205,7 @@ func spawn_ally(kind: String, opts: Dictionary) -> void:
 	allies.append(a)
 	EventBus.summon_count_changed.emit(allies.size())
 	# доп. призывы за перки
-	if not bool(opts.get("no_extra", false)) and int(player.S.summon_count) > 0 and kind in ["spirit", "skeleton", "holy_spear", "dragonling", "scythe"]:
+	if not bool(opts.get("no_extra", false)) and int(player.S.summon_count) > 0 and kind in ["spirit", "skeleton", "boomerang", "dragonling", "scythe"]:
 		for i in int(player.S.summon_count):
 			var extra: Ally
 			if ally_pool.is_empty():
@@ -2233,6 +2314,9 @@ func shard_burst(pos: Vector2, count: int, dmg: float) -> void:
 func damage_enemy(enemy: Node2D, amount: float, opts: Dictionary = {}) -> void:
 	if enemy == null or not enemy.active or amount <= 0.0:
 		return
+	if net_active and not net_host:
+		_net_client_damage(enemy, amount, opts)
+		return
 	var dmg := amount * (1.0 + float(combo) * 0.005)
 	if player != null and player.has_meta("qte_bonus"):
 		dmg*=float(player.get_meta("qte_bonus",1.25)); player.remove_meta("qte_bonus")
@@ -2279,6 +2363,7 @@ func damage_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false,
 		combo = 0
 		time_since_damage = 0.0
 		tension = clampf(tension + 2.0,0.0,100.0)
+		kick_camera(player.global_position - from_pos, 4.5)
 		if hud != null: hud.update_combo(0)
 	damage_taken = player.damage_taken
 
@@ -2559,6 +2644,8 @@ func pop_corpse() -> Vector2:
 	return corpses.pop_back()
 
 func shake(amount: float) -> void:
+	if String(GameManager.setting("camera_shake", "normal")) == "off":
+		return
 	if GameManager.setting("shake", true) and Engine.get_frames_per_second() >= 45:
 		shake_amount = maxf(shake_amount, amount)
 
@@ -2625,6 +2712,67 @@ void fragment() {
 	vision_mat.shader = shader
 	vision_rect.material = vision_mat
 	layer.add_child(vision_rect)
+
+## Виньетка: мягкое затемнение краёв + цветной пульс от низкого HP и комбо.
+func _setup_vignette() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 3
+	add_child(layer)
+	vignette_rect = ColorRect.new()
+	vignette_rect.color = Color.WHITE
+	vignette_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vignette_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var sh := Shader.new()
+	sh.code = """shader_type canvas_item;
+uniform float strength = 0.52;
+uniform float pulse = 0.0;
+uniform vec3 rim = vec3(0.74, 0.18, 0.16);
+void fragment() {
+	vec2 d = UV - vec2(0.5);
+	float r = length(d * vec2(1.18, 1.0));
+	float v = smoothstep(0.32, 0.88, r);
+	vec3 col = mix(vec3(0.01, 0.011, 0.02), rim, clamp(pulse, 0.0, 1.0) * v);
+	COLOR = vec4(col, v * strength + v * pulse * 0.34);
+}"""
+	vignette_mat = ShaderMaterial.new()
+	vignette_mat.shader = sh
+	vignette_rect.material = vignette_mat
+	layer.add_child(vignette_rect)
+
+func _tick_vignette(delta: float) -> void:
+	if vignette_rect == null or vignette_mat == null:
+		return
+	var on := bool(GameManager.setting("vignette", true)) and run_started and not ended and not photo_mode
+	vignette_rect.visible = on
+	if not on:
+		return
+	var low := 0.0
+	if player != null:
+		low = 1.0 - clampf(float(player.hp) / maxf(1.0, float(player.max_hp)), 0.0, 1.0)
+	var combo_k := 0.0
+	if bool(GameManager.setting("combo_fx", true)):
+		combo_k = clampf(float(combo) / 20.0, 0.0, 1.0)
+	var target_pulse := maxf(pow(low, 1.4) * 0.9, combo_k * 0.4)
+	vignette_pulse = lerpf(vignette_pulse, target_pulse, clampf(4.0 * delta, 0.0, 1.0))
+	vignette_mat.set_shader_parameter("pulse", vignette_pulse)
+	vignette_mat.set_shader_parameter("strength", 0.46 + 0.06 * sin(float(Time.get_ticks_msec()) * 0.0016))
+
+## Короткий «хит-стоп» на важных ударах: мир замирает на доли секунды.
+func hitstop(duration: float = 0.05) -> void:
+	if not bool(GameManager.setting("hit_stop", true)) or GameManager.autoplay:
+		return
+	if ended or Engine.time_scale != 1.0 or get_tree().paused:
+		return
+	hitstop_left = maxf(hitstop_left, duration)
+	Engine.time_scale = 0.14
+
+func _tick_hitstop(delta: float) -> void:
+	if hitstop_left <= 0.0:
+		return
+	hitstop_left -= delta / maxf(0.02, Engine.time_scale)
+	if hitstop_left <= 0.0:
+		hitstop_left = 0.0
+		Engine.time_scale = 1.0
 
 func current_vision_radius() -> float:
 	var base_v := float(player.S.vision) if player != null else 190.0
@@ -2794,6 +2942,11 @@ func on_enemy_death(enemy: Enemy) -> void:
 		Progression.add_progress("combo20", 1)
 	Progression.record_combo(combo)
 	if hud != null: hud.update_combo(combo)
+	if enemy.boss:
+		hitstop(0.085)
+		kick_camera(enemy.global_position - player.global_position, 3.0)
+	elif enemy.elite:
+		hitstop(0.035)
 	GameManager.add_album_enemy(enemy.id)
 	var role: String = String(enemy.role)
 	var dark_drop := (1.0 + float(int(GameManager.run_config.get("darkness", 1))) * 0.05) * (1.0 + float(combo) * float(combo_cfg.get("drop_per", 0.0075)))
@@ -2982,8 +3135,8 @@ func _card_vfx_kind(card: Dictionary) -> String:
 		"flame", "dragon", "damage": return "fireball"
 		"frost", "pickup": return "frost"
 		"dark", "soul", "scythe", "beast": return "curse"
-		"light", "shield", "health", "spear", "seal": return "holy"
-		"wind", "dodge", "move", "fast_arrows", "multishot", "proj_speed": return "wind"
+		"light", "shield", "health", "seal": return "holy"
+		"wind", "dodge", "move", "boomerang", "fast_arrows", "multishot", "proj_speed": return "wind"
 		"reload", "fire_rate", "pierce", "char_upgrade": return "blood"
 		"vision", "summon", "synergy", "evolution": return "smite"
 		_: return "holy"
@@ -3539,6 +3692,8 @@ func enemy_mult(role: String) -> Dictionary:
 func _check_end_conditions() -> void:
 	if ended:
 		return
+	if net_active and not net_host:
+		return
 	if mode != "endless" and elapsed >= wave_mgr.duration + 240.0:
 		# страховка: если финальный босс почему-то не появился/не убит
 		if not first_boss_done:
@@ -3556,6 +3711,9 @@ func _finish_run(win: bool, secret_win: bool) -> void:
 		return
 	ended = true
 	victory = win
+	hitstop_left = 0.0
+	if Engine.time_scale < 1.0:
+		Engine.time_scale = 1.0
 	photo_mode = false
 	if photo_layer != null:
 		photo_layer.visible = false
@@ -3700,6 +3858,354 @@ func _capture_photo() -> void:
 			photo_info.text = "Снимок сохранён: %s" % path.get_file()
 	print("[SURWAVE] photo=",path," err=",err," metadata map=",map_data.get("name","")," character=",player.char_data.get("name","")," time=",elapsed," level=",level," combo=",combo," kills=",kills," trials=",GameManager.run_config.get("trials",[]))
 
+# ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
+## Хост считает мир и рассылает снапшоты (10 Гц) + состояния игроков (20 Гц).
+## Клиент двигает своего игрока сам, рисует «кукол» врагов/снарядов/подборов
+## по снапшотам и отправляет хосту свой урон.
+func _setup_net() -> void:
+	net_active = bool(GameManager.run_config.get("network", false)) and Net.enabled
+	if not net_active:
+		return
+	net_host = Net.is_host()
+	Net.snapshot_received.connect(_net_apply_snapshot)
+	Net.state_received.connect(_net_on_state)
+	Net.damage_received.connect(_net_on_local_damage)
+	Net.event_received.connect(_net_on_event)
+	Net.session_ended.connect(_net_on_session_ended)
+	var loadouts: Dictionary = GameManager.run_config.get("loadouts", {})
+	var idx := 0
+	for key in loadouts.keys():
+		var pid := int(String(key))
+		if pid == Net.my_id():
+			continue
+		var pair: Array = loadouts[key]
+		var ch: String = String(pair[0]) if pair.size() > 0 else "aldar"
+		var wp: String = String(pair[1]) if pair.size() > 1 else "revolver"
+		var np := NetPlayer.new()
+		np.name = "Remote%d" % pid
+		world.add_child(np)
+		var ang := TAU * float(idx) / maxf(1.0, float(maxi(1, loadouts.size() - 1)))
+		np.setup(self, pid, Net.player_name(pid), ch, wp,
+			clamp_to_map(player.global_position + Vector2.RIGHT.rotated(ang) * 30.0))
+		net_proxies.append(np)
+		idx += 1
+	notify("СЕТЕВАЯ ИГРА · игроков: %d" % (net_proxies.size() + 1))
+	if net_host:
+		AudioManager.play_sfx("phase")
+
+func _net_tick(delta: float) -> void:
+	if not net_active:
+		return
+	for np in net_proxies:
+		np.update_visual(delta)
+	_net_state_cd -= delta
+	if net_host:
+		_net_snapshot_cd -= delta
+		if _net_snapshot_cd <= 0.0:
+			_net_snapshot_cd = 0.1
+			Net.broadcast_snapshot(_net_build_snapshot())
+		if _net_state_cd <= 0.0:
+			_net_state_cd = 0.05
+			Net.broadcast_states(_net_state_table())
+	elif _net_state_cd <= 0.0:
+		_net_state_cd = 0.05
+		Net.send_player_state(_net_player_payload(player,
+			String(GameManager.run_config.get("character", "aldar")),
+			String(GameManager.run_config.get("weapon", "revolver"))))
+
+func _net_player_payload(p: Node2D, ch: String, wp: String) -> Dictionary:
+	var aim := Vector2.RIGHT
+	var dead := false
+	var hp := 3
+	var max_hp := 3
+	var moving := false
+	if p is Player:
+		var pl := p as Player
+		aim = pl.aim_dir
+		dead = pl.dead
+		hp = pl.hp
+		max_hp = pl.max_hp
+		moving = pl.moving_now
+	elif p is NetPlayer:
+		var np := p as NetPlayer
+		aim = np.aim
+		dead = np.dead
+		hp = np.hp
+		max_hp = np.max_hp
+		moving = np.moving
+	return {
+		"x": int(p.global_position.x), "y": int(p.global_position.y),
+		"ax": aim.x, "ay": aim.y, "hp": hp, "max": max_hp,
+		"dead": dead, "mv": moving, "ch": ch, "wp": wp,
+	}
+
+func _net_state_table() -> Dictionary:
+	var out: Dictionary = {}
+	out["1"] = _net_player_payload(player,
+		String(GameManager.run_config.get("character", "aldar")),
+		String(GameManager.run_config.get("weapon", "revolver")))
+	for np in net_proxies:
+		out[str(np.peer_id)] = _net_player_payload(np, np.char_id, np.weapon_id)
+	return out
+
+func _net_on_state(peer_id: int, state: Dictionary) -> void:
+	if not net_active or peer_id == Net.my_id():
+		return
+	for np in net_proxies:
+		if np.peer_id == peer_id:
+			np.apply_state(state)
+			return
+
+func _net_build_snapshot() -> Dictionary:
+	var players_list: Array = []
+	players_list.append([1, int(player.global_position.x), int(player.global_position.y),
+		player.hp, player.max_hp, 1 if player.dead else 0])
+	for np in net_proxies:
+		players_list.append([np.peer_id, int(np.global_position.x), int(np.global_position.y),
+			np.hp, np.max_hp, 1 if np.dead else 0])
+	var enemy_list: Array = []
+	for e in enemies:
+		if not e.active:
+			continue
+		if not e.boss and e.global_position.distance_squared_to(player.global_position) > 1600.0 * 1600.0:
+			continue
+		enemy_list.append([e.net_id, String(e.id), int(e.global_position.x), int(e.global_position.y),
+			int(maxf(1.0, e.hp)), int(maxf(1.0, e.max_hp)), 1 if e.elite else 0])
+	var bullet_list: Array = []
+	for b in ebullets:
+		if not b.active:
+			continue
+		if b.global_position.distance_squared_to(player.global_position) > 1300.0 * 1300.0:
+			continue
+		bullet_list.append([int(b.global_position.x), int(b.global_position.y),
+			int(rad_to_deg(b.rotation)), int(b.radius * 10.0)])
+	var pick_list: Array = []
+	for pk in pickups:
+		if not pk.active or String(pk.kind) == "chest":
+			continue
+		pick_list.append([String(pk.kind), int(pk.global_position.x), int(pk.global_position.y)])
+	return {
+		"e": enemy_list, "b": bullet_list, "p": players_list, "pk": pick_list,
+		"xp": xp, "xn": xp_need, "lv": level, "k": kills, "t": int(elapsed),
+	}
+
+func _net_apply_snapshot(snap: Dictionary) -> void:
+	if not net_active or net_host or ended:
+		return
+	var plist: Array = snap.get("p", [])
+	for entry in plist:
+		var arr: Array = entry
+		if arr.size() < 4:
+			continue
+		var pid := int(arr[0])
+		if pid == Net.my_id():
+			var new_hp := int(arr[3])
+			if not GameManager.god_mode and new_hp != player.hp and not player.dead:
+				player.hp = clampi(new_hp, 0, player.max_hp)
+				EventBus.hp_changed.emit(player.hp, player.max_hp)
+				if player.hp <= 0:
+					player.dead = true
+					_on_player_died()
+			continue
+		for np in net_proxies:
+			if np.peer_id == pid:
+				np.apply_state({
+					"x": int(arr[1]), "y": int(arr[2]), "hp": int(arr[3]),
+					"max": int(arr[4]), "dead": int(arr[5]) == 1,
+				})
+				break
+	var lv_new := int(snap.get("lv", level))
+	if lv_new > level:
+		var gained := lv_new - level
+		level = lv_new
+		xp = int(snap.get("xp", 0))
+		xp_need = _xp_for_level(level)
+		pending_level_ups += gained
+		player.on_level_up(level)
+		AudioManager.play_sfx("levelup")
+		spawn_perk_fx("holy", player.global_position, 72.0, 0.42)
+		_open_level_up()
+	else:
+		level = maxi(1, lv_new)
+		xp = int(snap.get("xp", xp))
+		xp_need = int(snap.get("xn", xp_need))
+	EventBus.xp_changed.emit(xp, xp_need, level)
+	kills = int(snap.get("k", kills))
+	elapsed = maxf(elapsed, float(snap.get("t", int(elapsed))))
+	_net_sync_ghosts(snap.get("e", []))
+	_net_sync_bullets(snap.get("b", []))
+	_net_sync_pickups(snap.get("pk", []))
+
+func _net_sync_ghosts(list: Array) -> void:
+	var seen: Dictionary = {}
+	for entry in list:
+		var arr: Array = entry
+		if arr.size() < 6:
+			continue
+		var nid := int(arr[0])
+		seen[nid] = true
+		var e: Enemy = net_enemies.get(nid, null) as Enemy
+		if e == null or not is_instance_valid(e):
+			e = _net_spawn_ghost(nid, String(arr[1]), Vector2(float(arr[2]), float(arr[3])))
+			if e == null:
+				continue
+		e.net_target = Vector2(float(arr[2]), float(arr[3]))
+		e.hp = float(arr[4])
+		e.max_hp = maxf(1.0, float(arr[5]))
+		e.elite = int(arr[6]) == 1
+		if e.hp <= 0.0 and e.active:
+			_net_ghost_death(e)
+	for nid in net_enemies.keys():
+		if seen.has(nid):
+			continue
+		var gone: Enemy = net_enemies[nid] as Enemy
+		if gone != null and is_instance_valid(gone) and gone.active:
+			gone.deactivate()
+		net_enemies.erase(nid)
+
+func _net_spawn_ghost(nid: int, enemy_id: String, pos: Vector2) -> Enemy:
+	var data := DB.enemy(enemy_id)
+	if data.is_empty():
+		return null
+	var e: Enemy = ENEMY_SCENE.instantiate()
+	world.add_child(e)
+	e.setup(self)
+	e.init_enemy(self, data, pos)
+	e.net_remote = true
+	e.net_id = nid
+	e.net_target = pos
+	e.apply_map_tint(Gfx.hex(String(map_data.get("palette", {}).get("enemy", "#ffffff"))))
+	enemies.append(e)
+	net_enemies[nid] = e
+	return e
+
+func _net_ghost_death(e: Enemy) -> void:
+	spawn_fx(e.global_position, e.color, e.radius * 2.0, 0.25)
+	if e.boss:
+		spawn_perk_fx("blood", e.global_position, 90.0, 0.5)
+	e.deactivate()
+
+func _net_sync_bullets(list: Array) -> void:
+	while net_bullets.size() < list.size():
+		var b: EnemyBullet = EBULLET_SCENE.instantiate()
+		world.add_child(b)
+		b.setup(self)
+		b.net_remote = true
+		b.active = true
+		b.visible = true
+		b.sprite.texture = Assets.tex("projectile_enemy", Color(1.0, 0.42, 0.42))
+		b.sprite.scale = Vector2(0.8, 0.8)
+		net_bullets.append(b)
+	for i in net_bullets.size():
+		var b: EnemyBullet = net_bullets[i]
+		if i >= list.size():
+			b.visible = false
+			b.active = false
+			continue
+		var arr: Array = list[i]
+		if arr.size() < 4:
+			continue
+		var target := Vector2(float(arr[0]), float(arr[1]))
+		b.visible = true
+		b.active = true
+		b.net_target = target
+		if b.global_position.distance_to(target) > 220.0:
+			b.global_position = target
+		b.rotation = deg_to_rad(float(arr[2]))
+		b.life = 1.0
+
+func _net_sync_pickups(list: Array) -> void:
+	while net_pickup_ghosts.size() < list.size():
+		var pk: Pickup = PICKUP_SCENE.instantiate()
+		world.add_child(pk)
+		pk.setup(self)
+		pk.net_remote = true
+		net_pickup_ghosts.append(pk)
+	for i in net_pickup_ghosts.size():
+		var pk: Pickup = net_pickup_ghosts[i]
+		if i >= list.size():
+			pk.visible = false
+			continue
+		var arr: Array = list[i]
+		if arr.size() < 3:
+			continue
+		var pos := Vector2(float(arr[1]), float(arr[2]))
+		var kind := String(arr[0])
+		if not pk.active or pk.kind != kind:
+			pk.spawn_at(pos, kind, 1.0, Color(0.55, 0.9, 1.0), 5.0)
+			pk.net_remote = true
+		pk.visible = true
+		pk.global_position = pos
+
+## Клиент бьёт «куклу»: локальный отклик и запрос урона хосту.
+func _net_client_damage(enemy: Node2D, amount: float, opts: Dictionary) -> void:
+	var e := enemy as Enemy
+	if e == null or e.net_remote == false:
+		return
+	e.hp -= amount
+	e.hit_flash = 0.12
+	if GameManager.setting("damage_numbers", true) and amount >= 2.0:
+		spawn_dmg_number(e.global_position, amount, bool(opts.get("crit", false)), String(opts.get("source", "")))
+	if e.net_id > 0:
+		Net.request_damage(e.net_id, amount, String(opts.get("source", "weapon")))
+	if e.hp <= 0.0 and e.active:
+		_net_ghost_death(e)
+
+## Хост: урон по сетевому напарнику (снаряд/контакт врага).
+func net_hit_proxy(np: NetPlayer, dmg: int, from_pos: Vector2) -> void:
+	if np == null or np.dead:
+		return
+	np.hp -= dmg
+	np.hit_flash = 0.3
+	spawn_dmg_number(np.global_position, float(dmg), false, "net")
+	spawn_fx(np.global_position, Color(0.7, 0.95, 1.0, 0.8), 18.0, 0.2)
+	Net.send_player_damage(np.peer_id, dmg, from_pos)
+	if np.hp <= 0:
+		np.hp = 0
+		np.dead = true
+		np.visible = false
+		notify("%s выбыл из боя" % np.display_name)
+
+func _net_on_local_damage(amount: int, from_pos: Vector2) -> void:
+	if ended or player == null or player.dead:
+		return
+	damage_player(amount, from_pos, false, "net")
+
+func _net_on_event(kind: String, data: Dictionary) -> void:
+	match kind:
+		"request_damage":
+			if not net_host:
+				return
+			var enemy := _net_enemy_by_id(int(data.get("net_id", 0)))
+			if enemy != null and enemy.active:
+				damage_enemy(enemy, float(data.get("amount", 1.0)),
+					{"source": String(data.get("source", "net")), "silent": true})
+		"boss":
+			AudioManager.set_boss_layer(true)
+			AudioManager.play_sfx("boss")
+		"notice":
+			notify(String(data.get("text", "")))
+		"levelup":
+			AudioManager.play_sfx("levelup")
+		_:
+			pass
+
+func _net_enemy_by_id(id: int) -> Enemy:
+	if id <= 0:
+		return null
+	var e: Enemy = net_enemies.get(id, null) as Enemy
+	if e != null and is_instance_valid(e) and e.active:
+		return e
+	return null
+
+func _net_on_session_ended(reason: String) -> void:
+	if not net_active:
+		return
+	net_active = false
+	notify(reason)
+	if not ended:
+		_finish_run(false, false)
+
 # ------------------------------------------------------------------ ПРОЧЕЕ
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("photo_mode") and not ended:
@@ -3728,5 +4234,4 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP: camera.zoom = (camera.zoom + Vector2(0.1,0.1)).clamp(Vector2(0.5,0.5),Vector2(4,4))
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN: camera.zoom = (camera.zoom - Vector2(0.1,0.1)).clamp(Vector2(0.5,0.5),Vector2(4,4))
 	if event.is_action_pressed("fullscreen"):
-		var w := get_window()
-		w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		GameManager.cycle_window_mode()

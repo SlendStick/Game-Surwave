@@ -1632,3 +1632,51 @@ func _draw_target_arrows() -> void:
 			tag_pos.y = clampf(tag_pos.y, 44.0, 344.0)
 			target_arrows.draw_string(font, tag_pos + Vector2(1, 1), String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, Color(0, 0, 0, 0.85))
 			target_arrows.draw_string(font, tag_pos, String(t["tag"]), HORIZONTAL_ALIGNMENT_CENTER, 36, 7, rim)
+
+	# --- линия огня от игрока к прицелу (тонкая, не мешает картинке)
+	if bool(GameManager.setting("aim_line", true)) and game.player != null and not game.player.dead:
+		var aim: Vector2 = game.player.aim_dir
+		var line_from := p_screen + aim * 12.0
+		var line_to := p_screen + aim * 92.0
+		var steps := 4
+		for i in steps:
+			if i % 2 != 0:
+				continue
+			var a := line_from.lerp(line_to, float(i) / float(steps))
+			var b := line_from.lerp(line_to, float(i + 1) / float(steps))
+			target_arrows.draw_line(a, b, Color(0.92, 0.86, 0.68, 0.22), 1.0, true)
+
+	# --- прицел: свой, пиксельный, в стиле игры
+	if bool(GameManager.setting("crosshair", true)) and not game.photo_mode:
+		var mp := get_viewport().get_mouse_position()
+		if Rect2(0, 0, 640, 360).has_point(mp):
+			var cc := Color(0.86, 0.82, 0.66, 0.85)
+			var gap := 3.0
+			var ln := 4.0
+			target_arrows.draw_line(mp + Vector2(gap, 0), mp + Vector2(gap + ln, 0), cc, 1.0, true)
+			target_arrows.draw_line(mp - Vector2(gap, 0), mp - Vector2(gap + ln, 0), cc, 1.0, true)
+			target_arrows.draw_line(mp + Vector2(0, gap), mp + Vector2(0, gap + ln), cc, 1.0, true)
+			target_arrows.draw_line(mp - Vector2(0, gap), mp - Vector2(0, gap + ln), cc, 1.0, true)
+			target_arrows.draw_rect(Rect2(mp - Vector2(1, 1), Vector2(2, 2)), Color(0.95, 0.72, 0.28, 0.9))
+
+	# --- сетевой кооп: подпись режима и стрелки к напарникам
+	if game.net_active and game.net_proxies != null and not game.net_proxies.is_empty():
+		var net_font := UI.crisp_font()
+		var title := "СЕТЬ · %d" % (game.net_proxies.size() + 1)
+		target_arrows.draw_string(net_font, Vector2(520.0, 26.0), title, HORIZONTAL_ALIGNMENT_CENTER, 96, 8, Color(0.55, 0.92, 1.0, 0.75))
+		for np in game.net_proxies:
+			if np == null or not is_instance_valid(np) or np.dead:
+				continue
+			var npos: Vector2 = (np.global_position - cam_center) * zoom_v + center_screen
+			if Rect2(6.0, 34.0, 628.0, 314.0).has_point(npos):
+				continue
+			var ndir := (npos - center_screen).normalized()
+			var nanchor := center_screen + ndir * 168.0
+			var ntip := nanchor + ndir * 9.0
+			var nperp := Vector2(-ndir.y, ndir.x)
+			target_arrows.draw_colored_polygon(
+				PackedVector2Array([ntip, nanchor - ndir * 6.0 + nperp * 5.0, nanchor - ndir * 6.0 - nperp * 5.0]),
+				Color(0.35, 0.85, 1.0, 0.9))
+			var nname := String(np.display_name).substr(0, 10)
+			target_arrows.draw_string(net_font, nanchor - ndir * 16.0 + Vector2(-20.0, 3.0), nname,
+				HORIZONTAL_ALIGNMENT_CENTER, 44, 7, Color(0.7, 0.95, 1.0, 0.8))

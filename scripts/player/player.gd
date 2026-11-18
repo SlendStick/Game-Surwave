@@ -511,7 +511,7 @@ func _tick_perk_summons() -> void:
 		var kind := String(kind_v)
 		if kind == "":
 			continue
-		var desired := 1 + int(S.summon_count) if kind in ["scythe", "holy_spear", "dragonling"] else 1
+		var desired := 1 + int(S.summon_count) if kind in ["scythe", "boomerang", "dragonling"] else 1
 		var active_list: Array = []
 		for a in game.allies:
 			if a.active and a.kind == kind and bool(a.perk_summon):
@@ -519,12 +519,12 @@ func _tick_perk_summons() -> void:
 		var base_dmg := 12.0
 		match kind:
 			"scythe": base_dmg = 14.0
-			"holy_spear": base_dmg = 16.0
+			"boomerang": base_dmg = 13.0
 			"dragonling": base_dmg = 10.0
 			"thunder_beetle": base_dmg = 18.0
 		var dmg := base_dmg * float(S.summon_dmg) + soul_knight
-		if kind == "holy_spear":
-			dmg += upg.flag_num("spear_soul") * float(souls_collected)
+		if kind == "boomerang":
+			dmg += upg.flag_num("boomerang_soul") * float(souls_collected)
 		elif kind == "dragonling":
 			var mins := floorf(float(game.elapsed) / 60.0)
 			dmg = (base_dmg + upg.flag_num("dragon_flat") * mins) * float(S.summon_dmg) * (1.0 + upg.flag_num("dragon_growth") * mins) + soul_knight

@@ -64,6 +64,11 @@ func setup(fx_kind: String, pos: Vector2, sz: float = 48.0, dur: float = 0.32) -
 			sprite.scale = Vector2.ONE * (size_px / 26.0)
 			glow.modulate = Color(0.95, 0.22, 0.25, 0.72)
 			glow.scale = Vector2.ONE * (size_px / 16.0)
+		"boomerang":
+			sprite.scale = Vector2.ONE * (size_px / 24.0)
+			sprite.rotation = randf_range(-0.4, 0.4)
+			glow.modulate = Color(0.95, 0.78, 0.42, 0.7)
+			glow.scale = Vector2.ONE * (size_px / 15.0)
 	_apply_frame(0)
 
 func _apply_frame(idx: int) -> void:
@@ -82,6 +87,8 @@ func _apply_frame(idx: int) -> void:
 			sprite.texture = Assets.icon("vfx_curse_%d" % clampi(idx, 0, 3))
 		"holy":
 			sprite.texture = Assets.icon("vfx_holy_%d" % clampi(idx, 0, 3))
+		"boomerang":
+			sprite.texture = Assets.icon("vfx_boomerang_%d" % clampi(idx, 0, 3))
 		"wind":
 			sprite.texture = Assets.icon("vfx_wind_%d" % clampi(idx, 0, 2))
 		"blood":

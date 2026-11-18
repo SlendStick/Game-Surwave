@@ -1,7 +1,7 @@
 class_name Ally
 extends Node2D
 ## Призывы и временные союзники: духи, скелеты, турели, клинки, торнадо, мотыльки,
-## феникс, дракончик, святые копья, теневые клоны.
+## феникс, дракончик, бумеранги, теневые клоны.
 
 var game: Node = null
 var kind := "spirit"
@@ -21,6 +21,13 @@ var target: Node2D = null
 var hit_cd: Dictionary = {}
 var dragon_breath := false
 var perk_summon := false
+
+# --- бумеранг: висит у героя, летит к одной цели по дуге и возвращается
+var boom_state := "idle"
+var boom_target := Vector2.ZERO
+var boom_timer := 0.0
+var boom_arc := 1.0
+var boom_spin := 0.0
 
 func setup(g: Node) -> void:
 	game = g
@@ -55,12 +62,12 @@ func init_ally(g: Node, k: String, opts: Dictionary) -> void:
 		"phoenix": color = Color(1.0, 0.55, 0.2); radius = 12.0; speed = 150.0
 		"moth": color = Color(0.7, 0.9, 1.0); radius = 8.0; speed = 170.0
 		"scythe": color = Color(0.8, 0.7, 1.0); radius = 12.0; orbit_radius = 46.0
-		"holy_spear": color = Color(1.0, 0.95, 0.6); radius = 10.0; speed = 280.0
+		"boomerang": color = Color(0.86, 0.72, 0.42); radius = 9.0; speed = 168.0
 		"thunder_beetle": color = Color(0.7, 0.8, 1.0); radius = 9.0; speed = 135.0
 		"shadow_clone": color = Color(0.35, 0.3, 0.45); radius = 10.0; speed = 0.0
 		"dragonling": color = Color(0.6, 0.9, 0.6); radius = 11.0; speed = 150.0
 		"aura": color = Color(1.0, 0.9, 0.5); radius = float(opts.get("radius", 120.0)); speed = 0.0
-	var cls:={"spirit":"ally_spirit","skeleton":"ally_skeleton","turret":"ally_turret","blade":"ally_blade","orbit_blade":"ally_blade","tornado":"ally_tornado","phoenix":"ally_phoenix","moth":"ally_moth","scythe":"ally_scythe","holy_spear":"ally_spear","thunder_beetle":"ally_beetle","shadow_clone":"ally_clone","dragonling":"ally_dragon","aura":"ally_aura"}.get(kind,"ally_spirit")
+	var cls:={"spirit":"ally_spirit","skeleton":"ally_skeleton","turret":"ally_turret","blade":"ally_blade","orbit_blade":"ally_blade","tornado":"ally_tornado","phoenix":"ally_phoenix","moth":"ally_moth","scythe":"ally_scythe","boomerang":"ally_boomerang","thunder_beetle":"ally_beetle","shadow_clone":"ally_clone","dragonling":"ally_dragon","aura":"ally_aura"}.get(kind,"ally_spirit")
 	if sprite == null:
 		sprite=Sprite2D.new(); sprite.centered=true; sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST; add_child(sprite)
 	var atex := Assets.tex(String(cls), color)
@@ -86,8 +93,8 @@ func tick(delta: float) -> void:
 	match kind:
 		"spirit":
 			_chase_and_touch(delta, true)
-		"holy_spear":
-			_spear_hunt(delta)
+		"boomerang":
+			_boomerang_tick(delta)
 		"skeleton", "dragonling", "phoenix", "thunder_beetle":
 			_chase_and_shoot(delta)
 		"turret":
@@ -109,63 +116,80 @@ func _nearest() -> Node2D:
 		return null
 	return res[0]
 
-const SPEAR_MAX_RANGE := 215.0
-const SPEAR_ORBIT_RADIUS := 40.0
+const BOOMERANG_RANGE := 300.0
+const BOOMERANG_ORBIT := 34.0
 
-func _spear_slot() -> int:
+func _boomerang_slot() -> int:
 	var idx := 0
 	for a in game.allies:
 		if a == self:
 			return idx
-		if a.active and a.kind == "holy_spear":
+		if a.active and a.kind == "boomerang":
 			idx += 1
 	return idx
 
-func _spear_hunt(delta: float) -> void:
+## Бумеранг: 1) кружит у героя, 2) летит к выбранной цели по дуге,
+## 3) возвращается к герою. Урон наносится в обе стороны, скорость намеренно невысокая.
+func _boomerang_tick(delta: float) -> void:
 	if game == null or game.player == null:
 		return
-	var speed_add := 1.0 + float(game.player.upg.mod("summon_speed"))
+	var speed_add := 1.0 + float(game.player.upg.mod("summon_speed")) * 0.5
 	var ppos: Vector2 = game.player.global_position
-	var dist_from_player := global_position.distance_to(ppos)
-	var cand: Array = game.nearest_enemy(ppos, SPEAR_MAX_RANGE)
-	var tgt: Node2D = null
-	if not cand.is_empty() and dist_from_player <= SPEAR_MAX_RANGE + 28.0:
-		var slot := _spear_slot()
-		tgt = cand[slot % cand.size()]
-	if tgt != null and is_instance_valid(tgt) and tgt.active:
-		var dir := (tgt.global_position - global_position)
-		var dlen := dir.length()
-		var move_speed := speed * speed_add * (1.28 if dlen < 95.0 else 1.05)
-		if dlen > 1.0:
-			var move_dir := dir / dlen
-			global_position += move_dir * move_speed * delta
-			if sprite != null:
-				sprite.rotation = move_dir.angle() + PI * 0.25
-		# Ограничение дальности действия от игрока
-		var after_off := global_position - ppos
-		if after_off.length() > SPEAR_MAX_RANGE:
-			global_position = ppos + after_off.normalized() * SPEAR_MAX_RANGE
-		if attack_cd <= 0.0:
-			attack_cd = 0.08
-			game.spawn_fx(global_position, Color(1.0, 0.92, 0.45, 0.55), 7.0, 0.12)
-	else:
-		orbit_angle += delta * 2.8 * speed_add
-		var home: Vector2 = ppos + Vector2.RIGHT.rotated(orbit_angle) * SPEAR_ORBIT_RADIUS
-		var to_home: Vector2 = home - global_position
-		if to_home.length() > 2.0:
-			var mdir: Vector2 = to_home.normalized()
-			var ret_speed := speed * speed_add * (1.45 if dist_from_player > SPEAR_MAX_RANGE else 1.0)
-			global_position += mdir * minf(to_home.length(), ret_speed * delta)
-			if sprite != null:
-				sprite.rotation = mdir.angle() + PI * 0.25
-	for enemy in game.enemies_in_radius(global_position, radius + 12.0):
+	boom_spin += delta * (11.0 + speed * 0.02) * speed_add
+	if sprite != null:
+		sprite.rotation = boom_spin
+	boom_timer -= delta
+	match boom_state:
+		"idle":
+			orbit_angle += delta * 1.9 * speed_add
+			var home: Vector2 = ppos + Vector2.RIGHT.rotated(orbit_angle) * BOOMERANG_ORBIT
+			global_position = global_position.lerp(home, clampf(8.0 * delta, 0.0, 1.0))
+			if boom_timer <= 0.0 and game.player != null:
+				var cand: Array = game.nearest_enemy(ppos, BOOMERANG_RANGE)
+				if not cand.is_empty():
+					var slot := _boomerang_slot()
+					var tgt: Node2D = cand[slot % cand.size()]
+					if tgt != null and is_instance_valid(tgt) and tgt.active:
+						boom_target = tgt.global_position
+						boom_arc = 1.0 if slot % 2 == 0 else -1.0
+						boom_state = "out"
+						boom_timer = 0.0
+						attack_cd = 0.0
+						hit_cd.clear()
+		"out":
+			var to_target: Vector2 = boom_target - global_position
+			var dist := to_target.length()
+			var dir: Vector2 = to_target / dist if dist > 0.5 else Vector2.RIGHT
+			var step := speed * speed_add * delta
+			global_position += dir * step + Vector2(-dir.y, dir.x) * boom_arc * 34.0 * delta
+			if dist <= step + 12.0 or boom_timer <= -1.5:
+				boom_state = "back"
+				boom_timer = 0.0
+				hit_cd.clear()
+				if attack_cd <= 0.0:
+					attack_cd = 0.2
+					game.spawn_fx(global_position, color, 16.0, 0.18)
+					game.spawn_perk_fx("boomerang", global_position, 26.0, 0.2)
+					AudioManager.play_sfx("boomerang", randf_range(0.94, 1.08))
+		"back":
+			var to_player: Vector2 = ppos - global_position
+			var back_dist := to_player.length()
+			var back_step := speed * speed_add * 1.2 * delta
+			if back_dist > 0.5:
+				global_position += to_player / back_dist * minf(back_dist, back_step)
+			if back_dist <= 13.0:
+				boom_state = "idle"
+				boom_timer = randf_range(0.45, 0.85)
+				orbit_angle = (global_position - ppos).angle()
+	for enemy in game.enemies_in_radius(global_position, radius + 10.0):
 		var key: int = int(enemy.get_instance_id())
 		if float(hit_cd.get(key, 0.0)) > 0.0:
 			continue
-		hit_cd[key] = 0.35
-		game.damage_enemy(enemy, damage, {"source": "holy_spear", "knockback": 18.0, "knock_dir": (enemy.global_position - global_position)})
-		game.spawn_fx(enemy.global_position, color, 14.0, 0.18)
-		game.spawn_perk_fx("holy", enemy.global_position, 28.0, 0.22)
+		hit_cd[key] = 0.3
+		game.damage_enemy(enemy, damage, {"source": "boomerang", "knockback": 14.0,
+			"knock_dir": (enemy.global_position - global_position)})
+		game.spawn_fx(enemy.global_position, color, 12.0, 0.16)
+		game.spawn_perk_fx("boomerang", enemy.global_position, 24.0, 0.18)
 	for key in hit_cd.keys():
 		hit_cd[key] = float(hit_cd[key]) - delta
 		if float(hit_cd[key]) <= 0.0:
