@@ -38,7 +38,8 @@ func default_data() -> Dictionary:
 		"album_bosses": [],
 		"settings": {"music": 0.8, "sfx": 0.8, "lang": "ru", "shake": true, "god_mode": false,
 			"boss_fx": true, "slowmo": true, "qte": true, "post_fx": true, "photo_ui": true,
-			"hud_vitals": "corner", "window_mode": "windowed", "vsync": true,
+			"hud_vitals": "corner",
+			"toasts": false, "window_mode": "windowed", "vsync": true,
 			"camera_distance": "normal", "camera_shake": "normal", "damage_numbers": true,
 			"crosshair": true, "aim_line": true, "vignette": true, "screen_flash": true,
 			"hit_stop": true, "combo_fx": true, "net_name": "", "net_port": 7777, "net_last_ip": ""},
@@ -99,6 +100,9 @@ func load_game() -> void:
 		data["settings"]["lang"] = "ru"
 	if not data.get("settings", {}).has("hud_vitals"):
 		data["settings"]["hud_vitals"] = "corner"
+	if not data.get("settings", {}).has("toasts"):
+		# всплывающие надписи по умолчанию выключены
+		data["settings"]["toasts"] = false
 	_migrate(data)
 
 func _read(path: String) -> Dictionary:

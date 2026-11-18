@@ -1050,6 +1050,20 @@ func _process(delta: float) -> void:
 	if target_arrows != null:
 		target_arrows.queue_redraw()
 
+## Иконка навыка: в режиме «слева сверху» она стоит в углу, в режиме «над
+## игроком» едет рядом с микрошкалами героя, чтобы не висеть одной в углу.
+func _place_skill_icon(p: Player, corner: bool) -> void:
+	if skill_icon == null:
+		return
+	if corner:
+		skill_icon.position = Vector2(86.0, 46.0)
+		return
+	var cam_center: Vector2 = game.camera.get_screen_center_position() if game.camera != null else p.global_position
+	var zoom_v: float = game.camera.zoom.x if game.camera != null else 1.3
+	var p_screen: Vector2 = (p.global_position - cam_center) * zoom_v + Vector2(320.0, 180.0)
+	# микрошкалы героя занимают ~20 px над спрайтом: ставим иконку справа от них
+	skill_icon.position = p_screen + Vector2(13.0, -31.0)
+
 func _refresh(delta: float) -> void:
 	var p: Player = game.player
 	if weather_lbl != null:
@@ -1064,6 +1078,7 @@ func _refresh(delta: float) -> void:
 	# в режиме «над игроком» верхние сердца и патроны скрыты
 	if hearts != null:
 		hearts.visible = corner
+	_place_skill_icon(p, corner)
 	if ammo_icon != null:
 		ammo_icon.visible = corner
 	ammo_lbl.visible = corner
@@ -1242,6 +1257,9 @@ func _rebuild_pause_settings() -> void:
 		_rebuild_pause_settings())
 	_ps_toggle("Слоу-мо боссов", bool(GameManager.setting("slowmo", true)), func() -> void:
 		GameManager.set_setting("slowmo", not bool(GameManager.setting("slowmo", true)))
+		_rebuild_pause_settings())
+	_ps_toggle("Всплывающие надписи", bool(GameManager.setting("toasts", false)), func() -> void:
+		GameManager.set_setting("toasts", not bool(GameManager.setting("toasts", false)))
 		_rebuild_pause_settings())
 	var cur_vitals := String(GameManager.setting("hud_vitals", "corner"))
 	_ps_choice("HP и патроны", "Слева сверху" if cur_vitals == "corner" else "Над героем", func() -> void:
@@ -1606,6 +1624,10 @@ func _on_upgrade_picked(_id: String, _kind: String) -> void:
 	pass
 
 func _on_notify(text: String) -> void:
+	# Всплывающие надписи отключены настройкой «toasts» (по умолчанию выкл.):
+	# события карты, перки и боссы больше не засоряют экран.
+	if not bool(GameManager.setting("toasts", false)):
+		return
 	if text == "":
 		return
 	var l := UI.label(toast_box, text, 9, UI.TEXT)

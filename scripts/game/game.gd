@@ -1470,9 +1470,28 @@ func _run_controls_test() -> void:
 		if m.visible:
 			visible_marks += 1
 	assert(visible_marks > 0, "Сердца над игроком не отображаются")
+	# иконка навыка в режиме «над игроком» стоит рядом с героем, а не в углу
+	var cam_center: Vector2 = camera.get_screen_center_position()
+	var p_screen: Vector2 = (player.global_position - cam_center) * camera.zoom.x + Vector2(320.0, 180.0)
+	var icon_pos: Vector2 = hud.skill_icon.position
+	assert(icon_pos.distance_to(p_screen) < 90.0, "Иконка навыка не рядом с героем в режиме «над игроком»: %s vs %s" % [icon_pos, p_screen])
+	assert(icon_pos.distance_to(Vector2(86.0, 46.0)) > 40.0, "Иконка навыка осталась в углу в режиме «над игроком»")
+	# всплывающие надписи управляются настройкой toasts (по умолчанию выкл.)
+	assert(hud.toast_box != null, "В HUD нет контейнера всплывающих надписей")
+	var toasts_before := hud.toast_box.get_child_count()
+	GameManager.set_setting("toasts", false)
+	notify("проверка тостов")
+	await get_tree().process_frame
+	assert(hud.toast_box.get_child_count() == toasts_before, "Тост появился, хотя всплывающие надписи выключены")
+	GameManager.set_setting("toasts", true)
+	notify("проверка тостов")
+	await get_tree().process_frame
+	assert(hud.toast_box.get_child_count() > toasts_before, "Тост не появился при включённых надписях")
+	GameManager.set_setting("toasts", false)
 	GameManager.set_setting("hud_vitals", "corner")
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(hud.skill_icon.position.distance_to(Vector2(86.0, 46.0)) < 1.0, "Иконка навыка не вернулась в угол в режиме «слева сверху»")
 	var hidden_marks := 0
 	for m in player.hp_marks:
 		if not m.visible:

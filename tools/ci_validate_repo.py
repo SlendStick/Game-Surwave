@@ -1019,6 +1019,43 @@ def check_boss_fights(loaded: dict[str, object], errors: list[str]) -> None:
         fail("assets/sprites: нет спрайта boss_void.png", errors)
 
 
+def check_hud_tweaks(loaded: dict[str, object], errors: list[str]) -> None:
+    """Иконка навыка рядом со шкалами героя и отключаемые всплывающие надписи."""
+    hud = (ROOT / "scripts/ui/hud.gd").read_text(encoding="utf-8")
+    game = (ROOT / "scripts/game/game.gd").read_text(encoding="utf-8")
+    save = (ROOT / "scripts/autoload/save_manager.gd").read_text(encoding="utf-8")
+
+    if "func _place_skill_icon(" not in hud:
+        fail("hud.gd: нет _place_skill_icon() — иконка навыка не следует за шкалами героя", errors)
+    for snippet in (
+        "skill_icon.position = Vector2(86.0, 46.0)",
+        "_place_skill_icon(p, corner)",
+        "get_screen_center_position()",
+    ):
+        if snippet not in hud:
+            fail(f"hud.gd: раскладка иконки навыка не содержит «{snippet}»", errors)
+    if 'GameManager.setting("hud_vitals", "corner")) == "corner"' not in hud:
+        fail("hud.gd: режим виталов больше не читается", errors)
+
+    notify_body = hud.split("func _on_notify(", 1)
+    if len(notify_body) < 2 or 'GameManager.setting("toasts", false)' not in notify_body[1][:400]:
+        fail("hud.gd: всплывающие надписи не отключаются настройкой toasts", errors)
+    if 'set_setting("toasts"' not in hud:
+        fail("hud.gd: в настройках нет переключателя всплывающих надписей", errors)
+    if '"toasts": false' not in save:
+        fail("save_manager.gd: нет значения по умолчанию для toasts", errors)
+    if '"toasts"' not in save.split("func ", 1)[1]:
+        fail("save_manager.gd: миграция старых сохранений без toasts", errors)
+
+    for snippet in (
+        "Иконка навыка не рядом с героем в режиме «над игроком»",
+        "Тост появился, хотя всплывающие надписи выключены",
+        "Иконка навыка не вернулась в угол",
+    ):
+        if snippet not in game:
+            fail(f"game.gd: тест controls не проверяет «{snippet}»", errors)
+
+
 def check_python_tools(errors: list[str]) -> None:
     py_files = sorted((ROOT / "tools").glob("*.py"))
     for pf in py_files:
@@ -1045,6 +1082,7 @@ def main() -> int:
     check_gdscript_duplicate_funcs(errors)
     check_network_v2(errors)
     check_boss_fights(loaded, errors)
+    check_hud_tweaks(loaded, errors)
     check_python_tools(errors)
 
     if errors:
