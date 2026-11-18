@@ -4718,11 +4718,19 @@ func _run_coop_test() -> void:
 	np.dead = false
 	np.hp = np.max_hp
 	np.touch_cd = 0.0
+	np.away = false
+	np.safe_left = 0.0
 	net_hit_proxy(np, 2, player.global_position)
 	var hp_after_one: int = np.hp
+	assert(hp_after_one < np.max_hp, "Первый удар по напарнику не прошёл")
+	assert(np.touch_cd > 0.0, "Кулдаун попаданий не взвёлся")
 	net_hit_proxy(np, 2, player.global_position)
 	assert(np.hp == hp_after_one, "Второй удар в тот же миг снял HP — смерть от одного удара")
-	assert(np.touch_cd > 0.0, "Кулдаун попаданий не взвёлся")
+	# после возрождения напарник неуязвим
+	np.safe_left = 1.5
+	net_hit_proxy(np, 5, player.global_position)
+	assert(np.hp == hp_after_one, "Нет неуязвимости после возрождения")
+	np.safe_left = 0.0
 	np.touch_cd = 0.0
 	# 10) «вне боя»: игрок в меню прозрачен и неуязвим
 	net_away = true
