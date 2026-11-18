@@ -219,6 +219,8 @@ func _on_peer_disconnected(id: int) -> void:
 func _on_connected_to_server() -> void:
 	connected_ok.emit()
 	_register_player.rpc_id(1, my_name, PROTOCOL)
+	# Свой герой и оружие — сразу, иначе хост покажет чужие умолчания.
+	_srv_set_loadout.rpc_id(1, local_character, local_weapon)
 
 func _on_connection_failed() -> void:
 	last_error = "Хост не отвечает. Проверьте IP, порт и сеть."
@@ -343,6 +345,27 @@ func send_event(kind: String, data: Dictionary) -> void:
 	if not is_host():
 		return
 	_cli_event.rpc(kind, data)
+
+## Любой игрок → всем: эмоции, чат, взятый перк, просьба о возрождении.
+## Клиент отправляет хосту, хост рассылает дальше — так сохраняется порядок.
+func send_event_any(kind: String, data: Dictionary) -> void:
+	if not enabled:
+		return
+	if is_host():
+		send_event(kind, data)
+	else:
+		_srv_event.rpc_id(1, kind, data)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _srv_event(kind: String, data: Dictionary) -> void:
+	if not multiplayer.is_server():
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if id <= 0:
+		return
+	var payload: Dictionary = data.duplicate(true)
+	payload["peer"] = id
+	_cli_event.rpc(kind, payload)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _srv_player_state(state: Dictionary) -> void:

@@ -58,6 +58,30 @@ var net_id := 0
 var net_remote := false
 var net_target := Vector2.ZERO
 
+## Живая цель врага: хост-игрок или сетевой напарник (ближайший).
+## Раньше враги всегда били хоста, из-за чего второй игрок был неуязвим.
+var chase_target: Node2D = null
+
+func _refresh_target() -> void:
+	if game == null or net_remote:
+		return
+	chase_target = game.nearest_target(global_position)
+
+func tgt() -> Node2D:
+	if chase_target != null and is_instance_valid(chase_target) and not bool(chase_target.get("dead")):
+		return chase_target
+	return game.player if game != null else null
+
+func tgt_pos() -> Vector2:
+	var t := tgt()
+	return t.global_position if t != null else global_position
+
+## Урон игроку или сетевому напарнику — единая точка вместо game.damage_player.
+func hurt_player(amount: int, from_pos: Vector2, ignore_iframes: bool = false, source_role: String = "") -> void:
+	if game == null or net_remote:
+		return
+	game.hurt_target(tgt(), amount, from_pos, ignore_iframes, source_role)
+
 func setup(g: Node) -> void:
 	game = g
 
@@ -256,6 +280,7 @@ func tick(delta: float) -> void:
 	if net_remote:
 		_tick_remote(delta)
 		return
+	_refresh_target()
 	spawn_anim = minf(0.15, spawn_anim + delta)
 	walk_phase += delta * (8.0 if id == "bat" else 5.0)
 	attack_anim = maxf(0.0, attack_anim - delta)
@@ -281,7 +306,7 @@ func tick(delta: float) -> void:
 				sprite.texture = fr[idx]
 		sprite.position.y = sin(walk_phase) * (1.8 if id == "bat" else 0.5)
 		if game.player != null:
-			sprite.flip_h = game.player.global_position.x < global_position.x
+			sprite.flip_h = tgt_pos().x < global_position.x
 		if boss:
 			sprite.rotation = sin(walk_phase * 0.35) * 0.025
 		elif id == "bat" and fr.is_empty():
@@ -290,7 +315,7 @@ func tick(delta: float) -> void:
 		elite_ring.rotation += delta * 1.1
 	var base_mod := _base_modulate()
 	if game.player != null and game.player.has_meta("trial_invisible") and sprite and hit_flash <= 0.0:
-		var a := 1.0 if global_position.distance_to(game.player.global_position) < 128.0 else 0.08
+		var a := 1.0 if global_position.distance_to(tgt_pos()) < 128.0 else 0.08
 		sprite.modulate = Color(base_mod.r, base_mod.g, base_mod.b, a)
 	if hit_flash > 0.0:
 		hit_flash -= delta
@@ -325,7 +350,7 @@ func _tick_remote(delta: float) -> void:
 			sprite.texture = fr[int(floor(walk_phase * 1.4)) % fr.size()]
 		sprite.position.y = sin(walk_phase) * (1.8 if id == "bat" else 0.5)
 		if game != null and game.player != null:
-			sprite.flip_h = game.player.global_position.x < global_position.x
+			sprite.flip_h = tgt_pos().x < global_position.x
 		sprite.modulate = Color(1.9, 1.9, 1.9) if hit_flash > 0.0 else _base_modulate()
 	if elite_ring != null and elite_ring.visible:
 		elite_ring.rotation += delta * 1.1
@@ -336,7 +361,7 @@ func _tick_remote(delta: float) -> void:
 
 ## Особые способности врагов из ENEMIES_COMPLETE_SPECIFICATION.md.
 func _tick_specials(delta: float) -> void:
-	var player_pos: Vector2 = game.player.global_position
+	var player_pos: Vector2 = tgt_pos()
 	var to_player := player_pos - global_position
 	# время жизни призыва
 	if life_left > 0.0:
@@ -450,7 +475,7 @@ func slow_factor() -> float:
 
 # ------------------------------------------------------------------ ОБЫЧНЫЕ ВРАГИ
 func _normal_tick(delta: float) -> void:
-	var player_pos: Vector2 = game.player.global_position
+	var player_pos: Vector2 = tgt_pos()
 	var to_player := player_pos - global_position
 	var dir := to_player.normalized() if to_player.length() > 0.1 else Vector2.RIGHT
 	var kind := String(behavior.get("kind", "chase"))
@@ -525,13 +550,15 @@ func _normal_tick(delta: float) -> void:
 		if attack_cd <= 0.0:
 			attack_cd = float(behavior["pull"].get("interval", 4.0))
 			if to_player.length() < float(behavior["pull"].get("radius", 140.0)):
-				game.player.global_position += -dir * float(behavior["pull"].get("force", 90.0)) * 0.15
+				var pull_t: Node2D = tgt()
+				if pull_t != null:
+					pull_t.global_position += -dir * float(behavior["pull"].get("force", 90.0)) * 0.15
 	if behavior.has("cone"):
 		attack_cd -= delta
 		if attack_cd <= 0.0:
 			attack_cd = float(behavior["cone"].get("interval", 4.0))
 			if to_player.length() < float(behavior["cone"].get("radius", 130.0)):
-				game.damage_player(int(behavior["cone"].get("damage", 3)), global_position)
+				hurt_player(int(behavior["cone"].get("damage", 3)), global_position)
 	if behavior.has("beam"):
 		attack_cd -= delta
 		if attack_cd <= 0.0:
@@ -591,7 +618,7 @@ func _attack_projectile_custom(delta: float, proj: Dictionary) -> void:
 		return
 	attack_cd = float(proj.get("interval", 2.0))
 	var count := int(proj.get("count", 1))
-	var to_player: Vector2 = (game.player.global_position - global_position).normalized()
+	var to_player: Vector2 = (tgt_pos() - global_position).normalized()
 	for i in count:
 		var spread := 0.0
 		if count > 1:
@@ -633,7 +660,7 @@ func _try_contact_damage() -> void:
 			EventBus.ammo_changed.emit(game.player.mag, int(game.player.S.mag), false)
 		if flags.has("push_on_hit"):
 			p.global_position += (p.global_position - global_position).normalized() * float(flags["push_on_hit"]) * 0.2
-		game.damage_player(dmg, global_position, false, role)
+		hurt_player(dmg, global_position, false, role)
 		# отталкивание врага от игрока
 		knock = (global_position - p.global_position).normalized() * 120.0
 
@@ -678,7 +705,7 @@ func _boss_tick(delta: float) -> void:
 		game.spawn_fx(global_position, color, radius * 2.0, 0.5)
 		if sprite:
 			sprite.modulate = _base_modulate()
-	var player_pos: Vector2 = game.player.global_position
+	var player_pos: Vector2 = tgt_pos()
 	var to_player := (player_pos - global_position)
 	var dir := to_player.normalized() if to_player.length() > 0.1 else Vector2.RIGHT
 	var boss_rate_mult := float(game.diff_mods.get("boss_rate", 0.0))
@@ -717,7 +744,7 @@ func _exec_pattern(p: Dictionary) -> void:
 	attack_anim = 0.42
 	var kind := String(p.get("type", ""))
 	var pr: Dictionary = p.get("params", {})
-	var player_pos: Vector2 = game.player.global_position
+	var player_pos: Vector2 = tgt_pos()
 	var dir := (player_pos - global_position).normalized()
 	var vivid := Color("#ffd55a") if id == "boss_satanail" else (Color("#ff3a6e") if id == "boss_satan" else color.lightened(0.35))
 	match kind:
@@ -743,9 +770,9 @@ func _exec_pattern(p: Dictionary) -> void:
 				if not active or dead or game == null or game.player == null:
 					return
 				game.spawn_fx(global_position, Color(0.65, 0.65, 0.72), r1, 0.3)
-				if game.player.global_position.distance_to(global_position) < r1:
+				if tgt_pos().distance_to(global_position) < r1:
 					if not game.start_dodge_qte(slam_dmg, global_position, self):
-						game.damage_player(slam_dmg, global_position)
+						hurt_player(slam_dmg, global_position)
 					game.player.add_status("slow", slam_dur, {"amount": slam_slow}))
 		"dark_chains":
 			# Тёмные Цепи с чётким телеграфом
@@ -757,9 +784,9 @@ func _exec_pattern(p: Dictionary) -> void:
 				if not active or dead or game == null or game.player == null:
 					return
 				game.spawn_perk_fx("smite", global_position, r2 * 0.5, 0.32)
-				if game.player.global_position.distance_to(global_position) < r2:
+				if tgt_pos().distance_to(global_position) < r2:
 					if not game.start_dodge_qte(dc_dmg, global_position, self):
-						game.damage_player(dc_dmg, global_position)
+						hurt_player(dc_dmg, global_position)
 					game.player.add_status("stun", dc_root))
 		"storm_aura":
 			# Огненный/Тёмный Шторм: зона вокруг босса
@@ -817,7 +844,9 @@ func _exec_pattern(p: Dictionary) -> void:
 		"pull":
 			var d := player_pos - global_position
 			if d.length() < float(pr.get("radius", 220.0)):
-				game.player.global_position -= d.normalized() * float(pr.get("force", 140.0)) * 0.2
+				var push_t: Node2D = tgt()
+				if push_t != null:
+					push_t.global_position -= d.normalized() * float(pr.get("force", 140.0)) * 0.2
 		"pillar":
 			for i in int(pr.get("count", 4)):
 				var pos3 := player_pos + Vector2(randf_range(-120, 120), randf_range(-120, 120))
@@ -831,10 +860,10 @@ func _exec_pattern(p: Dictionary) -> void:
 			game.run_later(0.32, func() -> void:
 				if not active or dead or game == null or game.player == null:
 					return
-				if game.player.global_position.distance_to(global_position) < cone_r:
-					var angle_ok := absf(rad_to_deg(dir.angle_to(global_position.direction_to(game.player.global_position)))) < cone_ang
+				if tgt_pos().distance_to(global_position) < cone_r:
+					var angle_ok := absf(rad_to_deg(dir.angle_to(global_position.direction_to(tgt_pos())))) < cone_ang
 					if angle_ok:
-						game.damage_player(cone_dmg, global_position))
+						hurt_player(cone_dmg, global_position))
 		"pentagram":
 			for i in int(pr.get("count", 3)):
 				var pos4: Vector2 = player_pos if bool(pr.get("under_player", false)) else player_pos + Vector2(randf_range(-100, 100), randf_range(-100, 100))
@@ -876,7 +905,7 @@ func take_damage(amount: float, opts: Dictionary = {}) -> void:
 	if has_status("freeze") and float(game.player.upg.flag_num("frozen_vuln")) > 0.0:
 		amount *= 1.0 + float(game.player.upg.flag_num("frozen_vuln"))
 	if flags.has("reflect") and String(opts.get("source", "")) != "dot":
-		game.damage_player(int(float(amount) * float(flags["reflect"])), global_position)
+		hurt_player(int(float(amount) * float(flags["reflect"])), global_position)
 	var armor := float(data.get("armor", 0.0))
 	# «Бронебойные Пули»: игнорирует долю брони (50% в базовом перке)
 	if game != null and game.player != null:
@@ -900,7 +929,7 @@ func take_damage(amount: float, opts: Dictionary = {}) -> void:
 	# магический щит (тёмный маг: 15% отразить снаряд)
 	if float(flags.get("shield_reflect", 0.0)) > 0.0 and randf() < float(flags["shield_reflect"]):
 		game.spawn_fx(global_position, color, radius * 2.0, 0.25)
-		var to_player: Vector2 = (game.player.global_position - global_position).normalized()
+		var to_player: Vector2 = (tgt_pos() - global_position).normalized()
 		game.spawn_enemy_bullet(global_position, to_player, int(maxf(1.0, amount)), {"speed": 120.0, "color": color})
 		return
 	hp -= amount

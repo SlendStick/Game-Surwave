@@ -12,8 +12,9 @@ var color := Color.WHITE
 var size := 5.0
 var magnet := false
 var age := 0.0
-## Копия подбора на клиенте: только визуал, подбирает хост.
+## Копия подбора на клиенте: подбирается локально, хост убирает оригинал по id.
 var net_remote := false
+var net_id := 0
 
 func setup(g: Node) -> void:
 	game = g

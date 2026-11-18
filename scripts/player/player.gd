@@ -329,11 +329,13 @@ func tick(delta: float) -> void:
 ## Патроны и здоровье над персонажем — режим включается в настройках
 ## (Настройки → «Патроны и HP»: «над игроком» / «слева сверху»).
 ## Над героем рисуются две тонкие шкалы: сверху здоровье, ниже патроны.
-const BAR_W := 30.0
-const BAR_H := 2.0
+const BAR_W := 18.0
+const BAR_H := 1.5
 var hp_bar_bg: Sprite2D = null
 var mag_bar_bg: Sprite2D = null
 var mag_bar: Sprite2D = null
+var skill_bar: Sprite2D = null
+var skill_bar_bg: Sprite2D = null
 
 func _bar_sprite(existing: Sprite2D, size: Vector2, y: float) -> Sprite2D:
 	var sp := existing
@@ -345,16 +347,18 @@ func _bar_sprite(existing: Sprite2D, size: Vector2, y: float) -> Sprite2D:
 func _update_vitals() -> void:
 	var above := String(GameManager.setting("hud_vitals", "corner")) == "player"
 	if hp_bar_bg == null:
-		hp_bar_bg = _bar_sprite(null, Vector2(BAR_W + 2.0, BAR_H * 2.0 + 4.0), -22.0)
-		hp_bar_bg.modulate = Color(0.04, 0.04, 0.055, 0.85)
+		# Микрошкалы над героем: HP, патроны и откат навыка в один компактный блок.
+		hp_bar_bg = _bar_sprite(null, Vector2(BAR_W + 2.0, BAR_H * 3.0 + 4.0), -18.0)
+		hp_bar_bg.modulate = Color(0.04, 0.04, 0.055, 0.8)
 		hp_bar_bg.z_index = 2
-		hp_marks.append(_bar_sprite(null, Vector2(BAR_W, BAR_H), -24.5))
+		hp_marks.append(_bar_sprite(null, Vector2(BAR_W, BAR_H), -20.5))
 		hp_bar = hp_marks[0]
-		mag_bar = _bar_sprite(null, Vector2(BAR_W, BAR_H), -19.5)
+		mag_bar = _bar_sprite(null, Vector2(BAR_W, BAR_H), -18.0)
 		ammo_pips.append(mag_bar)
-		for sp in [hp_bar, mag_bar]:
+		skill_bar = _bar_sprite(null, Vector2(BAR_W, BAR_H), -15.5)
+		for sp in [hp_bar, mag_bar, skill_bar]:
 			sp.z_index = 3
-	for sp in [hp_bar_bg, hp_bar, mag_bar]:
+	for sp in [hp_bar_bg, hp_bar, mag_bar, skill_bar]:
 		if sp != null:
 			sp.visible = above
 	if not above:
@@ -374,6 +378,11 @@ func _update_vitals() -> void:
 	elif mag <= 0:
 		mag_col = Color("#7a5a2a")
 	_bar_fill(mag_bar, mag_frac, mag_col)
+	# Третья микрошкала — готовность навыка.
+	var skill_total := maxf(0.01, float(skill_data.get("cd", 10.0)))
+	var skill_frac := clampf(1.0 - skill_cd_left / skill_total, 0.0, 1.0)
+	var skill_col := Color("#7fd7ff") if skill_frac >= 0.999 else Color("#3f6b80")
+	_bar_fill(skill_bar, skill_frac, skill_col)
 
 ## Шкала заполняется слева направо: спрайт центрирован, поэтому сдвигаем его.
 func _bar_fill(bar: Sprite2D, frac: float, color: Color) -> void:
@@ -1130,7 +1139,9 @@ func _tick_skill(delta: float) -> void:
 	_tick_aim_mode()
 	skill_cd_left = maxf(0.0, skill_cd_left - delta)
 	EventBus.skill_cooldown.emit(skill_cd_left, float(skill_data.get("cd", 10.0)))
-	var pressed := (Input.is_action_just_pressed("skill") or Input.is_action_just_pressed("skill_mouse")) if not bot else bot_wants_skill
+	# Q — навык в одиночной игре; в коопе Q отдан колесу эмоций.
+	var q_skill := Input.is_action_just_pressed("emote") and (game == null or not bool(game.get("net_active")))
+	var pressed := (Input.is_action_just_pressed("skill") or Input.is_action_just_pressed("skill_mouse") or q_skill) if not bot else bot_wants_skill
 	if pressed and skill_cd_left <= 0.0 and not dead:
 		_use_skill()
 

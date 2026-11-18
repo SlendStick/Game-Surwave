@@ -10,6 +10,10 @@ var parts: Array = []
 var fog_banks: Array = []
 var strength := 1.0
 var wind := Vector2(1, 0.2)
+## Плавное появление/исчезновение: буран и туман больше не «включаются рывком».
+var fade := 0.0
+var fade_target := 0.0
+const FADE_TIME := 2.4
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -21,6 +25,11 @@ func start(kind_name: String, col: Color, amount: int = 90, wind_dir: Vector2 = 
 	var g := Gfx.gothic(col, 0.25)
 	tint = Color(g.r, g.g, g.b, 0.16)
 	visible = true
+	# мягкий вход: сначала прозрачно, потом набираем плотность
+	if fade <= 0.02:
+		fade = 0.0
+	fade_target = 1.0
+	modulate.a = fade
 	t = 0.0
 	wind = wind_dir
 	parts.clear()
@@ -47,14 +56,28 @@ func start(kind_name: String, col: Color, amount: int = 90, wind_dir: Vector2 = 
 			})
 	queue_redraw()
 
+## Останавливает погоду с плавным затуханием (слой доживает последние секунды).
 func stop() -> void:
+	fade_target = 0.0
+	if fade <= 0.01:
+		_hide_now()
+
+func _hide_now() -> void:
 	visible = false
+	fade = 0.0
+	fade_target = 0.0
+	modulate.a = 1.0
 	kind = ""
 	parts.clear()
 	fog_banks.clear()
 
 func tick(delta: float) -> void:
 	if not visible:
+		return
+	fade = move_toward(fade, fade_target, delta / FADE_TIME)
+	modulate.a = smoothstep(0.0, 1.0, fade)
+	if fade_target <= 0.0 and fade <= 0.01:
+		_hide_now()
 		return
 	t += delta
 	queue_redraw()

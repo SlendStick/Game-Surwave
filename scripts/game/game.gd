@@ -149,6 +149,21 @@ var net_pickup_ghosts: Array = []
 var net_id_seq := 1
 var _net_snapshot_cd := 0.0
 var _net_state_cd := 0.0
+## Кооп: паузу задаёт хост, кристаллы возрождения, чат и эмоции.
+var net_paused := false
+var revive_crystals: Array = []
+var revive_crystal_nodes: Array = []
+var net_taken_pickups: Dictionary = {}
+var _revive_req_cd := 0.0
+## Активные ивенты карты живут 30–60 секунд и бьют волнами.
+var active_events: Array = []
+var chat_log: Array = []
+var partner_perks: Array = []
+## Бесконечный мир: новые полосы генерируются по мере ухода игроков от края.
+const CHUNK_SIZE := 900.0
+const EDGE_MARGIN := 280.0
+var chunks_grown := 0
+var _world_grow_cd := 0.0
 var wave_number := 0
 var wave_break := 0.0
 var photo_filter := 0
@@ -239,6 +254,7 @@ func _ready() -> void:
 	if OS.get_environment("SURW_BOOM_TEST") != "": call_deferred("_run_boomerang_test")
 	if OS.get_environment("SURW_PERK_CLICK_TEST") != "": call_deferred("_run_perk_click_test")
 	if OS.get_environment("SURW_AVALANCHE_TEST") != "": call_deferred("_run_avalanche_test")
+	if OS.get_environment("SURW_COOP_TEST") != "": call_deferred("_run_coop_test")
 	if OS.get_environment("SURW_HAZARD_TEST") != "": call_deferred("_run_hazard_test")
 	if OS.get_environment("SURW_MAP_DUMP") != "": call_deferred("_run_map_dump")
 	if OS.get_environment("SURW_VIS_TEST") != "": call_deferred("_run_vis_test")
@@ -1521,6 +1537,10 @@ func _process(delta: float) -> void:
 	if not (net_active and not net_host):
 		wave_mgr.tick(delta)
 		events_mgr.tick(delta)
+	_tick_active_events(delta)
+	_check_world_growth(delta)
+	_resolve_player_collision(delta)
+	_tick_revive_crystals(delta)
 	_tick_audio(delta)
 	_tick_perf_guard(delta)
 	_tick_camera(delta)
@@ -1551,8 +1571,7 @@ func _process(delta: float) -> void:
 
 func _tick_player(delta: float) -> void:
 	player.tick(delta)
-	player.global_position.x = clampf(player.global_position.x, 8.0, map_rect.size.x - 8.0)
-	player.global_position.y = clampf(player.global_position.y, 8.0, map_rect.size.y - 8.0)
+	player.global_position = clamp_to_map(player.global_position)
 	_player_zones(delta)
 	if float(map_data.get("mods", {}).get("heat", 0.0)) > 0.0:
 		player.timers["heat"] = float(player.timers.get("heat", 15.0)) - delta
@@ -1663,8 +1682,7 @@ func _tick_ebullets(delta: float) -> void:
 			b.tick(delta)
 
 func _tick_pickups(delta: float) -> void:
-	if net_active and not net_host:
-		return
+	# Клиент тоже подбирает лут: опыт и золото теперь у каждого игрока свои.
 	for p in pickups:
 		if p.active:
 			p.tick(delta)
@@ -2230,6 +2248,8 @@ func spawn_pickup(kind: String, pos: Vector2, value: float = 1.0) -> void:
 		"soul": color = Color(0.8, 0.6, 1.0); size = 6.0
 		"chest": color = Color(1.0, 0.75, 0.25); size = 11.0
 	p.spawn_at(pos, kind, value, color, size)
+	p.net_id = net_id_seq
+	net_id_seq += 1
 	pickups.append(p)
 
 func spawn_ally(kind: String, opts: Dictionary) -> void:
@@ -2696,7 +2716,9 @@ func alive_allies() -> int:
 	return c
 
 func clamp_to_map(pos: Vector2) -> Vector2:
-	return Vector2(clampf(pos.x, 10.0, map_rect.size.x - 10.0), clampf(pos.y, 10.0, map_rect.size.y - 10.0))
+	return Vector2(
+		clampf(pos.x, map_rect.position.x + 10.0, map_rect.end.x - 10.0),
+		clampf(pos.y, map_rect.position.y + 10.0, map_rect.end.y - 10.0))
 
 func pop_corpse() -> Vector2:
 	if corpses.is_empty():
@@ -2949,6 +2971,9 @@ func add_xp(amount: float) -> void:
 	EventBus.xp_changed.emit(xp, xp_need, level)
 
 func collect_pickup(pickup: Pickup) -> void:
+	if net_active and not net_host and pickup.net_id > 0:
+		net_taken_pickups[pickup.net_id] = Time.get_ticks_msec()
+		Net.send_event_any("pickup", {"id": pickup.net_id})
 	var dark_lvl := int(GameManager.run_config.get("darkness", 1))
 	var combo_cfg: Dictionary = Progression.cfg.get("combo", {})
 	match pickup.kind:
@@ -3109,10 +3134,13 @@ func sync_pause_state() -> void:
 		return
 	var should_pause := photo_mode or GameManager.cheat_open or paused_for_choice
 	if hud != null:
-		if hud.pause_layer != null and hud.pause_layer.visible:
-			should_pause = true
 		if hud.syn_layer != null and hud.syn_layer.visible:
 			should_pause = true
+		# В коопе экран паузы клиента не морозит общий мир: паузу задаёт хост.
+		if hud.pause_layer != null and hud.pause_layer.visible and not net_active:
+			should_pause = true
+	if net_active:
+		should_pause = should_pause or net_paused
 	get_tree().paused = should_pause
 	# На паузе _process игры не идёт — курсор переключаем здесь же.
 	_sync_cursor()
@@ -3214,6 +3242,7 @@ func _on_choice_made(card: Dictionary) -> void:
 		player.full_heal()
 	player.recalc()
 	player.mag = mini(player.mag, int(player.S.mag))
+	report_perk(String((card.get("data", {}) as Dictionary).get("name", card.get("id", ""))))
 	if player != null:
 		spawn_perk_fx(_card_vfx_kind(card), player.global_position, 64.0, 0.42)
 	paused_for_choice = false
@@ -3281,6 +3310,9 @@ func stop_weather() -> void:
 
 func _tick_weather(delta: float) -> void:
 	if weather.is_empty():
+		# слой ещё может плавно затухать после окончания непогоды
+		if weather_fx != null and weather_fx.visible:
+			weather_fx.tick(delta)
 		return
 	weather["left"] = float(weather["left"]) - delta
 	vision_mult = minf(1.0, float(weather["vision"]))
@@ -3308,6 +3340,122 @@ func _tick_weather(delta: float) -> void:
 		if weather_fx.size != vs:
 			weather_fx.size = vs
 		weather_fx.tick(delta)
+
+# ------------------------------------------------------------------ БЕСКОНЕЧНЫЙ МИР
+## Мир тянется за игроками: подходим к краю — доращиваем полосу карты
+## и генерируем в ней препятствия. Карта больше не заканчивается стеной.
+func _check_world_growth(delta: float) -> void:
+	if map_rect.size.x < 1.0 or map_floor_node == null:
+		return
+	_world_grow_cd -= delta
+	if _world_grow_cd > 0.0:
+		return
+	_world_grow_cd = 0.25
+	var dirs: Array = []
+	for t in player_targets():
+		var p: Vector2 = t.global_position
+		if p.x > map_rect.end.x - EDGE_MARGIN and not dirs.has("right"):
+			dirs.append("right")
+		if p.y > map_rect.end.y - EDGE_MARGIN and not dirs.has("down"):
+			dirs.append("down")
+		if p.x < map_rect.position.x + EDGE_MARGIN and not dirs.has("left"):
+			dirs.append("left")
+		if p.y < map_rect.position.y + EDGE_MARGIN and not dirs.has("up"):
+			dirs.append("up")
+	for d in dirs:
+		_grow_world(String(d))
+
+func _grow_world(dir: String) -> void:
+	match dir:
+		"right":
+			map_rect.size.x += CHUNK_SIZE
+		"down":
+			map_rect.size.y += CHUNK_SIZE
+		"left":
+			map_rect.position.x -= CHUNK_SIZE
+			map_rect.size.x += CHUNK_SIZE
+		"up":
+			map_rect.position.y -= CHUNK_SIZE
+			map_rect.size.y += CHUNK_SIZE
+		_:
+			return
+	chunks_grown += 1
+	_fit_world_surfaces()
+	_generate_band(dir)
+	_apply_camera_limits()
+
+## Пол и фон растягиваются вместе с картой (в том числе в минус по координатам).
+func _fit_world_surfaces() -> void:
+	if map_bg_node != null and is_instance_valid(map_bg_node):
+		map_bg_node.position = map_rect.position
+		map_bg_node.size = map_rect.size
+	if map_floor_node != null and is_instance_valid(map_floor_node):
+		for ch in map_floor_node.get_children():
+			if ch is TextureRect:
+				(ch as TextureRect).position = map_rect.position
+				(ch as TextureRect).size = map_rect.size
+
+func _apply_camera_limits() -> void:
+	if camera == null:
+		return
+	camera.limit_left = int(map_rect.position.x)
+	camera.limit_top = int(map_rect.position.y)
+	camera.limit_right = int(map_rect.end.x)
+	camera.limit_bottom = int(map_rect.end.y)
+
+## Новая полоса карты: препятствия и декор по тем же правилам, что и у старта.
+func _generate_band(dir: String) -> void:
+	var md := map_data
+	var mid := String(md.get("id", ""))
+	var accent := Gfx.hex(String(md.get("palette", {}).get("accent", "#ffffff")))
+	var band := Rect2(map_rect.position, map_rect.size)
+	match dir:
+		"right":
+			band = Rect2(map_rect.end.x - CHUNK_SIZE, map_rect.position.y, CHUNK_SIZE, map_rect.size.y)
+		"down":
+			band = Rect2(map_rect.position.x, map_rect.end.y - CHUNK_SIZE, map_rect.size.x, CHUNK_SIZE)
+		"left":
+			band = Rect2(map_rect.position.x, map_rect.position.y, CHUNK_SIZE, map_rect.size.y)
+		"up":
+			band = Rect2(map_rect.position.x, map_rect.position.y, map_rect.size.x, CHUNK_SIZE)
+	for def in md.get("obstacles", []):
+		var kind := String(def.get("kind", "solid"))
+		var shape := String(def.get("shape", "box"))
+		var w := float(def.get("w", 26))
+		var h := float(def.get("h", 26))
+		var col := Gfx.hex(String(def.get("color", ""))) if String(def.get("color", "")) != "" else Gfx.hex(String(md.get("palette", {}).get("obstacle", "#404050")))
+		var hp_max := float(def.get("hp", 0))
+		var per_band := maxi(3, int(float(def.get("count", 30)) * 0.16))
+		for i in per_band:
+			var pos := Vector2(
+				rng.randf_range(band.position.x + 48.0, band.end.x - 48.0),
+				rng.randf_range(band.position.y + 48.0, band.end.y - 48.0))
+			if kind == "decor":
+				var vis := ObstacleVis.build(world, shape, Vector2(w, h), col, accent, mid)
+				vis.position = pos
+				decor_nodes.append(vis)
+				hazard_stats["decor"] = int(hazard_stats.get("decor", 0)) + 1
+				continue
+			var rect := Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h))
+			var obstacle := {
+				"rect": rect, "kind": kind, "shape": shape, "hp": hp_max, "max_hp": hp_max,
+				"slow": float(def.get("slow", 0.0)),
+				"damage": float(def.get("damage", 0.0)),
+				"interval": float(def.get("interval", 0.5)),
+				"timer": 0.0,
+				"reflect": float(def.get("reflect", 1.0)),
+				"heal": float(def.get("heal", 0.0)),
+				"poison": float(def.get("poison", 0.0)),
+				"node": null,
+				"color": col,
+			}
+			var vis2 := ObstacleVis.build(world, shape, Vector2(w, h), col, accent, mid)
+			vis2.position = pos
+			obstacle["node"] = vis2
+			if hp_max > 0.0:
+				hazard_stats["destructible"] = int(hazard_stats.get("destructible", 0)) + 1
+			hazard_stats[kind] = int(hazard_stats.get(kind, 0)) + 1
+			_register_obstacle(obstacle)
 
 # ------------------------------------------------------------------ ПОДВИЖНЫЕ УГРОЗЫ
 func spawn_mover(kind: String, pos: Vector2, vel: Vector2, opts: Dictionary = {}) -> Mover:
@@ -3367,9 +3515,79 @@ func _tick_player_pulls(delta: float) -> void:
 			if d.length() > 6.0:
 				player.global_position += d.normalized() * float(pl["force"]) * delta
 
+## Ивент карты запускается как «полоса непогоды» на 30–60 секунд: эффект
+## повторяется волнами, поэтому событие действительно видно, а не мелькает раз.
 func run_map_event(ev: Dictionary) -> void:
 	var kind := String(ev.get("kind", ""))
-	var p: Dictionary = ev.get("params", {})
+	if kind == "":
+		return
+	var p: Dictionary = (ev.get("params", {}) as Dictionary).duplicate(true)
+	var dur := float(p.get("duration", randf_range(30.0, 60.0)))
+	if not p.has("duration") or _is_weather_event(kind):
+		dur = clampf(dur, 30.0, 60.0)
+		p["duration"] = dur
+	active_events.append({
+		"kind": kind, "params": p, "left": dur, "total": dur,
+		"pulse_cd": 0.0, "pulse_every": _event_pulse_interval(kind),
+	})
+	_pulse_map_event(kind, p)
+	notify(_event_title(kind))
+
+func _is_weather_event(kind: String) -> bool:
+	return kind in ["weather", "sandstorm", "blizzard", "stormal", "fog", "necro_fog", "madness"]
+
+## Пульс активных ивентов: каждые несколько секунд событие бьёт снова,
+## пока не истечёт его 30–60-секундное окно.
+func _tick_active_events(delta: float) -> void:
+	if active_events.is_empty():
+		return
+	for i in range(active_events.size() - 1, -1, -1):
+		var ev: Dictionary = active_events[i]
+		ev["left"] = float(ev["left"]) - delta
+		ev["pulse_cd"] = float(ev["pulse_cd"]) - delta
+		if float(ev["pulse_cd"]) <= 0.0:
+			ev["pulse_cd"] = float(ev["pulse_every"])
+			if not (net_active and not net_host):
+				_pulse_map_event(String(ev["kind"]), ev["params"] as Dictionary)
+		if float(ev["left"]) <= 0.0:
+			active_events.remove_at(i)
+
+func _event_pulse_interval(kind: String) -> float:
+	if _is_weather_event(kind):
+		return 100000.0
+	match kind:
+		"rain", "crystal_rain", "ember_rain", "blood_rain", "hell_flame":
+			return 3.2
+		"meteor", "rockfall", "cave_in", "aoe_zone":
+			return 4.6
+		"avalanche", "eruption", "ice_spikes":
+			return 6.4
+		"band", "lightning", "void_rift", "crystal_flash":
+			return 5.4
+		_:
+			return 5.0
+
+func _event_title(kind: String) -> String:
+	match kind:
+		"avalanche":
+			return "ЛАВИНА!"
+		"rain", "crystal_rain", "ember_rain", "blood_rain":
+			return "ЛИВЕНЬ!"
+		"band":
+			return "ВОЛНА ЖАРА!"
+		"aoe_zone":
+			return "ОБСТРЕЛ!"
+		"meteor", "rockfall":
+			return "КАМНЕПАД!"
+		"blizzard", "sandstorm", "weather":
+			return "НЕПОГОДА!"
+		"void_rift":
+			return "РАЗЛОМ ПУСТОТЫ!"
+		_:
+			return "СОБЫТИЕ КАРТЫ"
+
+## Один «удар» события — прежнее поведение, вызывается волнами.
+func _pulse_map_event(kind: String, p: Dictionary) -> void:
 	var map_id := String(map_data.get("id", ""))
 	xp_boost_left = maxf(xp_boost_left, 15.0)
 	match kind:
@@ -3771,11 +3989,144 @@ func _check_end_conditions() -> void:
 			spawn_map_boss("final")
 
 func _on_player_died() -> void:
+	if net_active:
+		# Кооп: павший игрок оставляет кристалл-душу, напарник его возрождает.
+		_spawn_revive_crystal(Net.my_id(), player.global_position)
+		if not net_host:
+			Net.send_event_any("died", {"x": int(player.global_position.x), "y": int(player.global_position.y)})
+		notify("Вы пали! Напарник может подобрать кристалл-душу.")
+		if hud != null:
+			hud.flash_message("ЖДЁМ ВОЗРОЖДЕНИЯ: подберите кристалл-душу", Color(0.75, 0.9, 1.0))
+		if _coop_all_dead():
+			_finish_run(false, false)
+		return
 	_finish_run(false, false)
 
 ## Совместимость: игрок может сообщить о смерти и напрямую.
 func on_player_death() -> void:
-	_finish_run(false, false)
+	_on_player_died()
+
+## Все игроки в коопе лежат — только тогда забег проигран.
+func _coop_all_dead() -> bool:
+	if player != null and not player.dead:
+		return false
+	for np in net_proxies:
+		if np != null and is_instance_valid(np) and not np.dead:
+			return false
+	return true
+
+# ------------------------------------------------------------------ КООП: ВОЗРОЖДЕНИЕ
+## Кристалл-душа павшего игрока: подбирается напарником.
+func _spawn_revive_crystal(owner_id: int, pos: Vector2) -> void:
+	if owner_id <= 0:
+		return
+	for c in revive_crystals:
+		if int(c["owner"]) == owner_id:
+			c["x"] = int(pos.x)
+			c["y"] = int(pos.y)
+			return
+	revive_crystals.append({"owner": owner_id, "x": int(pos.x), "y": int(pos.y), "t": 0.0})
+	_net_sync_crystals([])
+	AudioManager.play_sfx("phase", 1.25)
+	spawn_perk_fx("curse", pos, 44.0, 0.45)
+
+func _tick_revive_crystals(delta: float) -> void:
+	if revive_crystals.is_empty():
+		return
+	for i in range(revive_crystals.size() - 1, -1, -1):
+		var c: Dictionary = revive_crystals[i]
+		c["t"] = float(c.get("t", 0.0)) + delta
+		if not net_host:
+			continue
+		var cpos := Vector2(float(c["x"]), float(c["y"]))
+		var owner_id := int(c["owner"])
+		for t in player_targets():
+			if _peer_of(t) == owner_id:
+				continue
+			if t.global_position.distance_to(cpos) <= 26.0:
+				_do_revive(owner_id, cpos)
+				revive_crystals.remove_at(i)
+				break
+	if net_host:
+		_net_sync_crystals([])
+
+func _peer_of(t: Node) -> int:
+	if t is NetPlayer:
+		return (t as NetPlayer).peer_id
+	return 1
+
+## Хост возрождает игрока (себя или напарника) и сообщает всем.
+func _do_revive(owner_id: int, pos: Vector2) -> void:
+	if owner_id == 1:
+		_revive_local_player(pos)
+		Net.send_event("revived", {"peer": 1})
+		notify("Возрождение!")
+	else:
+		for np in net_proxies:
+			if np != null and np.peer_id == owner_id:
+				np.dead = false
+				np.hp = maxi(1, int(float(np.max_hp) * 0.5))
+				np.global_position = pos
+				np.target_pos = pos
+				np.visible = true
+				spawn_perk_fx("holy", pos, 48.0, 0.4)
+				break
+		Net.send_event("revived", {"peer": owner_id, "x": int(pos.x), "y": int(pos.y)})
+		notify("Напарник возрождён")
+
+func _revive_local_player(pos: Vector2) -> void:
+	if player == null:
+		return
+	player.dead = false
+	player.hp = maxi(1, int(float(player.max_hp) * 0.5))
+	player.iframes = 2.0
+	player.global_position = pos
+	player.visible = true
+	EventBus.hp_changed.emit(player.hp, player.max_hp)
+	spawn_perk_fx("holy", pos, 60.0, 0.45)
+	AudioManager.play_sfx("levelup", 1.1)
+
+## Клиент получил «тебя возродили» от хоста.
+func net_apply_revive(peer: int) -> void:
+	if peer != Net.my_id() or not net_active:
+		return
+	var pos := player.global_position
+	if not revive_crystals.is_empty():
+		pos = Vector2(float(revive_crystals[0]["x"]), float(revive_crystals[0]["y"]))
+	_revive_local_player(pos)
+	revive_crystals.clear()
+	_net_sync_crystals([])
+
+## Отрисовка кристаллов-душ (у хоста — из своего списка, у клиента — из снапшота).
+func _net_sync_crystals(list: Array) -> void:
+	var src: Array = list
+	if net_host:
+		src = []
+		for c in revive_crystals:
+			src.append([int(c["owner"]), int(c["x"]), int(c["y"])])
+	while revive_crystal_nodes.size() < src.size():
+		var pk: Pickup = PICKUP_SCENE.instantiate()
+		world.add_child(pk)
+		pk.setup(self)
+		pk.spawn_at(Vector2.ZERO, "soul", 1.0, Color(0.75, 0.85, 1.0), 8.0)
+		pk.net_remote = true
+		revive_crystal_nodes.append(pk)
+	for i in revive_crystal_nodes.size():
+		var pk: Pickup = revive_crystal_nodes[i]
+		if i >= src.size():
+			pk.visible = false
+			pk.active = false
+			continue
+		var arr: Array = src[i]
+		pk.global_position = Vector2(float(arr[1]), float(arr[2]))
+		pk.visible = true
+		pk.active = true
+		pk.rotation += 0.02
+	if not net_host:
+		revive_crystals.clear()
+		for arr2 in src:
+			var a2: Array = arr2
+			revive_crystals.append({"owner": int(a2[0]), "x": int(a2[1]), "y": int(a2[2]), "t": 0.0})
 
 func _finish_run(win: bool, secret_win: bool) -> void:
 	if ended:
@@ -4114,6 +4465,161 @@ func _run_avalanche_test() -> void:
 	assert(taken > 0, "Лавина не нанесла урон за %.1f с" % waited)
 	print("[SURWAVE] avalanche OK: dmg=%d wait=%.2f" % [taken, waited])
 
+# ------------------------------------------------------------------ КООП: ЦЕЛИ И УРОН
+## Живые цели-игроки: хост-игрок и сетевые напарники.
+func player_targets() -> Array:
+	var out: Array = []
+	if player != null and not player.dead:
+		out.append(player)
+	for np in net_proxies:
+		if np != null and is_instance_valid(np) and not np.dead:
+			out.append(np)
+	return out
+
+## Ближайший живой игрок к точке (для врагов, ловушек и снарядов).
+func nearest_target(pos: Vector2) -> Node2D:
+	var best: Node2D = null
+	var best_d := INF
+	for t in player_targets():
+		var d: float = (t.global_position - pos).length_squared()
+		if d < best_d:
+			best_d = d
+			best = t
+	if best == null and player != null:
+		return player
+	return best
+
+## Все живые игроки в радиусе — ловушки бьют и напарника, а не только хоста.
+func players_in_radius(pos: Vector2, radius: float) -> Array:
+	var out: Array = []
+	for t in player_targets():
+		if t.global_position.distance_to(pos) <= radius:
+			out.append(t)
+	return out
+
+## Урон по игроку или напарнику — единая точка входа.
+func hurt_target(t: Node2D, amount: int, from_pos: Vector2, ignore_iframes: bool = false, source_role: String = "") -> void:
+	if t == null or not is_instance_valid(t):
+		return
+	if t is NetPlayer:
+		net_hit_proxy(t as NetPlayer, amount, from_pos)
+	else:
+		damage_player(amount, from_pos, ignore_iframes, source_role)
+
+## Информация для HUD: здоровье и перки напарников.
+func partner_info() -> Array:
+	var out: Array = []
+	for np in net_proxies:
+		if np == null or not is_instance_valid(np):
+			continue
+		out.append({
+			"name": np.display_name, "hp": np.hp, "max": np.max_hp,
+			"dead": np.dead, "char": np.char_id,
+		})
+	return out
+
+## Столкновение игроков между собой: не проходим друг сквозь друга.
+func _resolve_player_collision(delta: float) -> void:
+	if not net_active:
+		return
+	var bodies: Array = []
+	if player != null and not player.dead:
+		bodies.append(player)
+	for np in net_proxies:
+		if np != null and is_instance_valid(np) and not np.dead:
+			bodies.append(np)
+	if bodies.size() < 2:
+		return
+	for i in bodies.size():
+		for j in range(i + 1, bodies.size()):
+			var a: Node2D = bodies[i]
+			var b: Node2D = bodies[j]
+			var d: Vector2 = b.global_position - a.global_position
+			var dist := d.length()
+			var need := 13.0
+			if dist >= need:
+				continue
+			var dir := d / dist if dist > 0.01 else Vector2.RIGHT
+			var push := (need - dist) * 0.5
+			# Хост двигает обе стороны, клиент — только свою (позиция напарника
+			# приходит снапшотом и всё равно перезапишется).
+			if net_host or a == player:
+				a.global_position -= dir * push
+			if net_host or b == player:
+				b.global_position += dir * push
+	_ = delta
+
+## Кооп-тест без второго окна: поднимаем «фантомного» напарника и проверяем
+## визуал героя, приоритет целей, кристалл-душу, бесконечный мир и ивенты.
+func _run_coop_test() -> void:
+	await get_tree().process_frame
+	var was_net := net_active
+	net_active = true
+	net_host = true
+	# 1) напарник рисуется спрайтом героя, а не квадратом
+	var np := NetPlayer.new()
+	np.name = "RemoteTest"
+	world.add_child(np)
+	np.setup(self, 4242, "Напарник", "aldar", "revolver", player.global_position + Vector2(40, 0))
+	net_proxies.append(np)
+	await get_tree().process_frame
+	assert(np.sprite != null and np.sprite.texture != null, "У напарника нет текстуры")
+	assert(Assets.has_real_sprite(np._char_cls()), "У класса героя нет спрайта — будет квадрат")
+	assert(np.sprite.texture.get_width() >= 24, "Напарник рисуется заглушкой вместо героя")
+	assert(np.hp_bar != null and np.skill_bar != null, "У напарника нет микрошкал")
+	# 2) враги целятся в ближайшего игрока, а не только в хоста
+	np.global_position = player.global_position + Vector2(30, 0)
+	var probe := player.global_position + Vector2(24, 0)
+	assert(nearest_target(probe) == np, "nearest_target не выбирает напарника")
+	assert(players_in_radius(probe, 60.0).size() >= 2, "players_in_radius не видит обоих игроков")
+	# 3) смерть → кристалл-душа → возрождение напарником
+	np.dead = true
+	np.hp = 0
+	np.visible = false
+	_spawn_revive_crystal(np.peer_id, player.global_position + Vector2(40, 0))
+	assert(revive_crystals.size() == 1, "Кристалл-душа не появился")
+	np.global_position = Vector2(float(revive_crystals[0]["x"]), float(revive_crystals[0]["y"]))
+	_tick_revive_crystals(0.05)
+	assert(not np.dead and np.hp > 0, "Напарник не возродился от кристалла")
+	assert(revive_crystals.is_empty(), "Кристалл не исчез после возрождения")
+	# 4) у каждого свой опыт и перки
+	var lvl_before := level
+	np.hp = np.max_hp
+	assert(partner_info().size() == 1, "partner_info не видит напарника")
+	# 5) бесконечный мир: полоса карты доращивается
+	var size_before := map_rect.size
+	_grow_world("right")
+	assert(map_rect.size.x > size_before.x, "Мир не расширился вправо")
+	_grow_world("left")
+	assert(map_rect.position.x < 0.0, "Мир не расширился влево")
+	assert(chunks_grown >= 2, "Счётчик полос мира не растёт")
+	# 6) ивенты карты идут 30–60 секунд волнами
+	active_events.clear()
+	run_map_event({"kind": "meteor", "params": {}})
+	assert(active_events.size() == 1, "Ивент карты не встал в очередь")
+	var dur := float(active_events[0]["left"])
+	assert(dur >= 30.0 and dur <= 60.0, "Ивент карты длится %.1f с вместо 30–60" % dur)
+	active_events.clear()
+	# 7) лут получает сетевой id — клиент может подбирать опыт
+	spawn_pickup("xp", player.global_position + Vector2(12, 0), 1.0)
+	var last_pick: Pickup = pickups[pickups.size() - 1]
+	assert(last_pick.net_id > 0, "У подбора нет сетевого id")
+	# 8) чат и эмоции не ломаются без сети
+	send_chat("тест")
+	send_emote("ПРИВЕТ")
+	# уборка
+	for pk in net_pickup_ghosts:
+		if pk != null and is_instance_valid(pk):
+			pk.deactivate()
+	net_proxies.clear()
+	np.queue_free()
+	revive_crystals.clear()
+	net_active = was_net
+	net_host = false
+	level = lvl_before
+	print("[SURWAVE] coop OK: targets=%d crystals=ok world=%.0fx%.0f event=%.0fs" % [
+		2, map_rect.size.x, map_rect.size.y, dur])
+
 # ------------------------------------------------------------------ СЕТЕВАЯ ИГРА
 ## Хост считает мир и рассылает снапшоты (10 Гц) + состояния игроков (20 Гц).
 ## Клиент двигает своего игрока сам, рисует «кукол» врагов/снарядов/подборов
@@ -4123,6 +4629,7 @@ func _setup_net() -> void:
 	if not net_active:
 		return
 	net_host = Net.is_host()
+	GameManager.network_run = true
 	Net.snapshot_received.connect(_net_apply_snapshot)
 	Net.state_received.connect(_net_on_state)
 	Net.damage_received.connect(_net_on_local_damage)
@@ -4175,6 +4682,7 @@ func _net_player_payload(p: Node2D, ch: String, wp: String) -> Dictionary:
 	var hp := 3
 	var max_hp := 3
 	var moving := false
+	var skill := 1.0
 	if p is Player:
 		var pl := p as Player
 		aim = pl.aim_dir
@@ -4182,6 +4690,8 @@ func _net_player_payload(p: Node2D, ch: String, wp: String) -> Dictionary:
 		hp = pl.hp
 		max_hp = pl.max_hp
 		moving = pl.moving_now
+		var cd := maxf(0.01, float(pl.skill_data.get("cd", 10.0)))
+		skill = clampf(1.0 - float(pl.skill_cd_left) / cd, 0.0, 1.0)
 	elif p is NetPlayer:
 		var np := p as NetPlayer
 		aim = np.aim
@@ -4189,10 +4699,11 @@ func _net_player_payload(p: Node2D, ch: String, wp: String) -> Dictionary:
 		hp = np.hp
 		max_hp = np.max_hp
 		moving = np.moving
+		skill = np.skill_frac
 	return {
 		"x": int(p.global_position.x), "y": int(p.global_position.y),
 		"ax": aim.x, "ay": aim.y, "hp": hp, "max": max_hp,
-		"dead": dead, "mv": moving, "ch": ch, "wp": wp,
+		"dead": dead, "mv": moving, "ch": ch, "wp": wp, "sk": skill,
 	}
 
 func _net_state_table() -> Dictionary:
@@ -4226,7 +4737,8 @@ func _net_build_snapshot() -> Dictionary:
 		if not e.boss and e.global_position.distance_squared_to(player.global_position) > 1600.0 * 1600.0:
 			continue
 		enemy_list.append([e.net_id, String(e.id), int(e.global_position.x), int(e.global_position.y),
-			int(maxf(1.0, e.hp)), int(maxf(1.0, e.max_hp)), 1 if e.elite else 0])
+			int(maxf(1.0, e.hp)), int(maxf(1.0, e.max_hp)), 1 if e.elite else 0,
+			1 if e.boss else 0, String(e.boss_def.get("name", "")) if e.boss else ""])
 	var bullet_list: Array = []
 	for b in ebullets:
 		if not b.active:
@@ -4239,10 +4751,13 @@ func _net_build_snapshot() -> Dictionary:
 	for pk in pickups:
 		if not pk.active or String(pk.kind) == "chest":
 			continue
-		pick_list.append([String(pk.kind), int(pk.global_position.x), int(pk.global_position.y)])
+		pick_list.append([int(pk.net_id), String(pk.kind), int(pk.global_position.x), int(pk.global_position.y)])
+	var crystal_list: Array = []
+	for c in revive_crystals:
+		crystal_list.append([int(c["owner"]), int(c["x"]), int(c["y"])])
 	return {
 		"e": enemy_list, "b": bullet_list, "p": players_list, "pk": pick_list,
-		"xp": xp, "xn": xp_need, "lv": level, "k": kills, "t": int(elapsed),
+		"rc": crystal_list, "k": kills, "t": int(elapsed),
 	}
 
 func _net_apply_snapshot(snap: Dictionary) -> void:
@@ -4270,27 +4785,14 @@ func _net_apply_snapshot(snap: Dictionary) -> void:
 					"max": int(arr[4]), "dead": int(arr[5]) == 1,
 				})
 				break
-	var lv_new := int(snap.get("lv", level))
-	if lv_new > level:
-		var gained := lv_new - level
-		level = lv_new
-		xp = int(snap.get("xp", 0))
-		xp_need = _xp_for_level(level)
-		pending_level_ups += gained
-		player.on_level_up(level)
-		AudioManager.play_sfx("levelup")
-		spawn_perk_fx("holy", player.global_position, 72.0, 0.42)
-		_open_level_up()
-	else:
-		level = maxi(1, lv_new)
-		xp = int(snap.get("xp", xp))
-		xp_need = int(snap.get("xn", xp_need))
-	EventBus.xp_changed.emit(xp, xp_need, level)
-	kills = int(snap.get("k", kills))
+	# Опыт, уровень и перки у каждого игрока СВОИ: хостовые значения не применяем,
+	# иначе прокачка клиента перезаписывается чужой.
+	kills = maxi(kills, int(snap.get("k", kills)))
 	elapsed = maxf(elapsed, float(snap.get("t", int(elapsed))))
 	_net_sync_ghosts(snap.get("e", []))
 	_net_sync_bullets(snap.get("b", []))
 	_net_sync_pickups(snap.get("pk", []))
+	_net_sync_crystals(snap.get("rc", []))
 
 func _net_sync_ghosts(list: Array) -> void:
 	var seen: Dictionary = {}
@@ -4300,15 +4802,24 @@ func _net_sync_ghosts(list: Array) -> void:
 			continue
 		var nid := int(arr[0])
 		seen[nid] = true
+		var is_boss := arr.size() > 7 and int(arr[7]) == 1
+		var boss_title := String(arr[8]) if arr.size() > 8 else ""
 		var e: Enemy = net_enemies.get(nid, null) as Enemy
 		if e == null or not is_instance_valid(e):
-			e = _net_spawn_ghost(nid, String(arr[1]), Vector2(float(arr[2]), float(arr[3])))
+			e = _net_spawn_ghost(nid, String(arr[1]), Vector2(float(arr[2]), float(arr[3])), is_boss, boss_title)
 			if e == null:
 				continue
 		e.net_target = Vector2(float(arr[2]), float(arr[3]))
 		e.hp = float(arr[4])
 		e.max_hp = maxf(1.0, float(arr[5]))
 		e.elite = int(arr[6]) == 1
+		if is_boss:
+			e.boss = true
+			if String(e.boss_def.get("name", "")) == "":
+				e.boss_def = {"name": boss_title if boss_title != "" else "БОСС"}
+			# клиент видит полосу босса так же, как хост
+			if boss_enemy == null or not is_instance_valid(boss_enemy) or not boss_enemy.active:
+				boss_enemy = e
 		if e.hp <= 0.0 and e.active:
 			_net_ghost_death(e)
 	for nid in net_enemies.keys():
@@ -4319,14 +4830,37 @@ func _net_sync_ghosts(list: Array) -> void:
 			gone.deactivate()
 		net_enemies.erase(nid)
 
-func _net_spawn_ghost(nid: int, enemy_id: String, pos: Vector2) -> Enemy:
+func _net_spawn_ghost(nid: int, enemy_id: String, pos: Vector2, is_boss: bool = false, boss_title: String = "") -> Enemy:
 	var data := DB.enemy(enemy_id)
+	if data.is_empty():
+		# Боссы живут в bosses.json (у них свой id), поэтому без этой ветки
+		# клиент вообще не видел боссов.
+		var bd: Dictionary = DB.boss(String(map_data.get("id", "")))
+		if bd.is_empty() or (boss_title != "" and String(bd.get("name", "")) != boss_title):
+			bd = {}
+			for key in DB.bosses.keys():
+				var cand: Dictionary = DB.bosses[key]
+				if String(cand.get("id", "")) == enemy_id or String(cand.get("name", "")) == boss_title:
+					bd = cand
+					break
+		if not bd.is_empty():
+			data = {
+				"id": enemy_id, "name": String(bd.get("name", "БОСС")),
+				"hp": float(bd.get("hp", 900.0)), "speed": 24.0, "radius": 16.0,
+				"color": "#c8b4d8", "role": "boss", "size": 2.4,
+			}
 	if data.is_empty():
 		return null
 	var e: Enemy = ENEMY_SCENE.instantiate()
 	world.add_child(e)
 	e.setup(self)
-	e.init_enemy(self, data, pos)
+	if is_boss:
+		var bdef: Dictionary = DB.boss(String(map_data.get("id", "")))
+		if bdef.is_empty():
+			bdef = {"id": enemy_id, "name": boss_title if boss_title != "" else String(data.get("name", "БОСС"))}
+		e.init_boss(self, bdef, pos, float(data.get("hp", 900.0)))
+	else:
+		e.init_enemy(self, data, pos)
 	e.net_remote = true
 	e.net_id = nid
 	e.net_target = pos
@@ -4370,28 +4904,48 @@ func _net_sync_bullets(list: Array) -> void:
 		b.rotation = deg_to_rad(float(arr[2]))
 		b.life = 1.0
 
+## Лут на клиенте: у каждого предмета сетевой id, подобранное больше не рисуем.
 func _net_sync_pickups(list: Array) -> void:
-	while net_pickup_ghosts.size() < list.size():
-		var pk: Pickup = PICKUP_SCENE.instantiate()
-		world.add_child(pk)
-		pk.setup(self)
-		pk.net_remote = true
-		net_pickup_ghosts.append(pk)
-	for i in net_pickup_ghosts.size():
-		var pk: Pickup = net_pickup_ghosts[i]
-		if i >= list.size():
-			pk.visible = false
+	var now := Time.get_ticks_msec()
+	if not net_taken_pickups.is_empty():
+		for id in net_taken_pickups.keys():
+			if now - int(net_taken_pickups[id]) > 6000:
+				net_taken_pickups.erase(id)
+	var by_id: Dictionary = {}
+	for pk in net_pickup_ghosts:
+		if pk != null and is_instance_valid(pk) and pk.net_id > 0:
+			by_id[pk.net_id] = pk
+	var seen: Dictionary = {}
+	for entry in list:
+		var arr: Array = entry
+		if arr.size() < 4:
 			continue
-		var arr: Array = list[i]
-		if arr.size() < 3:
+		var pid := int(arr[0])
+		if net_taken_pickups.has(pid):
 			continue
-		var pos := Vector2(float(arr[1]), float(arr[2]))
-		var kind := String(arr[0])
-		if not pk.active or pk.kind != kind:
+		seen[pid] = true
+		var kind := String(arr[1])
+		var pos := Vector2(float(arr[2]), float(arr[3]))
+		var pk: Pickup = by_id.get(pid, null)
+		if pk == null or not is_instance_valid(pk):
+			pk = PICKUP_SCENE.instantiate()
+			world.add_child(pk)
+			pk.setup(self)
 			pk.spawn_at(pos, kind, 1.0, Color(0.55, 0.9, 1.0), 5.0)
+			pk.net_id = pid
 			pk.net_remote = true
-		pk.visible = true
+			net_pickup_ghosts.append(pk)
+		elif not pk.active or pk.kind != kind:
+			pk.spawn_at(pos, kind, 1.0, Color(0.55, 0.9, 1.0), 5.0)
+			pk.net_id = pid
+			pk.net_remote = true
 		pk.global_position = pos
+		pk.visible = true
+	for pk in net_pickup_ghosts:
+		if pk == null or not is_instance_valid(pk):
+			continue
+		if pk.net_id > 0 and not seen.has(pk.net_id):
+			pk.deactivate()
 
 ## Клиент бьёт «куклу»: локальный отклик и запрос урона хосту.
 func _net_client_damage(enemy: Node2D, amount: float, opts: Dictionary) -> void:
@@ -4420,7 +4974,8 @@ func net_hit_proxy(np: NetPlayer, dmg: int, from_pos: Vector2) -> void:
 		np.hp = 0
 		np.dead = true
 		np.visible = false
-		notify("%s выбыл из боя" % np.display_name)
+		_spawn_revive_crystal(np.peer_id, np.global_position)
+		notify("%s выбыл из боя — подберите его кристалл-душу" % np.display_name)
 
 func _net_on_local_damage(amount: int, from_pos: Vector2) -> void:
 	if ended or player == null or player.dead:
@@ -4443,8 +4998,43 @@ func _net_on_event(kind: String, data: Dictionary) -> void:
 			notify(String(data.get("text", "")))
 		"levelup":
 			AudioManager.play_sfx("levelup")
+		"chat":
+			if hud != null:
+				hud.push_chat(String(data.get("name", "Игрок")), String(data.get("text", "")), int(data.get("peer", 0)) == Net.my_id())
+		"emote":
+			_net_show_emote(int(data.get("peer", 0)), String(data.get("text", "")))
+		"perk":
+			partner_perks.append({"peer": int(data.get("peer", 0)), "name": String(data.get("name", ""))})
+			if partner_perks.size() > 8:
+				partner_perks.pop_front()
+		"pause":
+			net_apply_pause(bool(data.get("on", false)))
+		"pause_req":
+			if net_host:
+				net_toggle_pause()
+		"pickup":
+			if not net_host:
+				return
+			var taker := _net_pickup_by_id(int(data.get("id", 0)))
+			if taker != null:
+				taker.deactivate()
+		"died":
+			if not net_host:
+				return
+			var who := int(data.get("peer", 0))
+			_spawn_revive_crystal(who, Vector2(float(data.get("x", 0)), float(data.get("y", 0))))
+		"revived":
+			net_apply_revive(int(data.get("peer", 0)))
 		_:
 			pass
+
+func _net_pickup_by_id(id: int) -> Pickup:
+	if id <= 0:
+		return null
+	for pk in pickups:
+		if pk != null and is_instance_valid(pk) and pk.net_id == id and pk.active:
+			return pk
+	return null
 
 func _net_enemy_by_id(id: int) -> Enemy:
 	if id <= 0:
@@ -4461,6 +5051,111 @@ func _net_on_session_ended(reason: String) -> void:
 	notify(reason)
 	if not ended:
 		_finish_run(false, false)
+
+# ------------------------------------------------------------------ КООП: ПАУЗА, ЧАТ, ЭМОЦИИ
+## В коопе пауза общая и задаётся хостом: клиент не морозит мир сам,
+## иначе у напарника «зависает» полбоя.
+func net_toggle_pause() -> void:
+	if not net_active:
+		return
+	if not net_host:
+		if hud != null and hud.pause_layer != null:
+			hud.pause_layer.visible = not hud.pause_layer.visible
+			if hud.pause_layer.visible:
+				hud._refresh_pause_menu()
+		Net.send_event_any("pause_req", {})
+		return
+	net_paused = not net_paused
+	if hud != null and hud.pause_layer != null:
+		hud.pause_layer.visible = net_paused
+		if net_paused:
+			hud._refresh_pause_menu()
+	get_tree().paused = net_paused
+	Net.send_event("pause", {"on": net_paused})
+
+func net_apply_pause(on: bool) -> void:
+	net_paused = on
+	if hud != null and hud.pause_layer != null:
+		hud.pause_layer.visible = on
+		if on:
+			hud._refresh_pause_menu()
+	get_tree().paused = on
+	_sync_cursor()
+
+## Чат: короткая строка внизу экрана у всех игроков.
+func send_chat(text: String) -> void:
+	var t := text.strip_edges().left(120)
+	if t == "":
+		return
+	var who := String(Net.my_name)
+	if who == "":
+		who = "Игрок"
+	if hud != null:
+		hud.push_chat(who, t, true)
+	if net_active:
+		Net.send_event_any("chat", {"name": who, "text": t})
+
+## Эмоция из колеса (Q): облачко над головой у всех.
+func send_emote(text: String) -> void:
+	var t := text.strip_edges().left(32)
+	if t == "":
+		return
+	_show_emote_over(player, t, Color(0.9, 0.95, 1.0))
+	if net_active:
+		Net.send_event_any("emote", {"text": t})
+
+func _net_show_emote(peer: int, text: String) -> void:
+	if peer == Net.my_id():
+		return
+	for np in net_proxies:
+		if np != null and np.peer_id == peer:
+			np.show_bubble(text, Color(0.85, 0.95, 1.0), 4.0)
+			return
+
+## Всплывающее облачко над игроком (своя эмоция).
+func _show_emote_over(target: Node2D, text: String, color: Color) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	var holder := Node2D.new()
+	world.add_child(holder)
+	holder.z_index = 12
+	holder.global_position = target.global_position + Vector2(0, -26)
+	var w := clampf(float(text.length()) * 4.6 + 10.0, 22.0, 96.0)
+	var bg := Gfx.square(holder, Vector2(w, 12.0), Color(0.06, 0.07, 0.1, 0.9), Vector2(0, 0))
+	bg.z_index = 11
+	var lb := Label.new()
+	lb.text = text
+	lb.add_theme_font_override("font", UI.crisp_font())
+	lb.add_theme_font_size_override("font_size", 8)
+	lb.add_theme_color_override("font_color", color)
+	lb.add_theme_constant_override("outline_size", 1)
+	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lb.size = Vector2(w, 12.0)
+	lb.position = Vector2(-w * 0.5, -6.0)
+	lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb.z_index = 12
+	holder.add_child(lb)
+	var tw := create_tween()
+	tw.tween_property(holder, "position:y", holder.position.y - 10.0, 3.4)
+	tw.parallel().tween_property(holder, "modulate:a", 0.0, 3.4).set_delay(1.2)
+	tw.tween_callback(holder.queue_free)
+
+## Имена последних перков напарников (для панели союзника).
+func partner_perk_names() -> Array:
+	var out: Array = []
+	for e in partner_perks:
+		var nm := String(e.get("name", ""))
+		if nm != "":
+			out.append(nm)
+	return out
+
+## Игрок взял перк — напарники видят его в панели союзника.
+func report_perk(perk_name: String) -> void:
+	partner_perks.append({"peer": Net.my_id(), "name": perk_name})
+	if partner_perks.size() > 8:
+		partner_perks.pop_front()
+	if net_active and perk_name != "":
+		Net.send_event_any("perk", {"name": perk_name})
 
 # ------------------------------------------------------------------ ПРОЧЕЕ
 func _input(event: InputEvent) -> void:

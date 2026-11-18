@@ -87,6 +87,11 @@ func _input(event: InputEvent) -> void:
 		return
 	if game == null or not game.run_started or game.ended:
 		return
+	# В сетевом коопе консоль отключена: читы ломают общего врага и лут.
+	if GameManager.network_run or (game != null and bool(game.get("net_active"))):
+		if game != null and game.has_method("notify"):
+			game.notify("Чит-консоль недоступна в сетевой игре")
+		return
 	if line.visible or menu.visible:
 		close_all()
 	else:

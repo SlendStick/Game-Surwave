@@ -618,7 +618,8 @@ def check_playtest_fixes(loaded: dict[str, object], errors: list[str]) -> None:
         fail("main_menu.gd: адрес не копируется в буфер обмена", errors)
 
     # лавина должна наносить урон
-    av_match = re.search(r'"avalanche":.*?(?=\n\t\t"[a-z_]+":)', game_src, re.S)
+    av_src = game_src[game_src.find("func _pulse_map_event"):] if "_pulse_map_event" in game_src else game_src
+    av_match = re.search(r'"avalanche":.*?(?=\n\t\t"[a-z_]+":)', av_src, re.S)
     av_block = av_match.group(0) if av_match else ""
     if not av_block:
         fail("game.gd: нет ветки события «avalanche»", errors)

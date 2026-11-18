@@ -127,6 +127,13 @@ CORE_TESTS: list[TestCase] = [
         expect_re=r"\[SURWAVE\] avalanche OK:",
     ),
     TestCase(
+        name="coop_layer",
+        env={"SURW_COOP_TEST": "1", "SURW_MAP": "forest"},
+        args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],
+        expect_re=r"\[SURWAVE\] coop OK:",
+        timeout_s=90.0,
+    ),
+    TestCase(
         name="abilities",
         env={"SURW_ABILITY_TEST": "1"},
         args=["--headless", "--audio-driver", "Dummy", "--path", ".", "--", "--autoplay", "--god"],

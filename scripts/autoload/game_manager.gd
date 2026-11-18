@@ -33,6 +33,8 @@ const MAP_ORDER := ["sands", "tundra", "peak", "abyss", "forest", "rift", "grave
 ## Применяется каждый кадр автозагрузкой, поэтому меню паузы и выбор перков
 ## (когда дерево стоит на паузе) всё равно получают видимый курсор.
 var cursor_hidden := false
+## Идёт сетевой забег: чит-консоль в нём запрещена.
+var network_run := false
 
 func _ready() -> void:
 	# F11 и настройки должны работать и на паузе/в экране выбора перков
@@ -100,7 +102,9 @@ func _setup_input() -> void:
 	_add_action("move_up", [KEY_W])
 	_add_action("move_down", [KEY_S])
 	_add_action("reload", [KEY_R])
-	_add_action("skill", [KEY_SHIFT, KEY_Q])
+	_add_action("skill", [KEY_SHIFT])
+	_add_action("emote", [KEY_Q])
+	_add_action("chat", [KEY_ENTER, KEY_KP_ENTER, KEY_T])
 	_add_action("interact", [KEY_E])
 	_add_action("pause", [KEY_ESCAPE])
 	_add_action("synergies", [KEY_TAB])
@@ -149,6 +153,7 @@ func goto_select() -> void:
 # ------------------------------------------------------------------ ЗАБЕГ
 func start_run(config: Dictionary) -> void:
 	reset_cheats()
+	network_run = bool(config.get("network", false))
 	run_config = {
 		"character": String(config.get("character", "aldar")),
 		"weapon": String(config.get("weapon", "revolver")),

@@ -57,6 +57,18 @@ var syn_layer: Control
 var syn_list: VBoxContainer
 var current_cards: Array = []
 var cheat_console: Node = null
+# --- кооп: напарники, чат, эмоции
+var party_box: VBoxContainer = null
+var chat_box: VBoxContainer = null
+var chat_input: LineEdit = null
+var flash_lbl: Label = null
+var flash_left := 0.0
+var emote_wheel: Control = null
+var emote_buttons: Array = []
+var emote_open := false
+var emote_pick := -1
+var chat_lines: Array = []
+const EMOTES := ["ПРИВЕТ", "ПОМОГИ", "ИДУ", "ОПАСНО", "СПАСИБО", "ХА-ХА"]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -242,6 +254,7 @@ func _build() -> void:
 	toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(toast_box)
 
+	_build_coop_ui()
 	_apply_outlines(root)
 	_build_choice_layer()
 	_build_pause_layer()
@@ -255,6 +268,220 @@ func _build() -> void:
 	EventBus.upgrade_picked.connect(_on_upgrade_picked)
 	GameManager.cheat_state_changed.connect(_on_cheat_state_changed)
 	_sync_darkness_badge()
+
+# ------------------------------------------------------------------ КООП-ИНТЕРФЕЙС
+## Панель напарников, чат, всплывающие сообщения и колесо эмоций (Q).
+func _build_coop_ui() -> void:
+	party_box = VBoxContainer.new()
+	party_box.position = Vector2(6, 44)
+	party_box.size = Vector2(168, 60)
+	party_box.add_theme_constant_override("separation", 2)
+	party_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(party_box)
+
+	flash_lbl = UI.label(root, "", 13, Color(1.0, 0.95, 0.8), Vector2(0, 70))
+	flash_lbl.size = Vector2(640, 18)
+	flash_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flash_lbl.modulate.a = 0.0
+	flash_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	chat_box = VBoxContainer.new()
+	chat_box.position = Vector2(6, 286)
+	chat_box.size = Vector2(320, 62)
+	chat_box.add_theme_constant_override("separation", 1)
+	chat_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(chat_box)
+
+	chat_input = LineEdit.new()
+	chat_input.position = Vector2(150, 330)
+	chat_input.size = Vector2(340, 18)
+	chat_input.max_length = 120
+	chat_input.placeholder_text = "Сообщение…"
+	chat_input.add_theme_font_override("font", UI.crisp_font())
+	chat_input.add_theme_font_size_override("font_size", 8)
+	chat_input.visible = false
+	chat_input.text_submitted.connect(_on_chat_submitted)
+	root.add_child(chat_input)
+
+	emote_wheel = Control.new()
+	emote_wheel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	emote_wheel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	emote_wheel.visible = false
+	root.add_child(emote_wheel)
+	for i in EMOTES.size():
+		var ang := -PI * 0.5 + TAU * float(i) / float(EMOTES.size())
+		var b := UI.button(emote_wheel, String(EMOTES[i]), 8, Vector2(58, 18))
+		b.position = Vector2(320.0 + cos(ang) * 74.0 - 29.0, 172.0 + sin(ang) * 52.0 - 9.0)
+		var idx := i
+		b.pressed.connect(func() -> void: _pick_emote(idx))
+		emote_buttons.append(b)
+
+func _on_chat_submitted(text: String) -> void:
+	chat_input.visible = false
+	chat_input.release_focus()
+	if game != null and game.has_method("send_chat"):
+		game.send_chat(text)
+
+## Открыть строку чата (Enter в коопе).
+func open_chat() -> void:
+	if game == null or not bool(game.get("net_active")):
+		return
+	chat_input.visible = true
+	chat_input.text = ""
+	chat_input.grab_focus()
+
+## Строка чата в списке; чужие реплики — другим цветом.
+func push_chat(who: String, text: String, mine: bool = false) -> void:
+	var col := Color(0.95, 0.88, 0.62) if mine else Color(0.72, 0.9, 1.0)
+	var row := UI.label(chat_box, "%s: %s" % [who, text], 8, col)
+	row.custom_minimum_size = Vector2(320, 11)
+	row.clip_text = true
+	chat_lines.append({"node": row, "t": 0.0})
+	while chat_lines.size() > 5:
+		var first: Dictionary = chat_lines.pop_front()
+		var n: Label = first["node"]
+		if n != null and is_instance_valid(n):
+			n.queue_free()
+
+## Крупное сообщение по центру («Вы пали», «Возрождение»).
+func flash_message(text: String, color: Color = Color(1.0, 0.95, 0.8)) -> void:
+	if flash_lbl == null:
+		return
+	flash_lbl.text = text
+	flash_lbl.add_theme_color_override("font_color", color)
+	flash_lbl.modulate.a = 1.0
+	flash_left = 2.6
+
+func _tick_coop_ui(delta: float) -> void:
+	if flash_left > 0.0:
+		flash_left -= delta
+		if flash_lbl != null:
+			flash_lbl.modulate.a = clampf(flash_left / 1.2, 0.0, 1.0)
+	for entry in chat_lines:
+		entry["t"] = float(entry["t"]) + delta
+		var n: Label = entry["node"]
+		if n != null and is_instance_valid(n):
+			n.modulate.a = clampf((14.0 - float(entry["t"])) / 3.0, 0.0, 1.0)
+
+## Панель напарников: имя, здоровье и их перки (в коопе видно, кто что взял).
+func _refresh_party() -> void:
+	if party_box == null or game == null:
+		return
+	var infos: Array = []
+	if game.has_method("partner_info"):
+		infos = game.partner_info()
+	if infos.is_empty():
+		if party_box.get_child_count() > 0:
+			for ch in party_box.get_children():
+				ch.queue_free()
+		return
+	while party_box.get_child_count() < infos.size():
+		var holder := Control.new()
+		holder.custom_minimum_size = Vector2(168, 26)
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var nm := UI.label(holder, "", 8, Color(0.75, 0.93, 1.0), Vector2(0, 0))
+		nm.size = Vector2(120, 11)
+		var bar_back := ColorRect.new()
+		bar_back.color = Color(0.05, 0.05, 0.07, 0.9)
+		bar_back.position = Vector2(0, 11)
+		bar_back.size = Vector2(74, 6)
+		bar_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(bar_back)
+		var bar := ColorRect.new()
+		bar.color = Color(0.45, 0.9, 1.0)
+		bar.position = Vector2(1, 12)
+		bar.size = Vector2(72, 4)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(bar)
+		var perks := UI.label(holder, "", 7, Color(0.8, 0.78, 0.86), Vector2(0, 17))
+		perks.size = Vector2(168, 9)
+		perks.clip_text = true
+		party_box.add_child(holder)
+	for i in party_box.get_child_count():
+		var holder: Control = party_box.get_child(i)
+		if i >= infos.size():
+			holder.visible = false
+			continue
+		holder.visible = true
+		var info: Dictionary = infos[i]
+		var frac := clampf(float(info.get("hp", 0)) / maxf(1.0, float(info.get("max", 1))), 0.0, 1.0)
+		var nm: Label = holder.get_child(0)
+		nm.text = ("☠ " if bool(info.get("dead", false)) else "") + String(info.get("name", "Напарник"))
+		var bar: ColorRect = holder.get_child(2)
+		bar.size = Vector2(72.0 * frac, 4)
+		bar.color = Color(0.45, 0.9, 1.0) if frac > 0.35 else Color(1.0, 0.5, 0.45)
+		var perks: Label = holder.get_child(3)
+		var names: Array = []
+		if game.has_method("partner_perk_names"):
+			names = game.partner_perk_names()
+		perks.text = " · ".join(names.slice(maxi(0, names.size() - 3)))
+
+## Колесо эмоций (удержание Q). Отпускание отправляет выбранную эмоцию.
+func open_emote_wheel() -> void:
+	if game == null or not bool(game.get("net_active")) or emote_wheel == null:
+		return
+	emote_open = true
+	emote_pick = -1
+	emote_wheel.visible = true
+	_hover_emote()
+
+func close_emote_wheel(send: bool) -> void:
+	if not emote_open:
+		return
+	emote_open = false
+	emote_wheel.visible = false
+	if send and emote_pick >= 0 and emote_pick < EMOTES.size() and game != null and game.has_method("send_emote"):
+		game.send_emote(String(EMOTES[emote_pick]))
+	emote_pick = -1
+
+func _hover_emote() -> void:
+	if emote_wheel == null:
+		return
+	var m := get_viewport().get_mouse_position()
+	var c := Vector2(320, 172)
+	var d := m - c
+	if d.length() < 14.0:
+		emote_pick = -1
+	else:
+		var ang := fposmod(d.angle() + PI * 0.5, TAU)
+		emote_pick = int(floor(ang / (TAU / float(EMOTES.size())))) % EMOTES.size()
+	for i in emote_buttons.size():
+		var b: Button = emote_buttons[i]
+		b.modulate = Color(1.25, 1.15, 0.8) if i == emote_pick else Color(1, 1, 1, 0.9)
+
+func _pick_emote(idx: int) -> void:
+	emote_pick = idx
+	close_emote_wheel(true)
+
+func _input(event: InputEvent) -> void:
+	if game == null or not bool(game.get("net_active")):
+		return
+	if chat_input != null and chat_input.visible:
+		if event.is_action_pressed("pause"):
+			chat_input.visible = false
+			chat_input.release_focus()
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("chat"):
+		if (choice_layer != null and choice_layer.visible) or (pause_layer != null and pause_layer.visible) or (end_layer != null and end_layer.visible):
+			return
+		open_chat()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("emote"):
+		open_emote_wheel()
+		return
+	if event.is_action_released("emote"):
+		close_emote_wheel(true)
+		return
+	if emote_open and event is InputEventMouseMotion:
+		_hover_emote()
+		return
+	if emote_open and event is InputEventKey and event.pressed and not event.echo:
+		var k := (event as InputEventKey).physical_keycode
+		if k >= KEY_1 and k <= KEY_6:
+			_pick_emote(k - KEY_1)
+			get_viewport().set_input_as_handled()
 
 func setup(g: Node) -> void:
 	game = g
@@ -806,8 +1033,11 @@ func _on_card_pressed(card: Dictionary) -> void:
 	choice_made.emit(card)
 
 func _process(delta: float) -> void:
+	_tick_coop_ui(delta)
 	if game == null or game.player == null:
 		return
+	if bool(game.get("net_active")):
+		_refresh_party()
 	_refresh(delta)
 	if target_arrows != null:
 		target_arrows.queue_redraw()
@@ -912,6 +1142,11 @@ func _sync_hearts(pl: Player) -> void:
 # ------------------------------------------------------------------ ПАУЗА / КОНЕЦ
 func toggle_pause() -> void:
 	if end_layer.visible:
+		return
+	# Кооп: пауза общая, ей управляет хост (клиент не морозит мир сам).
+	if game != null and bool(game.get("net_active")):
+		game.net_toggle_pause()
+		AudioManager.play_sfx("ui", 0.9)
 		return
 	if game != null and game.photo_mode:
 		game.set_photo_mode(false)

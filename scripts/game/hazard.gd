@@ -104,8 +104,11 @@ func tick(delta: float) -> void:
 func _apply_hit() -> void:
 	if hits_enemies:
 		game.aoe_damage(global_position, radius, damage, {"source": "hazard"})
-	if hits_player and game.player != null and not game.player.dead:
-		if global_position.distance_to(game.player.global_position) < radius + 6.0:
+	if hits_player and game.player != null:
+		for t in game.players_in_radius(global_position, radius + 6.0):
+			if t is NetPlayer:
+				game.hurt_target(t, int(damage), global_position)
+				continue
 			var ward := 0.5 if game.player.has_meta("ward") else 1.0
 			game.damage_player(int(float(damage) * ward), global_position)
 			if root > 0.0:
@@ -116,8 +119,11 @@ func _apply_hit() -> void:
 func _apply_dot(step: float) -> void:
 	if hits_enemies:
 		game.aoe_damage(global_position, radius, dps * step, {"source": "hazard_dot"})
-	if hits_player and game.player != null and not game.player.dead:
-		if global_position.distance_to(game.player.global_position) < radius + 6.0:
+	if hits_player and game.player != null:
+		for t in game.players_in_radius(global_position, radius + 6.0):
+			if t is NetPlayer:
+				game.hurt_target(t, maxi(1, int(dps * step)), global_position)
+				continue
 			game.player._damage_over_time(dps * step)
 			if slow > 0.0:
 				game.player.add_status("slow", 0.4, {"amount": slow})
